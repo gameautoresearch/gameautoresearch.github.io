@@ -4,11 +4,8 @@ import { modelStyle } from "./colors";
 import { useWidth } from "./Frontier13";
 import raw from "./polytopia13.json";
 
-// Figure 1, animated: one session per scene, looping, two per game, inspired by real experiments and strategies
-// (including real failure modes) from each campaign. Each model states a short strategy, spends its GPU budget on
-// test runs and one long run (marked green ↑ when a run improves on the previous best, red ✕ when it falls short),
-// and its policy plays that game. The games rotate (Polytopia, Pokémon, Generals, then again), and strong and weak
-// sessions alternate, so no model speaks twice in a row.
+// One session per scene, looping. Most scenes illustrate a strategy, a series of runs and a match.
+// Carbon opens with its reaction to the practice evaluations of two consecutive Polytopia runs.
 //  - Polytopia: the 13-model empty-starter run (polytopia13.json, reports/polytopia/frontier6-2026-11-19.md). Curves
 //    are the Elo of the networks the model sealed, in order; the long run ends at its best network.
 //  - Pokémon 3v3: GPT-6.1 Sol a2 and GPT-6 Luna a1 of reports/pokemon/poke3v3-gpt6-2026-11-15 (timelines.json).
@@ -24,11 +21,20 @@ const MODELS = (raw as unknown as { models: Model[] }).models;
 const byKey = (k: string) => MODELS.find((m) => m.key === k)!;
 
 type Game = "polytopia" | "pokemon" | "generals";
+type PracticeRun = { label: string; score: number; samplesM: number };
 // tests/hero: the session's own scores in that game's unit (Polytopia scenes take theirs from polytopia13.json).
-type Scene = { key: string; game: Game; label?: string; strong: boolean; quote: string; result: string; frozen?: boolean; mid?: boolean; tests?: number[]; hero?: number };
+type Scene = { key: string; game: Game; label?: string; strong: boolean; quote: string; result: string; frozen?: boolean; mid?: boolean; tests?: number[]; hero?: number; practice?: readonly [PracticeRun, PracticeRun] };
 const SCENES: Scene[] = [
-  { key: "astra", game: "polytopia", strong: true, quote: "Add richer board features, run full PPO.", result: "Best network +268, above the 200M-sample starter",
-    tests: [-112, 123, 30, 212], hero: 268 },
+  {
+    key: "gem4c", game: "polytopia", strong: false, mid: true,
+    quote: "AHA!! THANK GOODNESS WE DID NOT TRUST ATTENTION",
+    result: "The multiscale CNN remained Carbon’s best checkpoint",
+    // Carbon's Polytopia empty-starter notes and trajectory step 185: v7multiscale, then v8fastattn.
+    practice: [
+      { label: "Multiscale CNN", score: 59.77, samplesM: 22.41 },
+      { label: "CNN + attention", score: 36.72, samplesM: 7.73 },
+    ],
+  },
   { key: "luna-poke", game: "pokemon", label: "GPT-6 Luna", strong: false, mid: true, quote: "Stop early and tweak the reward again.",
     result: "19 runs, most stopped early; final +2.9", tests: [4.95, -4.17, -9.51, -7.68, -6.25, -4.69, -7.16], hero: 4.95 },
   { key: "sol-gen", game: "generals", label: "GPT-6.1 Sol", strong: true, quote: "Python sim is too slow — rebuild in JAX.",
@@ -38,8 +44,13 @@ const SCENES: Scene[] = [
     result: "Final recipe +20.4 over the starter", tests: [12.76, 15.76, 14.58], hero: 22.01 },
   { key: "dspro-gen", game: "generals", label: "DeepSeek V4 Pro", strong: false, quote: "553 ticks/s is slow — train on it anyway.",
     result: "Kept the slow simulator; tournament 22.5 of 100", tests: [49.2], hero: 54.7 },
+  { key: "astra", game: "polytopia", strong: true, quote: "Add richer board features, run full PPO.", result: "Best network +268, above the 200M-sample starter",
+    tests: [-112, 123, 30, 212], hero: 268 },
 ];
 const labelOf = (s: Scene) => s.label ?? byKey(s.key).label;
+const sceneSummary = (s: Scene) => s.practice
+  ? `${s.practice.map((r) => `${r.label}: ${r.score} of 100 in practice, ${r.samplesM}M samples`).join(". ")}. ${s.result}.`
+  : `${s.result}.`;
 const GAME_NAME: Record<Game, string> = { polytopia: "Polytopia", pokemon: "Pokémon 3v3", generals: "Generals" };
 
 const SCENE_MS = 7200;
@@ -48,6 +59,7 @@ const T = { in: 460, type0: 0, type1: 1400, tests1: 3100, hero1: 4300, game1: 59
 const C = "#00a0d6", M = "#e0218a", K = "#111", GOOD = "#2f9e5c", BAD = "#d64545";
 const clamp = (v: number, a = 0, b = 1) => Math.max(a, Math.min(b, v));
 const ease = (t: number) => 1 - (1 - t) ** 3;
+const practiceProgress = (t: number, i: number) => clamp(((t - T.type1) / (T.hero1 - T.type1)) * 2 - i);
 // Elo → chart height (0 at the bottom of the plot, 1 at the top). The scale is piecewise linear so the part where
 // the strong models live (around the starter) gets room, and the long climb up from random play is compressed.
 const YS: [number, number][] = [[-1500, 0], [-600, 0.22], [-200, 0.42], [0, 0.56], [320, 1]];
@@ -159,9 +171,8 @@ type Mood = "talk" | "think" | "watch" | "happy" | "sad" | "frozen";
 const GAZE: Record<Mood, [number, number]> = { talk: [-0.35, -0.85], think: [0.55, -0.95], watch: [0.9, -0.15], happy: [0, 0], sad: [-0.15, 0.8], frozen: [0, 0] };
 
 function moodAt(s: Scene, t: number): { mood: Mood; since: number; prev: Mood } {
-  const stop = T.tests1 + (T.hero1 - T.tests1) * plan(s).hero.stop;
   const seq: [number, Mood][] = [[0, "talk"], [T.type1, "think"], [T.type1 + 250, "watch"]];
-  if (s.frozen) seq.push([stop + 100, "frozen"]);
+  if (s.frozen) seq.push([T.tests1 + (T.hero1 - T.tests1) * plan(s).hero.stop + 100, "frozen"]);
   else if (!s.mid) seq.push([T.hero1 + 250, s.strong ? "happy" : "sad"]);
   let i = 0;
   while (i + 1 < seq.length && t >= seq[i + 1][0]) i++;
@@ -238,11 +249,11 @@ function Agent({ s, t, color, compact, out }: { s: Scene; t: number; color: stri
   const botY = by + bh + 14;
   const label = labelOf(s);
   const op = ease(clamp(t / T.in)) * (1 - ease(out));
-  const p = plan(s);
+  const p = s.practice ? null : plan(s);
   // Spending is measured against the runs' own total, so the budget reaches exactly $0 when the last run finishes
   // (the gaps between runs on the cost strip would otherwise leave a sliver of a bill unspent).
-  const runs = [...p.tests, p.hero], total = runs.reduce((acc, r) => acc + (r.b - r.a), 0);
-  const spent = t < T.type1 ? 0 : runs.reduce((acc, r, i) => {
+  const runs = p ? [...p.tests, p.hero] : [], total = runs.reduce((acc, r) => acc + (r.b - r.a), 0);
+  const spent = !p || t < T.type1 ? 0 : runs.reduce((acc, r, i) => {
     const isHero = i === p.tests.length;
     const [r0, r1] = isHero ? [T.tests1, T.hero1] : [T.type1 + (i * (T.tests1 - T.type1)) / p.tests.length, T.type1 + ((i + 1) * (T.tests1 - T.type1)) / p.tests.length];
     const k = clamp((t - r0) / (r1 - r0)) * (isHero ? p.hero.stop : 1);
@@ -260,7 +271,19 @@ function Agent({ s, t, color, compact, out }: { s: Scene; t: number; color: stri
         <Avatar s={s} t={t} color={color} x={40} y={botY + 26} R={25} seed={SCENES.indexOf(s)} />
         <text x={78} y={botY + 31} className="rl-name">{label}</text>
       </g>
-      <CashPile left={remain} spending={spending} x={0} cy={215} compact={compact} />
+      {s.practice
+        ? <g opacity={op}>
+            <text x={0} y={187} className="rl-small">Two 15-minute GPU leases</text>
+            {s.practice.map((run, i) => (
+              <g key={run.label} opacity={ease(practiceProgress(t, i))}>
+                <text x={0} y={208 + i * 20} className="rl-head">{run.label}</text>
+                {practiceProgress(t, i) === 1 && (
+                  <text x={210} y={208 + i * 20} textAnchor="end" className="rl-small">{run.samplesM}M samples</text>
+                )}
+              </g>
+            ))}
+          </g>
+        : <CashPile left={remain} spending={spending} x={0} cy={215} compact={compact} />}
     </g>
   );
 }
@@ -354,6 +377,41 @@ function Runs({ s, t, out, refOp }: { s: Scene; t: number; out: number; refOp: n
       </g>
       <text x={x} y={244} className="rl-small">test runs</text>
       <text x={x + w} y={244} className="rl-small" textAnchor="end">long run</text>
+    </g>
+  );
+}
+
+function PracticeRuns({ runs, t, out }: { runs: readonly [PracticeRun, PracticeRun]; t: number; out: number }) {
+  const left = 23, right = 196, top = 27, bottom = 185;
+  const runWidth = (right - left) / runs.length;
+  const scoreY = (score: number) => bottom - (score / 100) * (bottom - top);
+  return (
+    <g opacity={1 - ease(out)}>
+      <text x={0} y={16} className="rl-small">Public practice score</text>
+      {[0, 50, 100].map((score) => (
+        <g key={score}>
+          <text x={left - 4} y={scoreY(score) + 3} textAnchor="end" className="rl-small">{score}</text>
+          <line x1={left} x2={right} y1={scoreY(score)} y2={scoreY(score)} stroke="#deded9" />
+        </g>
+      ))}
+      {runs.map((run, i) => {
+        const x = left + i * runWidth;
+        const cx = x + runWidth / 2, y = scoreY(run.score);
+        const progress = practiceProgress(t, i);
+        const ink = i === 0 ? "#3156a7" : "#646469";
+        return (
+          <g key={run.label}>
+            {progress === 1 && <>
+              <line x1={cx} x2={cx} y1={bottom} y2={y} stroke={ink} strokeDasharray="3 3" opacity={0.6} />
+              <circle cx={cx} cy={y} r={4.5} fill={ink} />
+              <text x={cx} y={y - 9} className="rl-result rl-halo" fill={ink} textAnchor="middle">{run.score}</text>
+            </>}
+            <rect x={x + 2} y={194} width={runWidth - 4} height={9} rx={3} fill="#eeeff2" />
+            <rect x={x + 2} y={194} width={(runWidth - 4) * progress} height={9} rx={3} fill={ink} />
+            <text x={cx} y={220} textAnchor="middle" className="rl-small">{run.label}</text>
+          </g>
+        );
+      })}
     </g>
   );
 }
@@ -752,8 +810,10 @@ export default function ResearchLoop() {
   // ?rl=SCENE,MS freezes the loop at that scene and time (for reviewing frames).
   const frozen = typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("rl")?.split(",").map(Number) : undefined;
   const reduce = !!frozen || (typeof window !== "undefined" && !!window.matchMedia?.("(prefers-reduced-motion: reduce)").matches);
-  const [scene, setScene] = useState(frozen ? frozen[0] % SCENES.length : 0);
-  const [t, setT] = useState(frozen ? frozen[1] ?? 0 : reduce ? SCENE_MS - 400 : 0);
+  const [{ scene, t }, setFrame] = useState({
+    scene: frozen ? frozen[0] % SCENES.length : 0,
+    t: frozen ? frozen[1] ?? 0 : reduce ? T.out : 0,
+  });
   const [visible, setVisible] = useState(true);
 
   useEffect(() => {
@@ -770,10 +830,10 @@ export default function ResearchLoop() {
     const tick = (now: number) => {
       const dt = Math.min(100, now - last);
       last = now;
-      setT((v) => {
-        const nv = v + dt;
-        if (nv >= SCENE_MS) { setScene((sc) => (sc + 1) % SCENES.length); return 0; }
-        return nv;
+      setFrame(({ scene, t }) => {
+        const next = t + dt;
+        if (next >= SCENE_MS) return { scene: (scene + 1) % SCENES.length, t: 0 };
+        return { scene, t: next };
       });
       raf = requestAnimationFrame(tick);
     };
@@ -784,7 +844,7 @@ export default function ResearchLoop() {
   if (agent) {
     return (
       <ul>
-        {SCENES.map((s) => <li key={s.key}>{GAME_NAME[s.game]}, {labelOf(s)}: “{s.quote}” {s.result}.</li>)}
+        {SCENES.map((s) => <li key={s.key}>{GAME_NAME[s.game]}, {labelOf(s)}: “{s.quote}” {sceneSummary(s)}</li>)}
       </ul>
     );
   }
@@ -799,17 +859,19 @@ export default function ResearchLoop() {
   const boardOp = Math.min(prev.game === s.game ? 1 : into, next.game === s.game ? 1 : 1 - ease(out));
   const hasRef = (x: Scene) => (SCALE[x.game].ref === null ? 0 : 1);
   const refOp = hasRef(s) * Math.min(hasRef(prev) ? 1 : into, hasRef(next) ? 1 : 1 - ease(out));
-  const go = (i: number) => { setScene(i); setT(reduce ? SCENE_MS - 400 : 0); };
+  const go = (i: number) => setFrame({ scene: i, t: reduce ? T.out : 0 });
   const vb = narrow ? "0 0 388 518" : "0 0 632 262";
   const place = narrow
     ? { agent: "translate(71 0)", runs: "translate(6 258)", game: "translate(214 258)" }
     : { agent: "translate(8 0)", runs: "translate(240 0)", game: "translate(456 0)" };
   return (
     <div className="rl" ref={ref}>
-      <svg viewBox={vb} role="img" aria-label={`${labelOf(s)} researching ${GAME_NAME[s.game]}: “${s.quote}” ${s.result}.`}
+      <svg viewBox={vb} role="img" aria-label={`${labelOf(s)} researching ${GAME_NAME[s.game]}: “${s.quote}” ${sceneSummary(s)}`}
         onClick={() => go((scene + 1) % SCENES.length)}>
         <g transform={place.agent}><Agent s={s} t={t} color={color} compact={narrow} out={out} /></g>
-        <g transform={place.runs}><Runs s={s} t={t} out={out} refOp={refOp} /></g>
+        <g transform={place.runs}>
+          {s.practice ? <PracticeRuns runs={s.practice} t={t} out={out} /> : <Runs s={s} t={t} out={out} refOp={refOp} />}
+        </g>
         <g transform={place.game}><Match s={s} t={t} out={out} boardOp={boardOp} /></g>
       </svg>
     </div>
