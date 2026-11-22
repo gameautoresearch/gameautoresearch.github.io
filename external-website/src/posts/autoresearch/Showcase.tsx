@@ -198,12 +198,15 @@ export default function Showcase() {
         </div>
 
         <div className="sc-main">
-          {touring && (
+          {/* Always reserve the progress bar's row so stopping the tour doesn't shift the layout. */}
+          {touring ? (
             <div
               className="sc-progress"
               key={`${i}-${visible}`}
               style={{ animationDuration: `${ROTATE_MS}ms`, animationPlayState: visible ? "running" : "paused" }}
             />
+          ) : (
+            <div className="sc-progress is-idle" aria-hidden="true" />
           )}
           <div className="sc-stage">
             <Stage item={item} />

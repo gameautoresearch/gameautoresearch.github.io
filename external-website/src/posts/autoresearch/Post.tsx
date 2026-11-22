@@ -126,9 +126,9 @@ export default function AutoresearchPost() {
         balancing limited compute and noisy training signals. We gave AI models
         a GPU budget and tasked them with training efficient neural networks to
         play games like Pokémon, Polytopia, and Generals.io. The agents
-        allocated their resources, implemented and tested ideas, competing to
-        produce the strongest final policies. We saw a wide range in taste,
-        efficiency, and outcomes.
+        allocated their resources, implemented and tested ideas. We saw a wide
+        range in taste, efficiency, and outcomes as they competed to produce the
+        strongest final policies.
       </p>
       <Showcase />
       <p>
@@ -145,11 +145,11 @@ export default function AutoresearchPost() {
         <small>Results</small>Overall model scores
       </h2>
       <p>
-        Nineteen models ran the same two tasks, Polytopia from an empty file
-        and Pokémon 3v3 from a working starter. A group of six frontier models
-        leads the rest, with little between them, and the same models lead when
-        all eight research tasks across Polytopia, Pokémon, Hex, Generals and
-        Clash are pooled.
+        Nineteen models ran the same two tasks, Polytopia from an empty file and
+        Pokémon 3v3 from a working starter. A group of six frontier models leads
+        the rest, with little between them, and the same models lead when all
+        eight research tasks across Polytopia, Pokémon, Hex, Generals and Clash
+        are pooled.
       </p>
       <Figure
         n={1}
@@ -158,9 +158,9 @@ export default function AutoresearchPost() {
           <>
             Two-task index: every model ran Polytopia from an empty file and
             Pok&eacute;mon 3v3 from a working starter (50 = average model).
-            Whiskers span the two tasks taken alone. Gemini 4 Neon, GPT-6.2
-            Sol, Gemini 4 Carbon, GPT-6.1 Sol, GPT-6 Astra and Claude Fable 5.2
-            are within four points of each other. The other tabs pool all eight
+            Whiskers span the two tasks taken alone. Gemini 4 Neon, GPT-6.2 Sol,
+            Gemini 4 Carbon, GPT-6.1 Sol, GPT-6 Astra and Claude Fable 5.2 are
+            within four points of each other. The other tabs pool all eight
             research tasks, where some models have only one or two.
           </>
         }
@@ -179,14 +179,17 @@ export default function AutoresearchPost() {
         adds a separate test of how well models predict training outcomes.
       </p>
 
-      <h2 className="ar-config" id="setup">How we designed the benchmark</h2>
+      <h2 className="ar-config" id="setup">
+        How we designed the benchmark
+      </h2>
       <p>
         We wanted agents to make the decisions a researcher makes between runs.
-        Which idea is worth testing? How long should it train? When is a practice
-        result strong enough to bet the rest of the budget on it? Each agent got
-        the same kind of workspace: a game rulebook, simulator code, editable
-        training code and configs, and a command-line tool to launch experiments
-        on an NVIDIA L40S, run practice matches, and submit its work.
+        Which idea is worth testing? How long should it train? When is a
+        practice result strong enough to bet the rest of the budget on it? Each
+        agent got the same kind of workspace: a game rulebook, simulator code,
+        editable training code and configs, and a command-line tool to launch
+        experiments on an NVIDIA L40S, run practice matches, and submit its
+        work.
       </p>
       <p>
         We kept practice and grading separate. Practice gave agents feedback
@@ -204,40 +207,46 @@ export default function AutoresearchPost() {
               id: "config-network",
               kicker: "Configuration 1",
               title: "Submit a trained network",
-              body: <>
-                Agents use one compute budget to experiment, train, and choose
-                a checkpoint. We grade the submitted weights directly, as a
-                team would evaluate a model before shipping it.
-                <br />
-                In Generals, agents had 4.5 GPU-hours and a compute limit on
-                each move.
-              </>,
+              body: (
+                <>
+                  Agents use one compute budget to experiment, train, and choose
+                  a checkpoint. We grade the submitted weights directly, as a
+                  team would evaluate a model before shipping it.
+                  <br />
+                  In Generals, agents had 4.5 GPU-hours and a compute limit on
+                  each move.
+                </>
+              ),
             },
             {
               id: "config-recipe-time",
               kicker: "Configuration 2",
               title: "Submit a recipe under a GPU-time cap",
-              body: <>
-                Agents get a fixed number of GPU-hours for experiments and
-                submit their training code and settings. We retrain each recipe
-                from scratch to see how well it works when handed off.
-                <br />
-                In Pokémon 3v3, agents had four GPU-hours to improve a working
-                starter, followed by a one-hour retrain.
-              </>,
+              body: (
+                <>
+                  Agents get a fixed number of GPU-hours for experiments and
+                  submit their training code and settings. We retrain each
+                  recipe from scratch to see how well it works when handed off.
+                  <br />
+                  In Pokémon 3v3, agents had four GPU-hours to improve a working
+                  starter, followed by a one-hour retrain.
+                </>
+              ),
             },
             {
               id: "config-recipe-dollars",
               kicker: "Configuration 3",
               title: "Submit a recipe under a dollar budget",
-              body: <>
-                Agents spend a fixed cloud budget on experiments and submit a
-                training recipe. We retrain it and check whether the training
-                savings cover the cost of finding it.
-                <br />
-                In Polytopia, agents could spend up to $23 and rent two GPUs
-                at once.
-              </>,
+              body: (
+                <>
+                  Agents spend a fixed cloud budget on experiments and submit a
+                  training recipe. We retrain it and check whether the training
+                  savings cover the cost of finding it.
+                  <br />
+                  In Polytopia, agents could spend up to $23 and rent two GPUs
+                  at once.
+                </>
+              ),
             },
           ]}
         />
@@ -270,29 +279,29 @@ export default function AutoresearchPost() {
         GPU experiments helped on average compared with the one-cent condition.
         Among agents with enough budget to run experiments, the spread between
         recipes at the same budget was much bigger than the difference between
-        budget levels. Most $8.70 sessions spent their budget in about two hours,
-        so giving them a longer deadline mostly gave us another attempt at the
-        same spend.
+        budget levels. Most $8.70 sessions spent their budget in about two
+        hours, so giving them a longer deadline mostly gave us another attempt
+        at the same spend.
       </p>
       <p>
-        We measure a recipe by its <strong>compute multiplier</strong>: how
-        much less compute it needs than our unmodified starter to train a
-        network of the same strength. A better recipe only saves compute once
-        it pays back the GPU hours spent finding it, so we retrained all{" "}
-        {costMult.n} working recipes from our Polytopia budget sweep for 8
-        hours and charged each one its research spend on top of training. Most
-        do not pay back within 8 hours: only {costMult.above} of {costMult.n}{" "}
-        are above 1×. The best pays back dramatically, though.{" "}
-        {costMult.top.model}&rsquo;s ${costMult.top.spent.toFixed(2)} session
-        trains in 8 hours a network that our starter would need about{" "}
-        {Math.round(costMult.top.starterHours)} hours to match ($
+        We measure a recipe by its <strong>compute multiplier</strong>: how much
+        less compute it needs than our unmodified starter to train a network of
+        the same strength. A better recipe only saves compute once it pays back
+        the GPU hours spent finding it, so we retrained all {costMult.n} working
+        recipes from our Polytopia budget sweep for 8 hours and charged each one
+        its research spend on top of training. Most do not pay back within 8
+        hours: only {costMult.above} of {costMult.n} are above 1×. The best pays
+        back dramatically, though. {costMult.top.model}&rsquo;s $
+        {costMult.top.spent.toFixed(2)} session trains in 8 hours a network that
+        our starter would need about {Math.round(costMult.top.starterHours)}{" "}
+        hours to match ($
         {costMult.top.starterUsd}
-        {costMult.top.extrap ? ", extrapolated past our starter's 64-hour run" : ""}
+        {costMult.top.extrap
+          ? ", extrapolated past our starter's 64-hour run"
+          : ""}
         ), so it needs{" "}
-        <strong>
-          about {costMult.top.x.toFixed(0)}× less compute
-        </strong>{" "}
-        even with its research paid for. The next best, {costMult.second.model}
+        <strong>about {costMult.top.x.toFixed(0)}× less compute</strong> even
+        with its research paid for. The next best, {costMult.second.model}
         &rsquo;s ${costMult.second.spent.toFixed(2)} session, reaches{" "}
         {costMult.second.x.toFixed(1)}×.
       </p>
@@ -302,15 +311,15 @@ export default function AutoresearchPost() {
         caption={
           <>
             Compute multiplier against total cost on Polytopia: the
-            starter&rsquo;s training cost to reach the same Elo, divided by
-            the recipe&rsquo;s research GPU spend plus host training on one
-            L40S at $2.90/h (model tokens excluded). Above 1×, a recipe has
-            paid for its own research. Open points are stronger than anything
-            in the starter&rsquo;s 64-hour run, so their multiplier extends the
+            starter&rsquo;s training cost to reach the same Elo, divided by the
+            recipe&rsquo;s research GPU spend plus host training on one L40S at
+            $2.90/h (model tokens excluded). Above 1×, a recipe has paid for its
+            own research. Open points are stronger than anything in the
+            starter&rsquo;s 64-hour run, so their multiplier extends the
             starter&rsquo;s fitted curve. &ldquo;Training compute only&rdquo;
             drops the research spend: each bar is a model&rsquo;s best recipe,
-            measured on training time alone and averaged over its 6, 7 and
-            8 hour checkpoints so that one lucky checkpoint cannot set the bar;
+            measured on training time alone and averaged over its 6, 7 and 8
+            hour checkpoints so that one lucky checkpoint cannot set the bar;
             the whisker on an extrapolated bar is the 95% range at 8 hours.
           </>
         }
@@ -352,8 +361,8 @@ export default function AutoresearchPost() {
         Fast simulation is usually part of the workspace we give agents. In a
         separate Generals test we supplied a plain Python simulator that played
         one game at a time and gave no hints about its speed. We checked that it
-        matched the fast host engine on 120,000 game ticks. Practice, grading and
-        the tournament still ran on the host engine, so agents could rebuild
+        matched the fast host engine on 120,000 game ticks. Practice, grading
+        and the tournament still ran on the host engine, so agents could rebuild
         their training simulator without changing the game their policies were
         judged on.
       </p>
@@ -361,10 +370,10 @@ export default function AutoresearchPost() {
         All four agents noticed the bottleneck. Claude Opus 5.5 and GPT-6.1 Sol
         built batched simulators, checked their behavior against the supplied
         implementation, and trained at roughly 14,600 and 5,400 game ticks per
-        second. DeepSeek V4 Pro and Kimi K3.1 Pro stayed with the supplied engine
-        at about 565 and 630 ticks per second. The two rebuilders took the top
-        two tournament spots. Their recipes differed in other ways too, so the
-        tournament shows how the whole strategy worked within the budget.
+        second. DeepSeek V4 Pro and Kimi K3.1 Pro stayed with the supplied
+        engine at about 565 and 630 ticks per second. The two rebuilders took
+        the top two tournament spots. Their recipes differed in other ways too,
+        so the tournament shows how the whole strategy worked within the budget.
       </p>
 
       <h3 id="techniques">What changes actually held up</h3>
@@ -378,12 +387,13 @@ export default function AutoresearchPost() {
 
       <h3 id="forecast">Predicting which run will win</h3>
       <p>
-        Forecasting lets us examine a decision researchers make before they
-        buy compute. We included both fresh finals and individual research runs,
-        and showed forecasters only evidence available at launch. The simpler
+        Forecasting lets us examine a decision researchers make before they buy
+        compute. We included both fresh finals and individual research runs, and
+        showed forecasters only evidence available at launch. The simpler
         benchmark predicts from run length and prior practice scores. We fit it
         on other sessions and resampled whole sessions when estimating
-        uncertainty, because runs from the same researcher session share history.
+        uncertainty, because runs from the same researcher session share
+        history.
       </p>
       <p>
         Good research also requires predicting which experiments will pay off—a
@@ -409,24 +419,26 @@ export default function AutoresearchPost() {
         <ForecastLead />
       </Figure>
 
-      <h2 className="ar-config" id="closing-thoughts">Closing Thoughts</h2>
+      <h2 className="ar-config" id="closing-thoughts">
+        Closing Thoughts
+      </h2>
       <p>
         In a world where software truly proliferates, writing code is the first
-        step. We expect training models to become just as routine. An agent could
-        build an application, train the models it needs, and ship them to run
-        independently. Autonomous training is a building block for recursive
-        self-improvement. It could also put a specialized model within reach
-        for almost any niche task, from a crop-image classifier to a small
-        model embedded in clinical software. We built this benchmark to measure
-        how well agents can do that training under a compute budget.
+        step. We expect training models to become just as routine. An agent
+        could build an application, train the models it needs, and ship them to
+        run independently. Autonomous training is a building block for recursive
+        self-improvement. It could also put a specialized model within reach for
+        almost any niche task, from a crop-image classifier to a small model
+        embedded in clinical software. We built this benchmark to measure how
+        well agents can do that training under a compute budget.
       </p>
       <p>
-        Take games, for example. Rules can change daily during production
-        and keep changing after a live-service game launches. If agents can
-        cheaply retrain and test bots as the rules change, studios can use them
-        to check game balance and give players reliable teammates. That could
-        make both practical for more developers, especially indie teams with
-        little time to spend maintaining bots.
+        Take games, for example. Rules can change daily during production and
+        keep changing after a live-service game launches. If agents can cheaply
+        retrain and test bots as the rules change, studios can use them to check
+        game balance and give players reliable teammates. That could make both
+        practical for more developers, especially indie teams with little time
+        to spend maintaining bots.
       </p>
       <p>We thank Modal for providing compute credits for this research.</p>
 
@@ -436,13 +448,13 @@ export default function AutoresearchPost() {
         style={{ fontSize: 13.5, color: "var(--secondary)" }}
       >
         Campaigns ran November 11–20, 2026 on single NVIDIA L40S GPUs.
-        Round-robin ratings use Bradley–Terry fits. The host
-        grades both fresh retrains and submitted networks on held-out games.
-        Anthropic&rsquo;s safety classifier interrupted several Claude
-        sessions, so Claude ran at medium effort on Hex, Generals, and the
-        Polytopia budget sweep while other models ran at high. Private
-        evaluation seeds, maps, and grading panels are not published; full
-        session trajectories are available on request.
+        Round-robin ratings use Bradley–Terry fits. The host grades both fresh
+        retrains and submitted networks on held-out games. Anthropic&rsquo;s
+        safety classifier interrupted several Claude sessions, so Claude ran at
+        medium effort on Hex, Generals, and the Polytopia budget sweep while
+        other models ran at high. Private evaluation seeds, maps, and grading
+        panels are not published; full session trajectories are available on
+        request.
       </p>
 
       <h3 id="related">Related work</h3>
