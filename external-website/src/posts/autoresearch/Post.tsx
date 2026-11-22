@@ -119,12 +119,8 @@ export default function AutoresearchPost() {
         wide
         caption={
           <>
-            Two-task index: every model ran Polytopia from an empty file and
-            Pok&eacute;mon 3v3 from a working starter (50 = average model).
-            Whiskers span the two tasks taken alone. Gemini 4 Neon, GPT-6.2 Sol,
-            Gemini 4 Carbon, GPT-6.1 Sol, GPT-6 Astra and Claude Fable 5.2 are
-            within four points of each other. The other tabs pool all eight
-            research tasks, where some models have only one or two.
+            Standardized model scores on the two shared tasks (50 = average),
+            with tabs for broader task pools.
           </>
         }
       >
@@ -195,10 +191,8 @@ export default function AutoresearchPost() {
         wide
         caption={
           <>
-            Polytopia from an empty starter. Lines show the strongest network
-            each agent had trained by that point. Diamonds show the fresh
-            15-minute retrain of the final submitted recipe. Elo is relative to
-            the 15-minute PPO starter.
+            Best network trained over time on Polytopia from an empty file, with
+            diamonds showing each final 15-minute retrain.
           </>
         }
       >
@@ -244,27 +238,7 @@ export default function AutoresearchPost() {
         &rsquo;s ${costMult.second.spent.toFixed(2)} session, reaches{" "}
         {costMult.second.x.toFixed(1)}×.
       </p>
-      <Figure
-        n={3}
-        wide
-        caption={
-          <>
-            Compute multiplier against total cost on Polytopia: the
-            starter&rsquo;s training cost to reach the same Elo, divided by the
-            recipe&rsquo;s research GPU spend plus host training on one L40S at
-            $2.90/h (model tokens excluded). Above 1×, a recipe has paid for its
-            own research. Open points are stronger than anything in the
-            starter&rsquo;s 64-hour run, so their multiplier extends the
-            starter&rsquo;s fitted curve. &ldquo;Training compute only&rdquo;
-            drops the research spend: each bar is a model&rsquo;s best recipe,
-            measured on training time alone and averaged over its 6, 7 and 8
-            hour checkpoints so that one lucky checkpoint cannot set the bar;
-            the whisker on an extrapolated bar is the 95% range at 8 hours.
-          </>
-        }
-      >
-        <CostMultiplier />
-      </Figure>
+      <CostMultiplier />
 
       <h2 className="ar-config ar-c3" id="taste">
         <small>Research taste</small>What separates strong researchers from weak
@@ -281,14 +255,12 @@ export default function AutoresearchPost() {
         minute probes that do not predict 1-hour performance.
       </p>
       <Figure
-        n={4}
+        n={3}
         wide
         caption={
           <>
-            Every Pokémon training run at its real session time, colored by
-            private strength (cyan = beats starter, magenta = loses to starter).
-            Crosses are aborted runs; diamonds are practice evals; flags are
-            submissions.
+            Pokémon 3v3 training runs over real session time, colored from
+            weaker (magenta) to stronger (cyan) than the starter.
           </>
         }
       >
@@ -345,12 +317,12 @@ export default function AutoresearchPost() {
         ranked the eventual 8-hour winner last.
       </p>
       <Figure
-        n={5}
+        n={4}
         caption={
           <>
             Forecast skill across {pokeSkill.items} Pokémon runs (0 = blind
-            guess, 1 = perfect; 90% intervals over sessions). Dotted line: ridge
-            regression
+            guess, 1 = perfect) compared with a ridge regression baseline
+            (dotted line).
           </>
         }
       >

@@ -91,13 +91,23 @@ const bars: Bar[] = [...new Set(curves.map((c) => c.r.model))].map((model) =>
 ).sort((a, b) => b.x - a.x);
 export const trainBars = { n: bars.length, top: bars[0] };
 
-function TrainBars({ W }: { W: number }) {
-  const narrow = W < 560;
-  const row = 30, m = { l: narrow ? 130 : 160, r: narrow ? 48 : 64, t: 26, b: 30 };
+function TrainBars({
+  W,
+  on,
+  onHover,
+}: {
+  W: number;
+  on: string | null;
+  onHover: (model: string | null) => void;
+}) {
+  const compact = W < 480;
+  const hasBelow = bars.some((p) => p.x < 1);
+  const row = compact ? 38 : 30;
+  const m = compact ? { l: 10, r: 44, t: 22, b: 36 } : { l: 148, r: 96, t: 22, b: 36 };
   const H = m.t + m.b + bars.length * row;
-  const L0 = Math.log2(1 / 2), L1 = Math.log2(64);
+  const L0 = Math.log2(hasBelow ? 1 / 2 : 1), L1 = Math.log2(64);
   const sx = (x: number) => m.l + ((Math.log2(Math.min(Math.max(x, 2 ** L0), 2 ** L1)) - L0) / (L1 - L0)) * (W - m.l - m.r);
-  const ticks = [1 / 2, 1, 2, 4, 8, 16, 32, 64];
+  const ticks = hasBelow ? [1 / 2, 1, 2, 4, 8, 16, 32, 64] : [1, 2, 4, 8, 16, 32, 64];
   return (
     <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label="Training-only compute multiplier of each model's best recipe">
       {ticks.map((t) => (
@@ -106,27 +116,59 @@ function TrainBars({ W }: { W: number }) {
           <text x={sx(t)} y={H - m.b + 16} className="viz-axis" textAnchor="middle">{t >= 1 ? `${t}×` : `1/${1 / t}`}</text>
         </g>
       ))}
-      <text x={m.l} y={m.t - 10} className="viz-axis">training-only compute multiplier, mean of 6–8 h: starter's training for the same strength ÷ recipe's (log scale)</text>
+      <line x1={sx(1)} x2={sx(1)} y1={m.t - 4} y2={H - m.b} stroke={CMYK.k} strokeWidth={1.6} />
+      <text x={m.l} y={m.t - 9} className="viz-axis">
+        {compact ? "best recipe, 6–8 h mean (log scale)" : "best recipe, mean of 6–8 h: starter's training ÷ recipe's (log scale)"}
+      </text>
+      <text x={W - m.r} y={H - 4} className="viz-axis" textAnchor="end">training compute multiplier</text>
       {bars.map((p, i) => {
-        const st = modelStyle(p.r.model), y = m.t + i * row, x0 = sx(1), x1 = sx(p.x), range = p.extrap && p.lo !== null && p.hi !== null;
+        const st = modelStyle(p.r.model);
+        const y = m.t + i * row;
+        const x0 = sx(1), x1 = sx(p.x);
+        const range = p.extrap && p.lo !== null && p.hi !== null;
+        const dim = on !== null && on !== p.r.model;
+        const barY = compact ? y + 19 : y + 5;
+        const barH = compact ? 11 : row - 10;
+        const midY = barY + barH / 2;
         return (
-          <g key={p.r.key}>
+          <g
+            key={p.r.key}
+            opacity={dim ? 0.28 : 1}
+            onPointerEnter={() => onHover(p.r.model)}
+            onPointerLeave={() => onHover(null)}
+            style={{ cursor: "default" }}
+          >
             <title>{`${p.r.model}, best recipe (${p.r.cell}): ${p.extrap ? "≈" : ""}${fx(p.x)} averaged over 6, 7 and 8 h of training; at 8 h as strong as the starter after ${p.extrap ? "about " : ""}${hrs(p.sh8)}${range ? ` (extrapolated past the starter's ${hrs(TOP.hours)} run; 8 h 95% range ${fx(p.lo!)} to ${fx(p.hi!)})` : ""}`}</title>
-            <text x={m.l - 10} y={y + row / 2} className="viz-label" textAnchor="end" dominantBaseline="middle">{p.r.model}</text>
-            <rect x={Math.min(x0, x1)} y={y + 5} width={Math.max(1, Math.abs(x1 - x0))} height={row - 10} rx={2}
-              fill={st.color} />
-            {range && (
-              <path d={`M${sx(p.lo!)},${y + row / 2}H${sx(p.hi!)}M${sx(p.lo!)},${y + 8}V${y + row - 8}M${sx(p.hi!)},${y + 8}V${y + row - 8}`}
-                stroke={CMYK.k} strokeWidth={1.3} fill="none" />
+            <rect x={0} y={y} width={W} height={row} fill="transparent" />
+            {compact ? (
+              <text
+                x={x0 + 5}
+                y={y + 13}
+                className="viz-label"
+                style={{ fontSize: 12, paintOrder: "stroke", stroke: "#fff", strokeWidth: 3 }}
+              >
+                {p.r.model}
+                {p.extrap && <tspan className="viz-axis"> · extrapolated</tspan>}
+              </text>
+            ) : (
+              <text x={m.l - 10} y={midY} className="viz-label" textAnchor="end" dominantBaseline="middle">{p.r.model}</text>
             )}
-            <text x={Math.max(x0, x1, range ? sx(p.hi!) : 0) + 6} y={y + row / 2} className="viz-label" dominantBaseline="middle">
+            <rect x={Math.min(x0, x1)} y={barY} width={Math.max(1, Math.abs(x1 - x0))} height={barH} rx={2} fill={st.color} />
+            {range && (
+              <path
+                d={`M${sx(p.lo!)},${midY}H${sx(p.hi!)}M${sx(p.lo!)},${midY - 4}V${midY + 4}M${sx(p.hi!)},${midY - 4}V${midY + 4}`}
+                stroke={CMYK.k}
+                strokeWidth={1.3}
+                fill="none"
+              />
+            )}
+            <text x={Math.max(x0, x1, range ? sx(p.hi!) : 0) + 6} y={midY} className="viz-label" dominantBaseline="middle" style={{ fontSize: compact ? 11.5 : 12.5 }}>
               <tspan style={{ fontWeight: 600 }}>{p.extrap ? "≈" : ""}{fx(p.x)}</tspan>
-              {p.extrap && <tspan className="viz-axis" dx={6}>extrapolated</tspan>}
+              {!compact && p.extrap && <tspan className="viz-axis" dx={6}>extrapolated</tspan>}
             </text>
           </g>
         );
       })}
-      <line x1={sx(1)} x2={sx(1)} y1={m.t - 4} y2={H - m.b} stroke={CMYK.k} strokeWidth={1.6} />
     </svg>
   );
 }
@@ -135,13 +177,13 @@ type Hit = { cx: number; cy: number; key: string; model: string; title: string; 
 
 export function CostMultiplier() {
   const agent = useAgentView();
-  const ref = useRef<HTMLDivElement>(null);
-  const W = useWidth(ref), narrow = W < 560;
+  const leftRef = useRef<HTMLDivElement>(null);
+  const rightRef = useRef<HTMLDivElement>(null);
+  const W = useWidth(leftRef);
+  const WR = useWidth(rightRef);
+  const compact = W < 480;
   const [hit, setHit] = useState<Hit | null>(null);
   const [legendModel, setLegendModel] = useState<string | null>(null);
-  // "total": research GPU spend plus training; "train": the recipe's own training only (research and model tokens not counted).
-  const [mode, setMode] = useState<"total" | "train">("total");
-  const train = mode === "train";
   if (agent) {
     return (
       <Table
@@ -152,15 +194,8 @@ export function CostMultiplier() {
       />
     );
   }
-  const tabs = (
-    <div className="ar-tabs ar-tabs-wrap" role="tablist" aria-label="What a recipe is charged">
-      <button role="tab" aria-selected={!train} onClick={() => { setMode("total"); setHit(null); }}>Research cost included</button>
-      <button role="tab" aria-selected={train} onClick={() => { setMode("train"); setHit(null); }}>Training compute only</button>
-    </div>
-  );
-  if (train) return <div className="viz ar-cost" ref={ref}>{tabs}<TrainBars W={W} /></div>;
-  const H = Math.round(Math.max(340, Math.min(500, W * 0.55)));
-  const m = { l: 46, r: narrow ? 12 : 92, t: 22, b: 40 };
+  const H = compact ? 22 + 36 + bars.length * 38 : Math.round(Math.max(300, Math.min(420, W * 0.52)));
+  const m = { l: compact ? 36 : 46, r: compact ? 10 : 88, t: 22, b: 36 };
   const all = curves.flatMap((c) => [...c.pts, ...c.finals]);
   const cx = (q: Pt) => q.cost, vy = (q: Pt) => q.x;
   const COST_MAX = Math.ceil(Math.max(...all.map(cx)) / 5) * 5;
@@ -169,9 +204,9 @@ export function CostMultiplier() {
   const sy = (x: number) => m.t + (1 - (Math.log2(Math.max(x, 2 ** L0)) - L0) / (L1 - L0)) * (H - m.t - m.b);
   const yTicks = [1 / 16, 1 / 8, 1 / 4, 1 / 2, 1, 2, 4, 8, 16];
   const xTicks: number[] = [];
-  for (let x = 0; x <= COST_MAX; x += narrow ? 10 : 5) xTicks.push(x);
-  const models = [...new Set(recipes.map((r) => r.model))];
-  // Hovering a recipe (or a legend entry) lights up every recipe from the same model.
+  for (let x = 0; x <= COST_MAX; x += compact ? 10 : 5) xTicks.push(x);
+  const models = [...bars.map((b) => b.r.model), ...recipes.map((r) => r.model)].filter((mo, i, a) => a.indexOf(mo) === i);
+  // Hovering a recipe, bar, or legend entry highlights that model across both figures.
   const on = hit?.model ?? legendModel;
   const top = TOP8;
   const rank = (r: Recipe) => (r.key === hit?.key ? 3 : r.model === on ? 2 : r === top.r ? 1 : 0);
@@ -191,59 +226,100 @@ export function CostMultiplier() {
     setHit(near);
   };
   const path = (pts: Pt[]) => pts.map((p, i) => `${i ? "L" : "M"}${sx(cx(p)).toFixed(1)},${sy(vy(p)).toFixed(1)}`).join("");
-  const tipLeft = hit ? Math.max(0, hit.cx + 12 + 250 > W ? hit.cx - 262 : hit.cx + 12) : 0;
+  const tipW = compact ? 220 : 250;
+  const tipLeft = hit ? Math.max(0, hit.cx + 12 + tipW > W ? Math.max(0, hit.cx - tipW - 12) : hit.cx + 12) : 0;
   return (
-    <div className="viz ar-cost" ref={ref}>
-      {tabs}
-      <div className="viz-legend">
-        {models.map((mo) => { const st = modelStyle(mo); return <span key={mo} onPointerEnter={() => setLegendModel(mo)} onPointerLeave={() => setLegendModel(null)} style={{ cursor: "default", opacity: on !== null && on !== mo ? 0.45 : 1 }}><i className={st.dashed ? "dashed" : undefined} style={st.dashed ? { color: st.color } : { background: st.color }} />{mo}'s recipes</span>; })}
-        <span><i style={{ background: CMYK.k }} />Unmodified starter (1×)</span>
-        <span><i className="sq" />Fresh 1 h finals, two seeds</span>
+    <div className="ar-cost-wrap">
+      <div className="viz-legend ar-cost-legend">
+        {models.map((mo) => {
+          const st = modelStyle(mo);
+          return (
+            <span
+              key={mo}
+              onPointerEnter={() => setLegendModel(mo)}
+              onPointerLeave={() => setLegendModel(null)}
+              style={{ cursor: "default", opacity: on !== null && on !== mo ? 0.45 : 1 }}
+            >
+              <i style={{ background: st.color }} />
+              {mo}
+            </span>
+          );
+        })}
+        <span><i style={{ background: CMYK.k }} />Starter (1×)</span>
+        <span><i className="sq" />1 h finals</span>
       </div>
-      <div className="ar-cost-plot">
-        <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label="Compute multiplier against total cost, research plus training, for every recipe"
-          onPointerMove={move} onPointerDown={move} onPointerLeave={() => setHit(null)} style={{ touchAction: "pan-y" }}>
-          {yTicks.map((t) => (
-            <g key={t}>
-              <line x1={m.l} x2={W - m.r} y1={sy(t)} y2={sy(t)} className="viz-grid" />
-              <text x={m.l - 8} y={sy(t)} className="viz-axis" textAnchor="end" dominantBaseline="middle">{t >= 1 ? `${t}×` : `1/${1 / t}`}</text>
-            </g>
-          ))}
-          {xTicks.map((t) => (
-            <g key={t}>
-              <line x1={sx(t)} x2={sx(t)} y1={m.t} y2={H - m.b} className="viz-grid" />
-              <text x={sx(t)} y={H - m.b + 16} className="viz-axis" textAnchor="middle">${t}</text>
-            </g>
-          ))}
-          <text x={W - m.r} y={H - 4} className="viz-axis" textAnchor="end">
-            {narrow ? "total cost: research + training" : `total cost: research GPU spend + training, one L40S at $${RATE.toFixed(2)} per hour`}
-          </text>
-          <text x={m.l} y={m.t - 9} className="viz-axis">compute multiplier: starter's cost for the same strength ÷ recipe's total cost (log scale)</text>
-          {[...curves].sort((a, b) => rank(a.r) - rank(b.r)).map(({ r, pts, finals }) => {
-            const st = modelStyle(r.model), lit = on === r.model, focus = hit?.key === r.key, dim = on !== null && !lit, hi = lit || (on === null && r === top.r);
-            const op = dim ? 0.18 : hi ? 1 : 0.22;
-            return (
-              <g key={r.key}>
-                <path d={path(pts)} fill="none" stroke={st.color} strokeWidth={focus ? 3 : lit ? 2 : hi ? 2.4 : 1.4} strokeDasharray={st.dashed ? "5 3" : undefined} strokeLinejoin="round" opacity={op} />
-                {pts.map((p) => <circle key={p.hours} cx={sx(cx(p))} cy={sy(vy(p))} r={focus ? 4 : lit ? 3.2 : 2.8} fill={p.extrap ? "#fff" : st.color} stroke={p.extrap ? st.color : "#fff"} strokeWidth={p.extrap ? 1.6 : 1} opacity={dim ? 0.2 : hi ? 1 : 0.3} />)}
-                {finals.map((p, i) => { const s = focus ? 5 : 4; return <rect key={i} x={sx(cx(p)) - s} y={sy(vy(p)) - s} width={2 * s} height={2 * s} rx={1.2} fill={st.color} stroke={CMYK.k} strokeWidth={1} opacity={dim ? 0.2 : hi ? 0.9 : 0.3} />; })}
-              </g>
-            );
-          })}
-          <line x1={m.l} x2={W - m.r} y1={sy(1)} y2={sy(1)} stroke={CMYK.k} strokeWidth={on === null ? 2.5 : 1.6} />
-          {!narrow && <text x={W - m.r + 6} y={sy(1)} className="viz-label" dominantBaseline="middle" style={{ fontWeight: 600 }}>Starter, 1×</text>}
-          {!narrow && (
-            <text x={sx(cx(top)) + 9} y={sy(vy(top)) - 10} className="viz-label" style={{ fontWeight: 600, paintOrder: "stroke", stroke: "#fff", strokeWidth: 4, strokeLinejoin: "round" }}>
-              {top.r.model}, {usd(top.r.spentUsd)} session: {top.extrap ? "≈" : ""}{fx(vy(top))}
-            </text>
-          )}
-        </svg>
-        {hit && (
-          <div className="viz-tip" style={hit.cy < 110 ? { left: tipLeft, top: hit.cy + 14, transform: "none" } : { left: tipLeft, top: hit.cy - 10 }} role="status">
-            <strong>{hit.title}</strong>
-            {hit.lines.map((l) => <span key={l}>{l}</span>)}
+      <div className="ar-cost-pair">
+        <figure className="pt-figure ar-cost-fig">
+          <div className="ar-cost-head">Research cost included</div>
+          <div className="viz ar-cost" ref={leftRef}>
+            <div className="ar-cost-plot">
+              <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label="Compute multiplier against total cost, research plus training, for every recipe"
+                onPointerMove={move} onPointerDown={move} onPointerLeave={() => setHit(null)} style={{ touchAction: "pan-y" }}>
+                {yTicks.map((t) => (
+                  <g key={t}>
+                    <line x1={m.l} x2={W - m.r} y1={sy(t)} y2={sy(t)} className="viz-grid" />
+                    <text x={m.l - 6} y={sy(t)} className="viz-axis" textAnchor="end" dominantBaseline="middle">{t >= 1 ? `${t}×` : `1/${1 / t}`}</text>
+                  </g>
+                ))}
+                {xTicks.map((t) => (
+                  <g key={t}>
+                    <line x1={sx(t)} x2={sx(t)} y1={m.t} y2={H - m.b} className="viz-grid" />
+                    <text x={sx(t)} y={H - m.b + 16} className="viz-axis" textAnchor="middle">${t}</text>
+                  </g>
+                ))}
+                <text x={W - m.r} y={H - 4} className="viz-axis" textAnchor="end">
+                  {compact ? "total cost: research + training" : `total cost: research GPU spend + training ($${RATE.toFixed(2)}/h)`}
+                </text>
+                <text x={m.l} y={m.t - 9} className="viz-axis">
+                  {compact ? "compute multiplier (log scale)" : "compute multiplier: starter's cost ÷ recipe's total cost (log scale)"}
+                </text>
+                {[...curves].sort((a, b) => rank(a.r) - rank(b.r)).map(({ r, pts, finals }) => {
+                  const st = modelStyle(r.model), lit = on === r.model, focus = hit?.key === r.key, dim = on !== null && !lit, hi = lit || (on === null && r === top.r);
+                  const op = dim ? 0.18 : hi ? 1 : 0.22;
+                  return (
+                    <g key={r.key}>
+                      <path d={path(pts)} fill="none" stroke={st.color} strokeWidth={focus ? 3 : lit ? 2 : hi ? 2.4 : 1.4} strokeLinejoin="round" opacity={op} />
+                      {pts.map((p) => <circle key={p.hours} cx={sx(cx(p))} cy={sy(vy(p))} r={focus ? 4 : lit ? 3.2 : 2.6} fill={p.extrap ? "#fff" : st.color} stroke={p.extrap ? st.color : "#fff"} strokeWidth={p.extrap ? 1.6 : 1} opacity={dim ? 0.2 : hi ? 1 : 0.3} />)}
+                      {finals.map((p, i) => { const s = focus ? 4.5 : 3.5; return <rect key={i} x={sx(cx(p)) - s} y={sy(vy(p)) - s} width={2 * s} height={2 * s} rx={1.2} fill={st.color} stroke={CMYK.k} strokeWidth={1} opacity={dim ? 0.2 : hi ? 0.9 : 0.3} />; })}
+                    </g>
+                  );
+                })}
+                <line x1={m.l} x2={W - m.r} y1={sy(1)} y2={sy(1)} stroke={CMYK.k} strokeWidth={on === null ? 2.2 : 1.5} />
+                {compact ? (
+                  <text x={W - m.r} y={sy(1) - 6} className="viz-axis" textAnchor="end" style={{ fill: "var(--ink)", fontWeight: 600, paintOrder: "stroke", stroke: "#fff", strokeWidth: 3 }}>
+                    Starter, 1×
+                  </text>
+                ) : (
+                  <text x={W - m.r + 6} y={sy(1)} className="viz-label" dominantBaseline="middle" style={{ fontWeight: 600 }}>Starter, 1×</text>
+                )}
+                <text
+                  x={compact ? sx(cx(top)) - 8 : sx(cx(top)) + 9}
+                  y={compact ? sy(vy(top)) + 1 : sy(vy(top)) - 10}
+                  className="viz-label"
+                  textAnchor={compact ? "end" : "start"}
+                  dominantBaseline={compact ? "middle" : "auto"}
+                  style={{ fontSize: compact ? 11.5 : 12.5, fontWeight: 600, paintOrder: "stroke", stroke: "#fff", strokeWidth: 4, strokeLinejoin: "round" }}
+                >
+                  {compact
+                    ? `${top.r.model}: ${top.extrap ? "≈" : ""}${fx(vy(top))}`
+                    : `${top.r.model}, ${usd(top.r.spentUsd)} session: ${top.extrap ? "≈" : ""}${fx(vy(top))}`}
+                </text>
+              </svg>
+              {hit && (
+                <div className="viz-tip" style={hit.cy < 110 ? { left: tipLeft, top: hit.cy + 14, transform: "none" } : { left: tipLeft, top: hit.cy - 10 }} role="status">
+                  <strong>{hit.title}</strong>
+                  {hit.lines.map((l) => <span key={l}>{l}</span>)}
+                </div>
+              )}
+            </div>
           </div>
-        )}
+        </figure>
+        <figure className="pt-figure ar-cost-fig">
+          <div className="ar-cost-head">Training compute only</div>
+          <div className="viz ar-cost" ref={rightRef}>
+            <TrainBars W={WR} on={on} onHover={setLegendModel} />
+          </div>
+        </figure>
       </div>
     </div>
   );
