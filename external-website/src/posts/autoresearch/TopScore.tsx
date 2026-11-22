@@ -8,7 +8,7 @@ import budgetRaw from "./budget.json";
 import { starterHoursFor } from "./CostMultiplier";
 
 // Composite model scores across all campaigns (reports/top-level-score-2026-11-20/build.py).
-// Default view ("two"): every model ran the same two tasks (Polytopia empty file, Pokémon 3v3); each task is
+// Default view ("two"): the models that ran both tasks (Polytopia empty file, Pokémon 3v3); each task is
 // standardized across those models and the two are averaged; the whisker spans the two tasks taken alone.
 // Other views: each task's scores are standardized within its field, then one least-squares fit estimates
 // score = model strength + task offset (with a small ridge prior). Scaled to 50 = average entrant,
@@ -178,7 +178,7 @@ export default function TopScore() {
     <div className="viz ar-top" ref={ref} onMouseLeave={() => setTip(null)}>
       <div className="ar-tabs ar-tabs-wrap" role="tablist" aria-label="Composite score view">
         <button role="tab" aria-selected={mode === "two"} onClick={() => { setMode("two"); setTip(null); }}>
-          Two tasks, every model ({DATA.two.length})
+          Two tasks ({DATA.two.length})
         </button>
         <button role="tab" aria-selected={recipe} onClick={() => { setMode("recipe"); setTip(null); }}>
           Two tasks + forecasting + $8.70 recipe ({RECIPE.length})

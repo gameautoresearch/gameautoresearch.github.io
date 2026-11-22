@@ -135,8 +135,9 @@ export default function AutoresearchPost() {
         Top Line Results
       </h2>
       <p>
-        Nineteen models ran the same two tasks, Polytopia from an empty file and
-        Pokémon 3v3 from a working starter. A group of six frontier models leads
+        Fourteen models have comparable results on the same two tasks,
+        Polytopia from an empty file and Pokémon 3v3 from a working starter;
+        five more are rerunning Polytopia. A group of six frontier models leads
         the rest, with little between them, and the same models lead when all
         eight research tasks across Polytopia, Pokémon, Hex, Generals and Clash
         are pooled.
@@ -155,7 +156,7 @@ export default function AutoresearchPost() {
       </Figure>
 
       <p>
-        The headline score uses only the two tasks every model ran, so each
+        The headline score uses only models that ran both tasks, so each
         model is judged on the same evidence. We standardize each task across
         the models and average the two: 50 is the average model, and 10 points
         is one standard deviation. The pooled tabs fit one rating through all
