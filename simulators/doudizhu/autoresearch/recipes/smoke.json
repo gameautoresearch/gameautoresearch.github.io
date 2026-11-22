@@ -1,0 +1,1 @@
+{"architecture":{"hidden":128,"depth":3,"history":64},"vector_games":2048,"batch_size":4096,"learning_rate":0.001,"epsilon":0.1}

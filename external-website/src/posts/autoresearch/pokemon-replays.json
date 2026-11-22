@@ -1,0 +1,42 @@
+[
+ {
+  "id": "sol61-a1-vs-astra6-a1",
+  "title": "GPT-6.1 Sol · a1 vs GPT-6 Astra · a1",
+  "players": [
+   "GPT-6.1 Sol · a1",
+   "GPT-6 Astra · a1"
+  ],
+  "winner": "GPT-6 Astra · a1",
+  "turns": 7
+ },
+ {
+  "id": "inkling2s-b2-vs-deepseek-v4pro-a2",
+  "title": "Inkling 2 Small · b2 vs DeepSeek V4 Pro · a2",
+  "players": [
+   "Inkling 2 Small · b2",
+   "DeepSeek V4 Pro · a2"
+  ],
+  "winner": "Inkling 2 Small · b2",
+  "turns": 16
+ },
+ {
+  "id": "luna6-a1-vs-kimi-k3-a2",
+  "title": "GPT-6 Luna · a1 vs Kimi K3 · a2",
+  "players": [
+   "GPT-6 Luna · a1",
+   "Kimi K3 · a2"
+  ],
+  "winner": "GPT-6 Luna · a1",
+  "turns": 5
+ },
+ {
+  "id": "sol61-a2-vs-glm53-a3",
+  "title": "GPT-6.1 Sol · a2 vs GLM-5.3 · a3",
+  "players": [
+   "GPT-6.1 Sol · a2",
+   "GLM-5.3 · a3"
+  ],
+  "winner": "GPT-6.1 Sol · a2",
+  "turns": 4
+ }
+]

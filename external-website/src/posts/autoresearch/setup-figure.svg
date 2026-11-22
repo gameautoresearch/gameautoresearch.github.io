@@ -1,0 +1,142 @@
+<svg viewBox="10 38 688 312" role="img" aria-label="An AI research agent, shown with something it might say, and a fixed budget of GPU dollars, shown as a server rack and a stack of bills, go in. The agent spends the budget on short test runs and then one full-length training run. A small policy network comes out and plays Polytopia against an opponent policy.">
+<defs>
+<marker id="ar-fig1-ah" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="6.5" markerHeight="6.5" orient="auto"><path d="M0 0.8L8 4L0 7.2Z"/></marker>
+<pattern id="ar-fig1-dots" width="6" height="6" patternUnits="userSpaceOnUse"><rect width="6" height="6" fill="var(--bg)"/><circle cx="3" cy="3" r="1" fill="var(--c)" opacity=".22"/></pattern>
+</defs>
+<g transform="translate(-13 0)">
+<rect x="31" y="46" width="188" height="46" rx="10" class="box"/>
+<path d="M117 91.4L125 104L136 91.4" class="box"/><path d="M118.3 91.6H134.7" class="cover"/>
+<text x="125" y="66" class="say mid">“This run went flat.</text>
+<text x="125" y="83" class="say mid">Try a higher learning rate.”</text>
+<rect x="88" y="128" width="6" height="16" rx="2.5" class="box"/><rect x="156" y="128" width="6" height="16" rx="2.5" class="box"/>
+<rect x="93" y="108" width="64" height="54" rx="15" class="box"/>
+<circle cx="113" cy="131" r="5.2" class="eye"/><circle cx="137" cy="131" r="5.2" class="eye"/>
+<path d="M117 147.5Q125 151.5 133 147.5" class="pin" stroke-linecap="round"/>
+<svg x="64" y="168.5" width="21" height="21" viewBox="0 0 65 65" fill="none" role="img" aria-label="Gemini logo"><mask id="gm-maskme" style="mask-type:alpha" maskUnits="userSpaceOnUse" x="0" y="0" width="65" height="65"><path d="M32.447 0c.68 0 1.273.465 1.439 1.125a38.904 38.904 0 001.999 5.905c2.152 5 5.105 9.376 8.854 13.125 3.751 3.75 8.126 6.703 13.125 8.855a38.98 38.98 0 005.906 1.999c.66.166 1.124.758 1.124 1.438 0 .68-.464 1.273-1.125 1.439a38.902 38.902 0 00-5.905 1.999c-5 2.152-9.375 5.105-13.125 8.854-3.749 3.751-6.702 8.126-8.854 13.125a38.973 38.973 0 00-2 5.906 1.485 1.485 0 01-1.438 1.124c-.68 0-1.272-.464-1.438-1.125a38.913 38.913 0 00-2-5.905c-2.151-5-5.103-9.375-8.854-13.125-3.75-3.749-8.125-6.702-13.125-8.854a38.973 38.973 0 00-5.905-2A1.485 1.485 0 010 32.448c0-.68.465-1.272 1.125-1.438a38.903 38.903 0 005.905-2c5-2.151 9.376-5.104 13.125-8.854 3.75-3.749 6.703-8.125 8.855-13.125a38.972 38.972 0 001.999-5.905A1.485 1.485 0 0132.447 0z" fill="#000"/><path d="M32.447 0c.68 0 1.273.465 1.439 1.125a38.904 38.904 0 001.999 5.905c2.152 5 5.105 9.376 8.854 13.125 3.751 3.75 8.126 6.703 13.125 8.855a38.98 38.98 0 005.906 1.999c.66.166 1.124.758 1.124 1.438 0 .68-.464 1.273-1.125 1.439a38.902 38.902 0 00-5.905 1.999c-5 2.152-9.375 5.105-13.125 8.854-3.749 3.751-6.702 8.126-8.854 13.125a38.973 38.973 0 00-2 5.906 1.485 1.485 0 01-1.438 1.124c-.68 0-1.272-.464-1.438-1.125a38.913 38.913 0 00-2-5.905c-2.151-5-5.103-9.375-8.854-13.125-3.75-3.749-8.125-6.702-13.125-8.854a38.973 38.973 0 00-5.905-2A1.485 1.485 0 010 32.448c0-.68.465-1.272 1.125-1.438a38.903 38.903 0 005.905-2c5-2.151 9.376-5.104 13.125-8.854 3.75-3.749 6.703-8.125 8.855-13.125a38.972 38.972 0 001.999-5.905A1.485 1.485 0 0132.447 0z" fill="url(#gm-prefix__paint0_linear_2001_67)"/></mask><g mask="url(#gm-maskme)"><g filter="url(#gm-prefix__filter0_f_2001_67)"><path d="M-5.859 50.734c7.498 2.663 16.116-2.33 19.249-11.152 3.133-8.821-.406-18.131-7.904-20.794-7.498-2.663-16.116 2.33-19.25 11.151-3.132 8.822.407 18.132 7.905 20.795z" fill="#FFE432"/></g><g filter="url(#gm-prefix__filter1_f_2001_67)"><path d="M27.433 21.649c10.3 0 18.651-8.535 18.651-19.062 0-10.528-8.35-19.062-18.651-19.062S8.78-7.94 8.78 2.587c0 10.527 8.35 19.062 18.652 19.062z" fill="#FC413D"/></g><g filter="url(#gm-prefix__filter2_f_2001_67)"><path d="M20.184 82.608c10.753-.525 18.918-12.244 18.237-26.174-.68-13.93-9.95-24.797-20.703-24.271C6.965 32.689-1.2 44.407-.519 58.337c.681 13.93 9.95 24.797 20.703 24.271z" fill="#00B95C"/></g><g filter="url(#gm-prefix__filter3_f_2001_67)"><path d="M20.184 82.608c10.753-.525 18.918-12.244 18.237-26.174-.68-13.93-9.95-24.797-20.703-24.271C6.965 32.689-1.2 44.407-.519 58.337c.681 13.93 9.95 24.797 20.703 24.271z" fill="#00B95C"/></g><g filter="url(#gm-prefix__filter4_f_2001_67)"><path d="M30.954 74.181c9.014-5.485 11.427-17.976 5.389-27.9-6.038-9.925-18.241-13.524-27.256-8.04-9.015 5.486-11.428 17.977-5.39 27.902 6.04 9.924 18.242 13.523 27.257 8.038z" fill="#00B95C"/></g><g filter="url(#gm-prefix__filter5_f_2001_67)"><path d="M67.391 42.993c10.132 0 18.346-7.91 18.346-17.666 0-9.757-8.214-17.667-18.346-17.667s-18.346 7.91-18.346 17.667c0 9.757 8.214 17.666 18.346 17.666z" fill="#3186FF"/></g><g filter="url(#gm-prefix__filter6_f_2001_67)"><path d="M-13.065 40.944c9.33 7.094 22.959 4.869 30.442-4.972 7.483-9.84 5.987-23.569-3.343-30.663C4.704-1.786-8.924.439-16.408 10.28c-7.483 9.84-5.986 23.57 3.343 30.664z" fill="#FBBC04"/></g><g filter="url(#gm-prefix__filter7_f_2001_67)"><path d="M34.74 51.43c11.135 7.656 25.896 5.524 32.968-4.764 7.073-10.287 3.779-24.832-7.357-32.488C49.215 6.52 34.455 8.654 27.382 18.94c-7.072 10.288-3.779 24.833 7.357 32.49z" fill="#3186FF"/></g><g filter="url(#gm-prefix__filter8_f_2001_67)"><path d="M54.984-2.336c2.833 3.852-.808 11.34-8.131 16.727-7.324 5.387-15.557 6.631-18.39 2.78-2.833-3.853.807-11.342 8.13-16.728 7.324-5.387 15.558-6.631 18.39-2.78z" fill="#749BFF"/></g><g filter="url(#gm-prefix__filter9_f_2001_67)"><path d="M31.727 16.104C43.053 5.598 46.94-8.626 40.41-15.666c-6.53-7.04-21.006-4.232-32.332 6.274s-15.214 24.73-8.683 31.77c6.53 7.04 21.006 4.232 32.332-6.274z" fill="#FC413D"/></g><g filter="url(#gm-prefix__filter10_f_2001_67)"><path d="M8.51 53.838c6.732 4.818 14.46 5.55 17.262 1.636 2.802-3.915-.384-10.994-7.116-15.812-6.731-4.818-14.46-5.55-17.261-1.636-2.802 3.915.383 10.994 7.115 15.812z" fill="#FFEE48"/></g></g><defs><filter id="gm-prefix__filter0_f_2001_67" x="-19.824" y="13.152" width="39.274" height="43.217" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB"><feFlood flood-opacity="0" result="BackgroundImageFix"/><feBlend in="SourceGraphic" in2="BackgroundImageFix" result="shape"/><feGaussianBlur stdDeviation="2.46" result="effect1_foregroundBlur_2001_67"/></filter><filter id="gm-prefix__filter1_f_2001_67" x="-15.001" y="-40.257" width="84.868" height="85.688" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB"><feFlood flood-opacity="0" result="BackgroundImageFix"/><feBlend in="SourceGraphic" in2="BackgroundImageFix" result="shape"/><feGaussianBlur stdDeviation="11.891" result="effect1_foregroundBlur_2001_67"/></filter><filter id="gm-prefix__filter2_f_2001_67" x="-20.776" y="11.927" width="79.454" height="90.916" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB"><feFlood flood-opacity="0" result="BackgroundImageFix"/><feBlend in="SourceGraphic" in2="BackgroundImageFix" result="shape"/><feGaussianBlur stdDeviation="10.109" result="effect1_foregroundBlur_2001_67"/></filter><filter id="gm-prefix__filter3_f_2001_67" x="-20.776" y="11.927" width="79.454" height="90.916" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB"><feFlood flood-opacity="0" result="BackgroundImageFix"/><feBlend in="SourceGraphic" in2="BackgroundImageFix" result="shape"/><feGaussianBlur stdDeviation="10.109" result="effect1_foregroundBlur_2001_67"/></filter><filter id="gm-prefix__filter4_f_2001_67" x="-19.845" y="15.459" width="79.731" height="81.505" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB"><feFlood flood-opacity="0" result="BackgroundImageFix"/><feBlend in="SourceGraphic" in2="BackgroundImageFix" result="shape"/><feGaussianBlur stdDeviation="10.109" result="effect1_foregroundBlur_2001_67"/></filter><filter id="gm-prefix__filter5_f_2001_67" x="29.832" y="-11.552" width="75.117" height="73.758" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB"><feFlood flood-opacity="0" result="BackgroundImageFix"/><feBlend in="SourceGraphic" in2="BackgroundImageFix" result="shape"/><feGaussianBlur stdDeviation="9.606" result="effect1_foregroundBlur_2001_67"/></filter><filter id="gm-prefix__filter6_f_2001_67" x="-38.583" y="-16.253" width="78.135" height="78.758" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB"><feFlood flood-opacity="0" result="BackgroundImageFix"/><feBlend in="SourceGraphic" in2="BackgroundImageFix" result="shape"/><feGaussianBlur stdDeviation="8.706" result="effect1_foregroundBlur_2001_67"/></filter><filter id="gm-prefix__filter7_f_2001_67" x="8.107" y="-5.966" width="78.877" height="77.539" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB"><feFlood flood-opacity="0" result="BackgroundImageFix"/><feBlend in="SourceGraphic" in2="BackgroundImageFix" result="shape"/><feGaussianBlur stdDeviation="7.775" result="effect1_foregroundBlur_2001_67"/></filter><filter id="gm-prefix__filter8_f_2001_67" x="13.587" y="-18.488" width="56.272" height="51.81" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB"><feFlood flood-opacity="0" result="BackgroundImageFix"/><feBlend in="SourceGraphic" in2="BackgroundImageFix" result="shape"/><feGaussianBlur stdDeviation="6.957" result="effect1_foregroundBlur_2001_67"/></filter><filter id="gm-prefix__filter9_f_2001_67" x="-15.526" y="-31.297" width="70.856" height="69.306" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB"><feFlood flood-opacity="0" result="BackgroundImageFix"/><feBlend in="SourceGraphic" in2="BackgroundImageFix" result="shape"/><feGaussianBlur stdDeviation="5.876" result="effect1_foregroundBlur_2001_67"/></filter><filter id="gm-prefix__filter10_f_2001_67" x="-14.168" y="20.964" width="55.501" height="51.571" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB"><feFlood flood-opacity="0" result="BackgroundImageFix"/><feBlend in="SourceGraphic" in2="BackgroundImageFix" result="shape"/><feGaussianBlur stdDeviation="7.273" result="effect1_foregroundBlur_2001_67"/></filter><linearGradient id="gm-prefix__paint0_linear_2001_67" x1="18.447" y1="43.42" x2="52.153" y2="15.004" gradientUnits="userSpaceOnUse"><stop stop-color="#4893FC"/><stop offset=".27" stop-color="#4893FC"/><stop offset=".777" stop-color="#969DFF"/><stop offset="1" stop-color="#BD99FE"/></linearGradient></defs></svg>
+<text x="91" y="184" class="eg">Gemini 4 Neon</text>
+<path d="M74.5 308.0L48.5 293.0L48.5 227.0L74.5 242.0Z" class="face fl"/>
+<path d="M74.5 308.0L114.3 285.0L114.3 219.0L74.5 242.0Z" class="face fr"/>
+<path d="M74.5 242.0L114.3 219.0L88.4 204.0L48.5 227.0Z" class="face ft"/>
+<path d="M78.0 300.0L110.9 281.0L110.9 272.8L78.0 291.8Z" class="unit"/>
+<circle cx="82.3" cy="293.4" r="1.7" class="led"/>
+<path d="M88.4 289.9L107.4 278.9" class="vent"/>
+<path d="M78.0 288.4L110.9 269.4L110.9 261.2L78.0 280.2Z" class="unit"/>
+<circle cx="82.3" cy="281.8" r="1.7" class="led"/>
+<path d="M88.4 278.3L107.4 267.3" class="vent"/>
+<path d="M78.0 276.8L110.9 257.8L110.9 249.6L78.0 268.6Z" class="unit"/>
+<circle cx="82.3" cy="270.2" r="1.7" class="led"/>
+<path d="M88.4 266.7L107.4 255.7" class="vent"/>
+<path d="M78.0 265.2L110.9 246.2L110.9 238.0L78.0 257.0Z" class="unit"/>
+<circle cx="82.3" cy="258.6" r="1.7" class="led"/>
+<path d="M88.4 255.1L107.4 244.1" class="vent"/>
+<path d="M78.0 253.6L110.9 234.6L110.9 226.4L78.0 245.4Z" class="unit"/>
+<circle cx="82.3" cy="247.0" r="1.7" class="led"/>
+<path d="M88.4 243.5L107.4 232.5" class="vent"/>
+<path d="M68.4 247.5L68.4 264.5" class="vent"/>
+<path d="M61.5 243.5L61.5 260.5" class="vent"/>
+<path d="M54.6 239.5L54.6 256.5" class="vent"/>
+<path d="M129.0 298.0L179.2 269.0L201.7 282.0L151.5 311.0Z" class="bill"/>
+<path d="M129.0 294.0L179.2 265.0L201.7 278.0L151.5 307.0Z" class="bill"/>
+<path d="M129.0 290.0L179.2 261.0L201.7 274.0L151.5 303.0Z" class="bill"/>
+<path d="M129.0 286.0L179.2 257.0L201.7 270.0L151.5 299.0Z" class="bill"/>
+<path d="M129.0 282.0L179.2 253.0L201.7 266.0L151.5 295.0Z" class="bill"/>
+<path d="M135.9 282.0L179.2 257.0L194.8 266.0L151.5 291.0Z" class="billin"/>
+<ellipse cx="165.4" cy="274.0" rx="8.5" ry="5" class="coin"/><text x="165.4" y="277.0" class="cointx">$</text>
+<text x="125" y="340" class="lab mid">Compute budget</text>
+</g>
+<path d="M211 69H244" class="arr" marker-end="url(#ar-fig1-ah)"/>
+<path d="M192 281C216 281 214 303.5 244 303.5" class="arr" marker-end="url(#ar-fig1-ah)"/>
+<path d="M250 56V246H490" class="axis"/>
+<text transform="translate(243 151) rotate(-90)" class="sub mid">training loss</text>
+<path d="M250 80.6 L251.6 88.2 L253.2 94.9 L254.8 104.2 L256.4 107.4 L258 115 L259.6 119 L261.2 121.9 L262.8 128 L264.4 129.2 L266 134.2 L267.6 135.2" class="curve probe"/>
+<circle cx="267.6" cy="135.2" r="2.6" class="end probe"/>
+<path d="M250 243V249" class="axis"/>
+<rect x="250" y="294" width="17.6" height="19" rx="2" class="note"/><rect x="252.5" y="296.5" width="12.6" height="14" rx="1" class="notein"/><circle cx="258.8" cy="303.5" r="4.6" class="coin"/><text x="258.8" y="306.1" class="notetx">$</text>
+<path d="M270.8 80.6 L272.4 85.8 L274 94 L275.6 101.8 L277.2 103.6 L278.8 108.8 L280.4 114.9 L282 120.3 L283.6 121.8 L285.2 123.8 L286.8 129.4 L288.4 127.2" class="curve probe"/>
+<circle cx="288.4" cy="127.2" r="2.6" class="end probe"/>
+<path d="M270.8 243V249" class="axis"/>
+<rect x="270.8" y="294" width="17.6" height="19" rx="2" class="note"/><rect x="273.3" y="296.5" width="12.6" height="14" rx="1" class="notein"/><circle cx="279.6" cy="303.5" r="4.6" class="coin"/><text x="279.6" y="306.1" class="notetx">$</text>
+<path d="M291.6 80.6 L293.2 95 L294.8 103.6 L296.4 113 L298 122.1 L299.6 131.1 L301.2 140.8 L302.8 144.3 L304.4 152.1 L306 157.6 L307.6 160.9 L309.2 166 L310.8 167.3 L312.4 170.7 L314 174.4" class="curve pick"/>
+<circle cx="314" cy="174.4" r="2.6" class="end pick"/>
+<path d="M291.6 243V249" class="axis"/>
+<rect x="291.6" y="294" width="22.4" height="19" rx="2" class="note"/><rect x="294.1" y="296.5" width="17.4" height="14" rx="1" class="notein"/><circle cx="302.8" cy="303.5" r="4.6" class="coin"/><text x="302.8" y="306.1" class="notetx">$</text>
+<path d="M317.2 80.6 L318.8 90.9 L320.4 98 L322 105.1 L323.6 113.1 L325.2 118.5 L326.8 123.1 L328.4 130.3 L330 134.2 L331.6 135.8 L333.2 140.9 L334.8 143.7 L336.4 148.3 L338 150 L339.6 150.1" class="curve probe"/>
+<circle cx="339.6" cy="150.1" r="2.6" class="end probe"/>
+<path d="M317.2 243V249" class="axis"/>
+<rect x="317.2" y="294" width="22.4" height="19" rx="2" class="note"/><rect x="319.7" y="296.5" width="17.4" height="14" rx="1" class="notein"/><circle cx="328.4" cy="303.5" r="4.6" class="coin"/><text x="328.4" y="306.1" class="notetx">$</text>
+<path d="M342.8 80.6 L344.4 89.2 L346 90.9 L347.6 98.1 L349.2 105.2 L350.8 107.5 L352.4 114.1 L354 116.7 L355.6 124.4 L357.2 129.3 L358.8 132.6 L360.4 138.1 L362 139.2 L363.6 144.7 L365.2 147.8 L366.8 151.1 L368.4 153.8 L370 158.7 L371.6 162.3 L373.2 162.7 L374.8 166.4 L376.4 166.1 L378 171.8 L379.6 173.9 L381.2 177.8 L382.8 179.2 L384.4 178.7 L386 181.2 L387.6 184.5 L389.2 183.2 L390.8 187.1 L392.4 187.3 L394 188.7 L395.6 190 L397.2 194.9 L398.8 193.2 L400.4 195.1 L402 197.2 L403.6 200.7 L405.2 198.1 L406.8 201.1 L408.4 202.6 L410 205.3 L411.6 206 L413.2 207.2 L414.8 205.2 L416.4 206.8 L418 207.3 L419.6 210.7 L421.2 211.9 L422.8 208.7 L424.4 209.5 L426 210.5 L427.6 211 L429.2 212.9 L430.8 214 L432.4 213 L434 212.2 L435.6 214.8 L437.2 215.2 L438.8 216.5 L440.4 219 L442 218.1 L443.6 217.6 L445.2 218.5 L446.8 219.2 L448.4 216.5 L450 221 L451.6 220.7 L453.2 221.5 L454.8 221.5 L456.4 219.7 L458 220.1 L459.6 219 L461.2 221.7 L462.8 219.2 L464.4 219.5 L466 220.4 L467.6 220.4 L469.2 221.5 L470.8 220.3 L472.4 220.2 L474 221.2 L475.6 221.1 L477.2 222.5 L478.8 221.1 L480.4 225.3 L482 224.2 L483.6 222.1 L485.2 222.8 L486.8 223.3 L488.4 223.5 L490 222.4" class="curve long"/>
+<path d="M342.8 243V249" class="axis"/>
+<rect x="342.8" y="294" width="147.2" height="19" rx="2" class="note"/><rect x="345.3" y="296.5" width="142.2" height="14" rx="1" class="notein"/><circle cx="416.4" cy="303.5" r="4.6" class="coin"/><text x="416.4" y="306.1" class="notetx">$</text><circle cx="354.8" cy="303.5" r="2.2" class="notein"/><circle cx="478" cy="303.5" r="2.2" class="notein"/>
+<text x="314" y="187.4" class="sub pickt mid">best idea</text>
+<text x="294.8" y="340" class="sub mid">short test runs</text>
+<text x="416.4" y="340" class="sub mid">hero run</text>
+<path d="M418 199C432 160 470 118 521 118" class="arr" marker-end="url(#ar-fig1-ah)"/>
+<g transform="translate(-190 0)">
+<path d="M723 100L745 94" class="edge"/>
+<path d="M723 100L745 110" class="edge"/>
+<path d="M723 100L745 126" class="edge"/>
+<path d="M723 100L745 142" class="edge"/>
+<path d="M723 118L745 94" class="edge"/>
+<path d="M723 118L745 110" class="edge"/>
+<path d="M723 118L745 126" class="edge"/>
+<path d="M723 118L745 142" class="edge"/>
+<path d="M723 136L745 94" class="edge"/>
+<path d="M723 136L745 110" class="edge"/>
+<path d="M723 136L745 126" class="edge"/>
+<path d="M723 136L745 142" class="edge"/>
+<path d="M745 94L767 109" class="edge"/>
+<path d="M745 94L767 127" class="edge"/>
+<path d="M745 110L767 109" class="edge"/>
+<path d="M745 110L767 127" class="edge"/>
+<path d="M745 126L767 109" class="edge"/>
+<path d="M745 126L767 127" class="edge"/>
+<path d="M745 142L767 109" class="edge"/>
+<path d="M745 142L767 127" class="edge"/>
+<circle cx="723" cy="100" r="4" class="node"/>
+<circle cx="723" cy="118" r="4" class="node"/>
+<circle cx="723" cy="136" r="4" class="node"/>
+<circle cx="745" cy="94" r="4" class="node"/>
+<circle cx="745" cy="110" r="4" class="node"/>
+<circle cx="745" cy="126" r="4" class="node"/>
+<circle cx="745" cy="142" r="4" class="node"/>
+<circle cx="767" cy="109" r="4" class="node"/>
+<circle cx="767" cy="127" r="4" class="node"/>
+</g>
+<g class="opp" transform="translate(-100 0)">
+<path d="M723 100L745 94" class="edge"/>
+<path d="M723 100L745 110" class="edge"/>
+<path d="M723 100L745 126" class="edge"/>
+<path d="M723 100L745 142" class="edge"/>
+<path d="M723 118L745 94" class="edge"/>
+<path d="M723 118L745 110" class="edge"/>
+<path d="M723 118L745 126" class="edge"/>
+<path d="M723 118L745 142" class="edge"/>
+<path d="M723 136L745 94" class="edge"/>
+<path d="M723 136L745 110" class="edge"/>
+<path d="M723 136L745 126" class="edge"/>
+<path d="M723 136L745 142" class="edge"/>
+<path d="M745 94L767 109" class="edge"/>
+<path d="M745 94L767 127" class="edge"/>
+<path d="M745 110L767 109" class="edge"/>
+<path d="M745 110L767 127" class="edge"/>
+<path d="M745 126L767 109" class="edge"/>
+<path d="M745 126L767 127" class="edge"/>
+<path d="M745 142L767 109" class="edge"/>
+<path d="M745 142L767 127" class="edge"/>
+<circle cx="723" cy="100" r="4" class="node"/>
+<circle cx="723" cy="118" r="4" class="node"/>
+<circle cx="723" cy="136" r="4" class="node"/>
+<circle cx="745" cy="94" r="4" class="node"/>
+<circle cx="745" cy="110" r="4" class="node"/>
+<circle cx="745" cy="126" r="4" class="node"/>
+<circle cx="745" cy="142" r="4" class="node"/>
+<circle cx="767" cy="109" r="4" class="node"/>
+<circle cx="767" cy="127" r="4" class="node"/>
+</g>
+<text x="555" y="66" class="lab mid">Trained policy</text>
+<text x="645" y="66" class="lab mid">Opponent</text>
+<g transform="translate(600 218) scale(.56)"><!--board--></g>
+<path d="M555 153Q551 190 562 222" class="arr dash" marker-end="url(#ar-fig1-ah)"/>
+<path d="M645 153Q649 190 638 222" class="arr dash" marker-end="url(#ar-fig1-ah)"/>
+<text x="600" y="340" class="lab mid">The game</text>
+</svg>

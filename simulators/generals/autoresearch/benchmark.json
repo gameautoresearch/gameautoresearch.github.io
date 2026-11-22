@@ -1,0 +1,130 @@
+{
+  "schema_version": 1,
+  "game": "generals",
+  "benchmark_id": "generals-autoresearch-medium-v2",
+  "session_contract": "generals-autoresearch-v3",
+  "policy_package": "generals-autoresearch-v2",
+  "task": {
+    "id": "generals-research-1v1-medium-v2",
+    "min_grid_size": 12,
+    "max_grid_size": 15,
+    "pad_to": 16,
+    "dimension_sampling": "Independent uniform integer sides, inclusive 12..15, fold_in(seed,0x53495a45); board key=PRNGKey(seed)",
+    "mountain_density_range": [
+      0.2,
+      0.2
+    ],
+    "num_castles_range": [
+      4,
+      6
+    ],
+    "castle_val_range": [
+      10,
+      16
+    ],
+    "min_generals_distance": 10,
+    "max_generals_distance": null,
+    "truncation": 1000,
+    "num_players": 2,
+    "perfect_info": false,
+    "build_castles": false,
+    "deathtouch_turn": null,
+    "general_trade": true,
+    "timeout_score": "draw; zero terminal reward",
+    "reward": "capture +/-1; nothing else from the environment",
+    "action_codec": "0 pass; 1+(((row*16+col)*4+direction)*2+split); padded sources/destinations masked",
+    "range_semantics": "Map sides and castle counts inclusive; castle army upper bound exclusive, as in pinned upstream",
+    "observation_codec": "9 spatial + 5 public scalar broadcast planes, normalized; no memory",
+    "engine_commit": "954927f508aa47899019d66317cc313af3e9cc19",
+    "observation_shape": [
+      16,
+      16,
+      14
+    ],
+    "action_count": 2049,
+    "policy_flops_cap": 1000000000,
+    "policy_flops_measure": "counted from the jaxpr of one forward pass, batch 1, padded 16x16 board: 2 per multiply-add in convolutions and matrix products, 1 per element of other arithmetic (flops.py)",
+    "policy_tensor_cap": 32000000,
+    "inference": "stateless greedy visible-only"
+  },
+  "resources": {
+    "gpu": "L40S",
+    "cpu_cores": 4,
+    "memory_gib": 16,
+    "practice_worker": "the training shape (the submitted network runs on the GPU); charged to the research budget at its shape's price",
+    "leases": "0 or 1 L40S, 1-32 CPU cores, 2-64 GiB, researcher commands, shared /scratch Volume",
+    "concurrency": "seconds mode (default): one active job (run, practice or lease); usd mode: 4 active jobs, at most 2 with a GPU and 64 CPU cores in total",
+    "charging": "seconds mode: training-worker seconds = worker seconds x cost(shape)/cost(training shape); usd mode: US dollars = worker seconds x cost(shape); cost at the frozen Modal sandbox list prices in contract.py PRICE"
+  },
+  "budget": {
+    "default_mode": "seconds",
+    "research_seconds": 16200,
+    "smoke_research_seconds": 360,
+    "research_usd": 10.0,
+    "research_wall_seconds": 18000,
+    "fresh_final_train_seconds": 3600,
+    "smoke_research_usd": 0.5,
+    "min_run_seconds": 120,
+    "export_reserve_seconds": {
+      "fraction_of_run": 0.05,
+      "minimum": 40,
+      "maximum": 60
+    },
+    "accounting": "allocated_worker_wall_time",
+    "smoke_includes_gpu_grading": true,
+    "model_smoke_usd": 2,
+    "seconds_mode": {
+      "research_seconds": 16200,
+      "smoke_research_seconds": 360,
+      "concurrency": "one job at a time"
+    },
+    "usd_mode": {
+      "research_usd": 10.0,
+      "smoke_research_usd": 0.5,
+      "wall_seconds": 18000,
+      "smoke_wall_seconds": 4800,
+      "concurrency": "parallel: up to 4 jobs, 2 GPUs, 64 CPU cores"
+    },
+    "max_run_seconds": 1500
+  },
+  "starter": {
+    "recipe": "recipes/starter.json",
+    "editable_files": [
+      "starter/policy.py",
+      "starter/learner.py",
+      "starter/train.py",
+      "recipes/starter.json"
+    ],
+    "initialization": "random"
+  },
+  "agent": {
+    "brief": "task/brief.md"
+  },
+  "evaluation": {
+    "primary_metric": "panel_points",
+    "score_scale": [
+      0,
+      100
+    ],
+    "capture_win": 1,
+    "capture_loss": 0,
+    "cap_draw": 0.5,
+    "seat_weighting": "both physical seats, equal weight",
+    "opponent_weighting": "equal frozen-panel weight",
+    "confidence_interval": "95% whole-map paired bootstrap, 2000 replicates",
+    "train_maps": 256,
+    "practice_maps": 16,
+    "private_grade_maps": 128,
+    "private_calibration_maps": 128,
+    "smoke_grade_maps": 2,
+    "normalized_reference_score": null,
+    "policy_fault": "invalid submission",
+    "simulator_fault": "abort grading",
+    "incomplete_schedule": "no score"
+  },
+  "commands": {
+    "prepare": ".venv-generals-ar/bin/python -m harness prepare generals --out RELEASE",
+    "smoke": ".venv-generals-ar/bin/python -m harness run generals network --release RELEASE --out SESSION --smoke --model MODEL --execute",
+    "grade": ".venv-generals-ar/bin/python -m harness grade --session SESSION"
+  }
+}

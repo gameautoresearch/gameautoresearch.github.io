@@ -1,0 +1,86 @@
+/*
+ * crforge - https://github.com/voonhous/crforge
+ * SPDX-License-Identifier: Apache-2.0
+ * Porting this code? Please cite this file and the commit you read: see the README.
+ */
+
+package org.crforge.core.battle;
+
+/**
+ * The scheduled actions of one entity, as the holder tick drives them.
+ *
+ * <p>The holder calls into every entity's actions five times per tick, always in the same order:
+ * the pending pass for phase 1 before any component runs, the run pass after the component passes,
+ * the pending pass for phase 2, the pending pass for phase 3 after the entity post-hooks, and the
+ * end-of-tick countdown last of all. {@code ActionHolder} gives these calls their body.
+ */
+public interface EntityActions {
+
+  /** Phase of actions that start before the component passes. */
+  int PHASE_POST_TICK_INIT = 1;
+
+  /** Phase of actions that start after the component passes and the run pass. */
+  int PHASE_POST_COMPONENT_TICK = 2;
+
+  /** Phase of actions that start after the entity post-hooks. */
+  int PHASE_POST_GAME_OBJECT_TICK = 3;
+
+  /** An entity that schedules nothing. */
+  EntityActions NONE =
+      new EntityActions() {
+        @Override
+        public void pendingPass(int phase) {}
+
+        @Override
+        public void runPass(int tick) {}
+
+        @Override
+        public void endOfTick() {}
+      };
+
+  /** Starts every queued action of the given phase whose delay has run out. */
+  void pendingPass(int phase);
+
+  /** Steps every action that lasts longer than one tick. */
+  void runPass(int tick);
+
+  /** Takes one tick off every queued delay. Runs for the live list, not the tick's snapshot. */
+  void endOfTick();
+
+  /**
+   * An entity has left the battle: each running action hears of it first, by its id, and does what
+   * its class does with the notice, most of them nothing.
+   *
+   * @param leftId the id of the entity that left
+   */
+  default void objectLeft(int leftId) {}
+
+  /**
+   * The entity's spawner made a character: each running action, from the last to the first, hears
+   * of it by its id, and does what its class does with the notice, most of them nothing.
+   *
+   * @param childId the id of the character made
+   */
+  default void childSpawned(int childId) {}
+
+  /**
+   * An entity has left the battle: the queued actions it caused, and whose rows abort when their
+   * cause does, are dropped. Running actions are left as they are.
+   *
+   * @param left the actions of the entity that left
+   */
+  default void instigatorLeft(EntityActions left) {}
+
+  /**
+   * The entity itself is leaving the battle, and no entity has heard of it yet: each running
+   * action, from the last to the first, does what its class does as its owner leaves, most of them
+   * nothing.
+   */
+  default void leaving() {}
+
+  /**
+   * The entity itself has left the battle, and every entity has heard of it: each running action is
+   * stopped, and does what its class does as it stops, most of them nothing.
+   */
+  default void released() {}
+}

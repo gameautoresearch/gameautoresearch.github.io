@@ -1,0 +1,671 @@
+[
+ {
+  "id": "kimi31",
+  "model": "Kimi K3.1 Pro",
+  "note": "high effort · Modal coordinator",
+  "endH": 5.6241,
+  "endLabel": "Finalized",
+  "summary": "One from-scratch network (res1), then fine-tunes against more Hunter, judged by its own Hunter benchmark on fresh maps; ended with weight averages of its best checkpoints (nearblend).",
+  "events": [
+   {
+    "s": 0.045,
+    "e": 0.1055,
+    "k": "new",
+    "t": "The unchanged starter, 300 s baseline",
+    "d": "Lease basew, 3.6 min. Packaged as base."
+   },
+   {
+    "s": 0.1126,
+    "e": 0.1192,
+    "k": "practice",
+    "t": "Practice: 46.1 points",
+    "d": "0 capture wins, 5 losses, 59 cap draws in 64 games vs random and expansion."
+   },
+   {
+    "s": 0.1349,
+    "e": 0.5014,
+    "k": "new",
+    "t": "8 residual blocks, width 48, dihedral augmentation, land shaping",
+    "d": "Lease res1w, 22.0 min. Packaged as res1."
+   },
+   {
+    "s": 0.5522,
+    "e": 0.559,
+    "k": "practice",
+    "t": "Practice: 99.2 points",
+    "d": "63 capture wins, 0 losses, 1 cap draws in 64 games vs random and expansion."
+   },
+   {
+    "s": 0.5824,
+    "e": 0.5891,
+    "k": "diagnose",
+    "t": "Accidental duplicate, stopped",
+    "d": "Lease mix1w, 0.4 min."
+   },
+   {
+    "s": 0.6036,
+    "e": 0.7319,
+    "k": "new",
+    "t": "From scratch vs 25% Hunter / 25% expansion (stopped: too harsh)",
+    "d": "Lease mix2w, 7.7 min."
+   },
+   {
+    "s": 0.7471,
+    "e": 1.0024,
+    "k": "continue",
+    "t": "From res1: 12.5% Hunter, 12.5% expansion",
+    "d": "Lease fine1w, 15.3 min. Packaged as fine1."
+   },
+   {
+    "s": 1.043,
+    "e": 1.0482,
+    "k": "practice",
+    "t": "Practice: 100.0 points",
+    "d": "64 capture wins, 0 losses, 0 cap draws in 64 games vs random and expansion."
+   },
+   {
+    "s": 1.0735,
+    "e": 1.1452,
+    "k": "own_eval",
+    "t": "Own Hunter benchmark on fresh maps",
+    "d": "Lease huntertest, 4.3 min."
+   },
+   {
+    "s": 1.1809,
+    "e": 1.5519,
+    "k": "continue",
+    "t": "From fine1: 25% Hunter, 25% expansion",
+    "d": "Lease fine2w, 22.3 min. Packaged as fine2."
+   },
+   {
+    "s": 1.5561,
+    "e": 1.5609,
+    "k": "practice",
+    "t": "Practice: 100.0 points",
+    "d": "64 capture wins, 0 losses, 0 cap draws in 64 games vs random and expansion."
+   },
+   {
+    "s": 1.5831,
+    "e": 1.6176,
+    "k": "own_eval",
+    "t": "Own Hunter benchmark, 256 fresh maps",
+    "d": "Lease hunter2, 2.1 min."
+   },
+   {
+    "s": 1.6763,
+    "e": 2.043,
+    "k": "continue",
+    "t": "From fine2: 50% Hunter",
+    "d": "Lease fine3w, 22.0 min. Packaged as fine3."
+   },
+   {
+    "s": 2.0469,
+    "e": 2.0522,
+    "k": "practice",
+    "t": "Practice: 100.0 points",
+    "d": "64 capture wins, 0 losses, 0 cap draws in 64 games vs random and expansion."
+   },
+   {
+    "s": 2.1253,
+    "e": 2.1608,
+    "k": "own_eval",
+    "t": "Own Hunter benchmark",
+    "d": "Lease hunter3, 2.1 min."
+   },
+   {
+    "s": 2.1655,
+    "e": 2.1715,
+    "k": "diagnose",
+    "t": "Wrong opponent mixture, stopped",
+    "d": "Lease fine4w, 0.4 min."
+   },
+   {
+    "s": 2.1787,
+    "e": 2.4891,
+    "k": "continue",
+    "t": "From fine3: 50% Hunter only (regressed)",
+    "d": "Lease fine5w, 18.6 min. Packaged as fine5."
+   },
+   {
+    "s": 2.5013,
+    "e": 2.5083,
+    "k": "practice",
+    "t": "Practice: 98.4 points",
+    "d": "62 capture wins, 0 losses, 2 cap draws in 64 games vs random and expansion."
+   },
+   {
+    "s": 2.5479,
+    "e": 2.8577,
+    "k": "continue",
+    "t": "From fine3: expansion-heavy, higher entropy (not better)",
+    "d": "Lease fine6w, 18.6 min. Packaged as fine6."
+   },
+   {
+    "s": 2.9177,
+    "e": 2.9247,
+    "k": "practice",
+    "t": "Practice: 99.2 points",
+    "d": "63 capture wins, 0 losses, 1 cap draws in 64 games vs random and expansion."
+   },
+   {
+    "s": 2.9559,
+    "e": 3.0259,
+    "k": "average",
+    "t": "Average fine2 and fine3; Hunter test",
+    "d": "Lease avgtest, 4.2 min."
+   },
+   {
+    "s": 3.0427,
+    "e": 3.048,
+    "k": "practice",
+    "t": "Practice: 100.0 points",
+    "d": "64 capture wins, 0 losses, 0 cap draws in 64 games vs random and expansion."
+   },
+   {
+    "s": 3.2923,
+    "e": 3.6577,
+    "k": "continue",
+    "t": "From the average avgmid",
+    "d": "Lease avgtrainw, 21.9 min. Packaged as avgtrain."
+   },
+   {
+    "s": 3.6669,
+    "e": 3.6724,
+    "k": "practice",
+    "t": "Practice: 100.0 points",
+    "d": "64 capture wins, 0 losses, 0 cap draws in 64 games vs random and expansion."
+   },
+   {
+    "s": 3.7604,
+    "e": 3.8407,
+    "k": "average",
+    "t": "Average avgmid and avgtrain (avgblend)",
+    "d": "Lease avgchild, 4.8 min."
+   },
+   {
+    "s": 3.8455,
+    "e": 3.8505,
+    "k": "practice",
+    "t": "Practice: 100.0 points",
+    "d": "64 capture wins, 0 losses, 0 cap draws in 64 games vs random and expansion."
+   },
+   {
+    "s": 3.9754,
+    "e": 4.3426,
+    "k": "continue",
+    "t": "From avgblend",
+    "d": "Lease blendtrainw, 22.0 min. Packaged as blendtrain."
+   },
+   {
+    "s": 4.357,
+    "e": 4.3629,
+    "k": "practice",
+    "t": "Practice: 99.2 points",
+    "d": "63 capture wins, 0 losses, 1 cap draws in 64 games vs random and expansion."
+   },
+   {
+    "s": 4.3906,
+    "e": 4.4373,
+    "k": "average",
+    "t": "Average avgblend and blendtrain",
+    "d": "Lease blendavg, 2.8 min."
+   },
+   {
+    "s": 4.4422,
+    "e": 4.8085,
+    "k": "continue",
+    "t": "From avgblend (regressed)",
+    "d": "Lease lasttrainw, 22.0 min. Packaged as lasttrain."
+   },
+   {
+    "s": 4.8184,
+    "e": 4.8261,
+    "k": "practice",
+    "t": "Practice: 97.7 points",
+    "d": "61 capture wins, 0 losses, 3 cap draws in 64 games vs random and expansion."
+   },
+   {
+    "s": 4.8383,
+    "e": 4.9015,
+    "k": "average",
+    "t": "Multi-checkpoint averages (no gain)",
+    "d": "Lease multiavg, 3.8 min."
+   },
+   {
+    "s": 4.9239,
+    "e": 5.0068,
+    "k": "own_eval",
+    "t": "FLOPs check and 4,096 Hunter games",
+    "d": "Lease finalcheck, 5.0 min."
+   },
+   {
+    "s": 5.0121,
+    "e": 5.0749,
+    "k": "average",
+    "t": "Average avgmid and avgblend (nearblend, final)",
+    "d": "Lease lastavg, 3.8 min."
+   },
+   {
+    "s": 5.1389,
+    "e": 5.1452,
+    "k": "practice",
+    "t": "Practice: 100.0 points",
+    "d": "64 capture wins, 0 losses, 0 cap draws in 64 games vs random and expansion."
+   },
+   {
+    "s": 5.1805,
+    "e": 5.2093,
+    "k": "own_eval",
+    "t": "Independent Hunter verification",
+    "d": "Lease verify, 1.7 min."
+   },
+   {
+    "s": 5.2178,
+    "e": 5.5841,
+    "k": "continue",
+    "t": "From nearblend, LR 5e-6 (not better)",
+    "d": "Lease neartunew, 22.0 min. Packaged as neartune."
+   },
+   {
+    "s": 5.6016,
+    "e": 5.6074,
+    "k": "practice",
+    "t": "Practice: 100.0 points",
+    "d": "64 capture wins, 0 losses, 0 cap draws in 64 games vs random and expansion."
+   }
+  ],
+  "submits": [
+   {
+    "at": 0.1337,
+    "t": "Submitted base"
+   },
+   {
+    "at": 0.5643,
+    "t": "Submitted res1"
+   },
+   {
+    "at": 1.0664,
+    "t": "Submitted fine1"
+   },
+   {
+    "at": 1.6175,
+    "t": "Submitted fine2"
+   },
+   {
+    "at": 2.1604,
+    "t": "Submitted fine3"
+   },
+   {
+    "at": 3.0634,
+    "t": "Submitted avgmid"
+   },
+   {
+    "at": 3.8604,
+    "t": "Submitted avgblend"
+   },
+   {
+    "at": 5.1489,
+    "t": "Submitted nearblend"
+   }
+  ],
+  "grades": [
+   {
+    "at": 1.8583,
+    "t": "Graded point ⅓ of the allocation (submission 4)"
+   },
+   {
+    "at": 4.0784,
+    "t": "Graded point ⅔ of the allocation (submission 7)"
+   }
+  ],
+  "used": "97%"
+ },
+ {
+  "id": "dsflash",
+  "model": "DeepSeek V4 Flash",
+  "note": "high effort · Modal coordinator",
+  "endH": 5.5067,
+  "endLabel": "Finalized",
+  "summary": "Four from-scratch recipes, then a chain of continuations from v1 (generated maps, scripted fine-tunes, low-LR self-play). Chose by public practice, which was already 98-100.",
+  "events": [
+   {
+    "s": 0.1321,
+    "e": 0.1613,
+    "k": "diagnose",
+    "t": "Smoke run of the new residual dilated network",
+    "d": "Lease smokew, 1.7 min. Packaged as smoke."
+   },
+   {
+    "s": 0.1867,
+    "e": 0.1942,
+    "k": "practice",
+    "t": "Practice: 57.8 points",
+    "d": "10 capture wins, 0 losses, 54 cap draws in 64 games vs random and expansion."
+   },
+   {
+    "s": 0.2637,
+    "e": 0.5772,
+    "k": "new",
+    "t": "Residual dilated CNN (6 blocks, width 16), direction-aware head, territory shaping",
+    "d": "Lease v1w, 18.8 min. Packaged as v1."
+   },
+   {
+    "s": 0.6154,
+    "e": 0.6252,
+    "k": "practice",
+    "t": "Practice: 98.4 points",
+    "d": "62 capture wins, 0 losses, 2 cap draws in 64 games vs random and expansion."
+   },
+   {
+    "s": 0.724,
+    "e": 1.1187,
+    "k": "new",
+    "t": "Same recipe, longer (1,500 s)",
+    "d": "Lease v2w, 23.7 min. Packaged as v2."
+   },
+   {
+    "s": 1.1717,
+    "e": 1.1796,
+    "k": "practice",
+    "t": "Practice: 96.1 points",
+    "d": "59 capture wins, 0 losses, 5 cap draws in 64 games vs random and expansion."
+   },
+   {
+    "s": 1.2279,
+    "e": 1.2365,
+    "k": "diagnose",
+    "t": "Smoke test of scripted-opponent collection",
+    "d": "Lease sctestw, 0.5 min."
+   },
+   {
+    "s": 1.3375,
+    "e": 1.3791,
+    "k": "diagnose",
+    "t": "Smoke test of scripted-opponent collection",
+    "d": "Lease sctest3w, 2.5 min."
+   },
+   {
+    "s": 1.4373,
+    "e": 1.7499,
+    "k": "new",
+    "t": "Scripted-opponent collection from scratch",
+    "d": "Lease v3w, 18.8 min. Packaged as v3."
+   },
+   {
+    "s": 1.8111,
+    "e": 1.8201,
+    "k": "practice",
+    "t": "Practice: 78.9 points",
+    "d": "38 capture wins, 1 losses, 25 cap draws in 64 games vs random and expansion."
+   },
+   {
+    "s": 1.8688,
+    "e": 2.182,
+    "k": "new",
+    "t": "Generated-map augmentation from scratch",
+    "d": "Lease v4w, 18.8 min. Packaged as v4."
+   },
+   {
+    "s": 2.2002,
+    "e": 2.2076,
+    "k": "practice",
+    "t": "Practice: 97.7 points",
+    "d": "61 capture wins, 0 losses, 3 cap draws in 64 games vs random and expansion."
+   },
+   {
+    "s": 2.2893,
+    "e": 2.6066,
+    "k": "continue",
+    "t": "From v1: 1,024 generated maps, LR 3e-4",
+    "d": "Lease v5w, 19.0 min. Packaged as v5."
+   },
+   {
+    "s": 2.6525,
+    "e": 2.6588,
+    "k": "practice",
+    "t": "Practice: 99.2 points",
+    "d": "63 capture wins, 0 losses, 1 cap draws in 64 games vs random and expansion."
+   },
+   {
+    "s": 2.6918,
+    "e": 3.0036,
+    "k": "continue",
+    "t": "From v5: generated maps, LR 1e-4",
+    "d": "Lease v6w, 18.7 min. Packaged as v6."
+   },
+   {
+    "s": 3.0368,
+    "e": 3.0442,
+    "k": "practice",
+    "t": "Practice: 98.4 points",
+    "d": "62 capture wins, 0 losses, 2 cap draws in 64 games vs random and expansion."
+   },
+   {
+    "s": 3.3755,
+    "e": 3.6905,
+    "k": "continue",
+    "t": "From v5: scripted-expansion fine-tune",
+    "d": "Lease v9w, 18.9 min. Packaged as v9."
+   },
+   {
+    "s": 3.7103,
+    "e": 3.7167,
+    "k": "practice",
+    "t": "Practice: 99.2 points",
+    "d": "63 capture wins, 0 losses, 1 cap draws in 64 games vs random and expansion."
+   },
+   {
+    "s": 3.7363,
+    "e": 4.0488,
+    "k": "continue",
+    "t": "From v5: expansion-scripted fine-tune on GPU",
+    "d": "Lease v10w, 18.7 min. Packaged as v10."
+   },
+   {
+    "s": 4.2107,
+    "e": 4.2179,
+    "k": "practice",
+    "t": "Practice: 100.0 points",
+    "d": "64 capture wins, 0 losses, 0 cap draws in 64 games vs random and expansion."
+   },
+   {
+    "s": 4.2939,
+    "e": 4.6057,
+    "k": "continue",
+    "t": "From v10: low-LR self-play",
+    "d": "Lease v11w, 18.7 min. Packaged as v11."
+   },
+   {
+    "s": 4.6318,
+    "e": 4.6381,
+    "k": "practice",
+    "t": "Practice: 100.0 points",
+    "d": "64 capture wins, 0 losses, 0 cap draws in 64 games vs random and expansion."
+   },
+   {
+    "s": 4.6551,
+    "e": 5.0516,
+    "k": "continue",
+    "t": "From v11: low-LR self-play, 2,048 generated maps",
+    "d": "Lease v12w, 23.8 min. Packaged as v12."
+   },
+   {
+    "s": 5.0625,
+    "e": 5.0684,
+    "k": "practice",
+    "t": "Practice: 100.0 points",
+    "d": "64 capture wins, 0 losses, 0 cap draws in 64 games vs random and expansion."
+   },
+   {
+    "s": 5.0938,
+    "e": 5.49,
+    "k": "continue",
+    "t": "From v12: LR 1e-5, to use the remaining allocation",
+    "d": "Lease v13w, 23.8 min. Packaged as v13."
+   }
+  ],
+  "submits": [
+   {
+    "at": 0.2234,
+    "t": "Submitted smoke"
+   },
+   {
+    "at": 0.6609,
+    "t": "Submitted v1"
+   },
+   {
+    "at": 2.6805,
+    "t": "Submitted v5"
+   },
+   {
+    "at": 4.2359,
+    "t": "Submitted v10"
+   },
+   {
+    "at": 4.6509,
+    "t": "Submitted v11"
+   },
+   {
+    "at": 5.082,
+    "t": "Submitted v12"
+   }
+  ],
+  "grades": [
+   {
+    "at": 2.354,
+    "t": "Graded point ⅓ of the allocation (submission 2)"
+   },
+   {
+    "at": 4.768,
+    "t": "Graded point ⅔ of the allocation (submission 5)"
+   }
+  ],
+  "used": "91%"
+ },
+ {
+  "id": "sol61-a1",
+  "model": "GPT-6.1 Sol",
+  "note": "attempt 1 · interrupted at 3.3 h · uncounted",
+  "endH": 3.4027,
+  "endLabel": "Hung (app stopped)",
+  "summary": "Built its own held-out Hunter test and head-to-heads between its checkpoints, and used them to choose: it kept expand5 and rejected an attention branch that beat Hunter but lost 48-71 to its parent. Stopped at 3.3 h when this Mac lost its connection to Modal and Modal stopped the session app.",
+  "events": [
+   {
+    "s": 0.081,
+    "e": 0.3973,
+    "k": "new",
+    "t": "Residual dilated CNN, land shaping, combat priors",
+    "d": "Lease expand1w, 19.0 min. Packaged as expand1."
+   },
+   {
+    "s": 0.4445,
+    "e": 0.4543,
+    "k": "practice",
+    "t": "Practice: 99.2 points",
+    "d": "63 capture wins, 0 losses, 1 cap draws in 64 games vs random and expansion."
+   },
+   {
+    "s": 0.4842,
+    "e": 0.89,
+    "k": "continue",
+    "t": "From expand1: 2,048 generated maps, 25% expansion opponents",
+    "d": "Lease expand2w, 24.3 min. Packaged as expand2."
+   },
+   {
+    "s": 0.9197,
+    "e": 0.9277,
+    "k": "practice",
+    "t": "Practice: 100.0 points",
+    "d": "64 capture wins, 0 losses, 0 cap draws in 64 games vs random and expansion."
+   },
+   {
+    "s": 0.9502,
+    "e": 1.3513,
+    "k": "continue",
+    "t": "From expand2: 12.5% Hunter, frozen expand1 opponents",
+    "d": "Lease expand3w, 24.1 min. Packaged as expand3."
+   },
+   {
+    "s": 1.4094,
+    "e": 1.4163,
+    "k": "practice",
+    "t": "Practice: 100.0 points",
+    "d": "64 capture wins, 0 losses, 0 cap draws in 64 games vs random and expansion."
+   },
+   {
+    "s": 1.4707,
+    "e": 1.8729,
+    "k": "continue",
+    "t": "From expand2: gamma .999, horizon 64, greedy frozen opponent",
+    "d": "Lease expand4w, 24.1 min. Packaged as expand4."
+   },
+   {
+    "s": 1.8977,
+    "e": 1.9081,
+    "k": "practice",
+    "t": "Practice: 99.2 points",
+    "d": "63 capture wins, 0 losses, 1 cap draws in 64 games vs random and expansion."
+   },
+   {
+    "s": 2.0061,
+    "e": 2.4108,
+    "k": "continue",
+    "t": "From expand4: league of frozen expand4, Hunter, expansion, self-play",
+    "d": "Lease expand5w, 24.3 min. Packaged as expand5."
+   },
+   {
+    "s": 2.4794,
+    "e": 2.49,
+    "k": "practice",
+    "t": "Practice: 100.0 points",
+    "d": "64 capture wins, 0 losses, 0 cap draws in 64 games vs random and expansion."
+   },
+   {
+    "s": 2.574,
+    "e": 2.9794,
+    "k": "continue",
+    "t": "From expand5: two attention blocks added (rejected: lost 48-71 to expand5)",
+    "d": "Lease attend6w, 24.3 min. Packaged as attend6."
+   },
+   {
+    "s": 3.0175,
+    "e": 3.0263,
+    "k": "practice",
+    "t": "Practice: 100.0 points",
+    "d": "64 capture wins, 0 losses, 0 cap draws in 64 games vs random and expansion."
+   },
+   {
+    "s": 3.0945,
+    "e": 3.386,
+    "k": "continue",
+    "t": "From expand5: CNN league, greedy opponents (lost when Modal stopped the app)",
+    "d": "Lease league7w, 17.5 min."
+   }
+  ],
+  "submits": [
+   {
+    "at": 0.4801,
+    "t": "Submitted expand1"
+   },
+   {
+    "at": 0.9395,
+    "t": "Submitted expand2"
+   },
+   {
+    "at": 1.9352,
+    "t": "Submitted expand4"
+   },
+   {
+    "at": 2.5715,
+    "t": "Submitted expand5"
+   }
+  ],
+  "grades": [
+   {
+    "at": 1.8231,
+    "t": "Graded point ⅓ of the allocation (submission 2)"
+   }
+  ],
+  "used": null
+ }
+]

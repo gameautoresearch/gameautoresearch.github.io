@@ -1,0 +1,4 @@
+torch==2.9.1
+numpy==2.5.4
+JPype1==1.7.1
+# Install the pinned local crforge/python package; see README.md.

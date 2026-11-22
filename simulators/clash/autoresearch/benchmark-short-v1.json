@@ -1,0 +1,213 @@
+{
+  "agent": {
+    "brief": "task/brief.md",
+    "harness": "../../../harness/README.md",
+    "researcher": "Harbor Terminus-2 in the uniform workspace; model calls are made by Harbor on the host"
+  },
+  "benchmark_id": "clash-autoresearch-short-v1",
+  "budget": {
+    "accounting": "allocated_worker_wall_time",
+    "default_mode": "seconds",
+    "max_active_gpu_workers": 1,
+    "modes": {
+      "seconds": "the contract's mode: one job at a time (a training run or a practice) within research_worker_seconds of the training worker",
+      "usd": "chosen per session (--budget-mode usd): up to 4 jobs and 2 GPUs at once (two training runs), research_usd of training-worker time at $0.0008064 per second (L40S, 4 CPU, 16 GiB at the harness's frozen list prices); every queued or running run holds its whole grant; research wall clock research_wall_seconds; CPU practice stays limited by count and uncharged; fresh final training is unchanged",
+      "research_usd": 5.81,
+      "research_wall_seconds": 18000,
+      "smoke_research_usd": 0.48,
+      "smoke_wall_seconds": 4800
+    },
+    "model_smoke_usd": 2,
+    "research_worker_seconds": 7200,
+    "retries": 0,
+    "smoke_worker_seconds": 600
+  },
+  "commands": {
+    "finalize": "ar finalize (inside a session)",
+    "practice": "ar eval RUN (inside a session)",
+    "prepare": "python -m harness prepare clash --out NEW_RELEASE",
+    "run": "ar run RUN --seconds SECONDS (inside a session); SECONDS is the worker's hard time, 90..3300, and reserves SECONDS plus a 30-second settlement reserve",
+    "session": "python -m harness run clash {recipe|network} --release RELEASE --out NEW_SESSION --model MODEL [--execute]",
+    "submit": "ar submit RUN (network sessions) or ar submit (recipe sessions)"
+  },
+  "contract": "CONTRACT-short-v1.md",
+  "evaluation": {
+    "draw": 0.5,
+    "dropped_opponents": {
+      "incumbent-v4": "learned on the pinned 180+120 s, 4-decisions-per-second form; not retrained",
+      "retained-deepseek": "learned on the pinned 180+120 s, 4-decisions-per-second form; not retrained"
+    },
+    "execution_observer": "refusal_diagnostics.py",
+    "grading_pair_workers": 3,
+    "interface": {
+      "actions": 2307,
+      "bundle_format": "clash-ar-bundle-v1",
+      "decision_ticks": 10,
+      "decisions_per_second": 2,
+      "entity_rows": 200,
+      "entrant_dtype": "float32",
+      "entrant_inference": "stateless per-seat pure NN, deterministic masked greedy argmax; no search",
+      "entrant_parameter_cap": 1000000,
+      "entrant_pipe_deadline_seconds": 15,
+      "execution_observer": "clash-visible-execution-observer-v1",
+      "grading_pair_workers": 3,
+      "legacy_engine_binding_unchanged": false,
+      "match_form": {
+        "decision_ticks": 10,
+        "decisions_per_second": 2,
+        "name": "short-v1",
+        "overtime_seconds": 30,
+        "regulation_seconds": 60,
+        "tick_ms": 50,
+        "timeline_ms": {
+          "card_cooldown_ms": [
+            1000,
+            500,
+            350
+          ],
+          "cooldown_ms": [
+            40000,
+            35000,
+            15000
+          ],
+          "full_bar_ms": [
+            28000,
+            14000,
+            9300
+          ],
+          "rate_ms": [
+            40000,
+            35000,
+            15000
+          ],
+          "section_ms": [
+            60000,
+            30000
+          ],
+          "section_types": [
+            0,
+            1
+          ]
+        }
+      },
+      "observation_ints": 7024,
+      "official_grading_cpu_cores": 8,
+      "official_grading_memory_gib": 32,
+      "overtime_seconds": 30,
+      "private_bank_units": 32,
+      "reference_normalized_score": null,
+      "regulation_seconds": 60,
+      "score": "equal opponent/seat natural game points; paired seed-cluster interval",
+      "simulation_threads_per_pair": 1,
+      "task": "clash-fixed8-v1",
+      "trusted_opponent_inference": {
+        "CPU_only": true,
+        "inputs": "single seat public observation and legal mask only",
+        "model_parameter_cap_applies": false,
+        "per_decision_deadline_seconds": 0.2,
+        "search": false
+      },
+      "version": "clash-evaluation-short-v1"
+    },
+    "interval": "paired seed cluster bootstrap",
+    "invalid_policy": "null score on any fault/illegal/truncation/incomplete schedule",
+    "loss": 0,
+    "normalized_reference_score": null,
+    "opponent_registry": "immutable release/public/opponent-registry.json: standard, pressure, intermediate, teacher (scripted, public-observation only)",
+    "primary_metric": "equal_opponent_equal_seat_game_points",
+    "private_release_seeds": 32,
+    "protected_validation_is_public": true,
+    "public_practice_seeds": 8,
+    "score_scale": [
+      0,
+      100
+    ],
+    "selection_before_fresh_bank_required": true,
+    "simulation_threads_per_pair": 1,
+    "win": 1
+  },
+  "game": "clash",
+  "historical_declaration": "benchmark-v4.json (the pinned 180+120 s, 4-decisions-per-second form; source at git tag full-size-20261113)",
+  "provider": "harness/games/clash/provider.py FastProvider; one finite session ledger per harness session; no old campaign",
+  "qualification": {
+    "private_grading": "protected development grade on fresh secret seeds; no official private final bank",
+    "requires": "exact immutable official public trajectory-parity and selected successor workflow receipts",
+    "strength_labels_independent": true,
+    "strong_panel_qualified": false,
+    "superhuman_evidence": false
+  },
+  "resources": {
+    "cpu_cores": 4,
+    "gpu": "NVIDIA L40S",
+    "memory_gib": 16
+  },
+  "schema_version": 4,
+  "starter": {
+    "editable_files": [
+      "starter/policy.py",
+      "starter/learner.py",
+      "starter/train.py",
+      "recipes/starter.json"
+    ],
+    "envs": 1024,
+    "initialization": "random Policy64/embedding12; sparse terminal selfplay, no teacher, no pretrained weights",
+    "recipe": "recipes/starter.json (match_form short-v1, rules.decision_ticks 10)",
+    "training_route": "native-fast-v1"
+  },
+  "task": {
+    "actions": 2307,
+    "arena_routing_cells": [
+      36,
+      64
+    ],
+    "decision_hz": 2,
+    "decision_ticks": 10,
+    "deck": [
+      "Knight",
+      "Archer",
+      "Musketeer",
+      "Giant",
+      "MiniPekka",
+      "Fireball",
+      "Arrows",
+      "Zap"
+    ],
+    "elixir_timeline": {
+      "card_cycle_cooldown_ms": [
+        1000,
+        500,
+        350
+      ],
+      "source": "pinned Ladder steps (x1 0-120 s, x2 120-240 s, x3 240-300 s) moved in proportion: the last third of regulation and the second half of overtime",
+      "x1_seconds": [
+        0,
+        40
+      ],
+      "x2_seconds": [
+        40,
+        75
+      ],
+      "x3_seconds": [
+        75,
+        90
+      ]
+    },
+    "entity_rows": 200,
+    "id": "clash-fixed8-v1",
+    "level": 11,
+    "match_form": "short-v1",
+    "max_ticks": 0,
+    "natural_end": true,
+    "observation_ints": 7024,
+    "overtime_seconds": 30,
+    "placement_tiles": [
+      18,
+      32
+    ],
+    "players": 2,
+    "regulation_seconds": 60,
+    "rules_lock": "../rules.lock.json",
+    "tick_ms": 50,
+    "tower_level": 11
+  }
+}

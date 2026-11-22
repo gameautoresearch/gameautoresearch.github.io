@@ -1,0 +1,363 @@
+/*
+ * crforge - https://github.com/voonhous/crforge
+ * SPDX-License-Identifier: Apache-2.0
+ * Porting this code? Please cite this file and the commit you read: see the README.
+ */
+
+package org.crforge.desktop;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+import io.airlift.compress.zstd.ZstdOutputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.io.PrintStream;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.StandardOpenOption;
+import java.util.Arrays;
+import java.util.List;
+import java.util.zip.GZIPOutputStream;
+import org.crforge.core.battle.data.GameTables;
+import org.crforge.core.battle.data.GameVersions;
+import org.crforge.core.battle.replay.ReplayCapture;
+import org.crforge.core.battle.replay.ScenarioItems;
+import org.crforge.desktop.battle.DataVersions;
+import org.crforge.desktop.battle.TableCopies;
+import org.crforge.desktop.render.ViewOrientation;
+import org.crforge.desktop.replay.ReplayArchive;
+import org.crforge.desktop.replay.ReplayFile;
+import org.crforge.desktop.replay.ReplayPlayer;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
+
+/**
+ * A crawl's output: one record a line, zstd- or gzip-compressed or not, each holding a replay as a
+ * string with the session and battle it was fetched in. The records are built from the synthetic
+ * Archer Queen replay; the tables root's two versions are copies of the configured tables, the
+ * second with another content sha in its headers.
+ */
+class ReplayArchiveTest {
+
+  private static final ObjectMapper MAPPER = new ObjectMapper();
+
+  /** The content sha of the root's second version. */
+  private static final String OTHER_SHA = "0123456789abcdef0123456789abcdef01234567";
+
+  private static final String FETCHED_AT = "2026-10-07T14:03:38Z";
+
+  @TempDir Path root;
+
+  private final ByteArrayOutputStream outBytes = new ByteArrayOutputStream();
+  private final ByteArrayOutputStream errBytes = new ByteArrayOutputStream();
+  private final PrintStream out = new PrintStream(outBytes, true, StandardCharsets.UTF_8);
+  private final PrintStream err = new PrintStream(errBytes, true, StandardCharsets.UTF_8);
+
+  private Path first;
+  private Path second;
+  private DataVersions versions;
+
+  @BeforeEach
+  void twoVersions() throws IOException {
+    first = TableCopies.copy(root, "1.0.0");
+    second = TableCopies.withContentSha(root, "2.0.0", OTHER_SHA);
+    versions =
+        new DataVersions(
+            root, List.of("1.0.0", "2.0.0"), first, GameTables.load(first), "test", "unknown");
+  }
+
+  /**
+   * The data version both of the root's versions hold: the copies keep the configured tables'
+   * version in their headers, only their folders are named 1.0.0 and 2.0.0.
+   */
+  private String version() {
+    return versions.current().version();
+  }
+
+  /**
+   * The synthetic Archer Queen replay with every field its version writes, as the server sends it:
+   * one line of compact JSON. Its plays' items are fitted to the configured tables, whose rows the
+   * root's two versions copy: their costs and levels.
+   */
+  private static String replayText() throws IOException {
+    try (InputStream in =
+        ReplayArchiveTest.class.getResourceAsStream("/replays/archer_queen_every_field.json")) {
+      return MAPPER.writeValueAsString(
+          ScenarioItems.fitted((ObjectNode) MAPPER.readTree(in), GameTables.loadConfigured()));
+    }
+  }
+
+  /** A crawl record holding the replay, its battle on the data of the given content sha. */
+  private static String record(String replay, String contentVersion, String contentSha)
+      throws IOException {
+    ObjectNode record = MAPPER.createObjectNode();
+    record.put("format", 1);
+    record.put("channel_id", 162000038L);
+    ObjectNode session = record.putObject("session");
+    session.put("client_version", GameVersions.CLIENT_16_402_17);
+    session.put("content_sha", contentSha);
+    session.put("fetched_at", FETCHED_AT);
+    ObjectNode battle = record.putObject("battle");
+    battle.put("content_version", contentVersion);
+    battle.put("content_sha", contentSha);
+    record.putObject("entry").put("high", 1);
+    record.put("replay", replay);
+    return MAPPER.writeValueAsString(record);
+  }
+
+  /** Writes each list of lines as one gzip member, the members one after another. */
+  @SafeVarargs
+  private Path gzip(String name, List<String>... members) throws IOException {
+    Path file = root.resolve(name);
+    for (List<String> lines : members) {
+      try (OutputStream gz =
+          new GZIPOutputStream(
+              Files.newOutputStream(file, StandardOpenOption.CREATE, StandardOpenOption.APPEND))) {
+        gz.write((String.join("\n", lines) + "\n").getBytes(StandardCharsets.UTF_8));
+      }
+    }
+    return file;
+  }
+
+  /** Writes each list of lines as one zstd frame, the frames one after another. */
+  @SafeVarargs
+  private Path zstd(String name, List<String>... frames) throws IOException {
+    Path file = root.resolve(name);
+    for (List<String> lines : frames) {
+      try (OutputStream zst =
+          new ZstdOutputStream(
+              Files.newOutputStream(file, StandardOpenOption.CREATE, StandardOpenOption.APPEND))) {
+        zst.write((String.join("\n", lines) + "\n").getBytes(StandardCharsets.UTF_8));
+      }
+    }
+    return file;
+  }
+
+  private String printed() {
+    return outBytes.toString(StandardCharsets.UTF_8);
+  }
+
+  @Test
+  @DisplayName("each line is a record: one that cannot be read says why and leaves the others")
+  void eachLineIsRead() throws IOException {
+    String good = record(replayText(), version(), OTHER_SHA);
+    Path file =
+        zstd(
+            "crawl.jsonl.zst",
+            List.of(
+                good,
+                "",
+                "{not json",
+                good.replace("\"format\":1", "\"format\":2"),
+                record("[1,2]", "2.0.0", OTHER_SHA),
+                good));
+
+    ReplayArchive archive = ReplayArchive.read(file);
+
+    assertThat(archive.entries())
+        .extracting(ReplayArchive.Entry::line)
+        .containsExactly(1, 3, 4, 5, 6);
+    assertThat(archive.readable()).isEqualTo(2);
+    assertThat(archive.entries().get(1).problem()).startsWith("not JSON: ");
+    assertThat(archive.entries().get(2).problem())
+        .isEqualTo("record format 2, this viewer reads 1");
+    assertThat(archive.entries().get(3).problem()).isEqualTo("its replay is not a JSON object");
+    ReplayArchive.Entry entry = archive.entries().get(0);
+    assertThat(entry.problem()).isNull();
+    assertThat(entry.channelId()).isEqualTo(162000038L);
+    assertThat(entry.clientVersion()).isEqualTo(GameVersions.CLIENT_16_402_17);
+    assertThat(entry.contentVersion()).isEqualTo(version());
+    assertThat(entry.contentSha()).isEqualTo(OTHER_SHA);
+    assertThat(entry.gameMode()).isEqualTo(72000006);
+    assertThat(entry.endTick()).isEqualTo(400);
+    assertThat(entry.replay()).isEqualTo(replayText());
+  }
+
+  @Test
+  @DisplayName(
+      "a plain file, one of several zstd frames and one of several gzip members read the same")
+  void eachCompression() throws IOException {
+    String good = record(replayText(), version(), OTHER_SHA);
+    Path plain = root.resolve("crawl.jsonl");
+    Files.writeString(plain, good + "\n\n" + good + "\n", StandardCharsets.UTF_8);
+    // A crawl appending to its output writes one frame or member per write.
+    Path zstd = zstd("crawl.jsonl.zst", List.of(good, ""), List.of(good));
+    Path gzip = gzip("crawl.jsonl.gz", List.of(good, ""), List.of(good));
+
+    for (Path file : List.of(plain, zstd, gzip)) {
+      assertThat(ReplayArchive.read(file).entries())
+          .extracting(ReplayArchive.Entry::line)
+          .containsExactly(1, 3);
+      assertThat(ReplayArchive.read(file).entries().get(1).replay()).isEqualTo(replayText());
+    }
+  }
+
+  @Test
+  @DisplayName("a damaged compressed file is a read error, not records")
+  void damagedFiles() throws IOException {
+    String good = record(replayText(), version(), OTHER_SHA);
+    for (Path file :
+        List.of(zstd("crawl.jsonl.zst", List.of(good)), gzip("crawl.jsonl.gz", List.of(good)))) {
+      byte[] packed = Files.readAllBytes(file);
+      Files.write(file, Arrays.copyOf(packed, packed.length / 2));
+
+      assertThatThrownBy(() -> ReplayArchive.read(file)).isInstanceOf(IOException.class);
+    }
+  }
+
+  @Test
+  @DisplayName("a replay is opened with the capture block its record names, the file unchanged")
+  void theRecordNamesTheData() throws IOException {
+    Path file = zstd("crawl.jsonl.zst", List.of(record(replayText(), version(), OTHER_SHA)));
+    byte[] before = Files.readAllBytes(file);
+    ReplayArchive archive = DesktopLauncher.openArchive(file, out, err);
+
+    ReplayFile replay = DesktopLauncher.openFirst(archive, versions, out, err);
+
+    assertThat(replay.playable()).isTrue();
+    assertThat(replay.dataNamed()).isTrue();
+    assertThat(versions.currentFolder()).isEqualTo(second);
+    assertThat(replay.capture())
+        .contains(
+            new ReplayCapture(GameVersions.CLIENT_16_402_17, version(), OTHER_SHA, FETCHED_AT));
+    assertThat(replay.line()).isEqualTo(1);
+    assertThat(replay.name()).isEqualTo("crawl.jsonl.zst line 1");
+    assertThat(replay.describe())
+        .contains("replay: " + file.toAbsolutePath().normalize() + ", line 1");
+    assertThat(new ReplayPlayer(replay, versions.current()).statusLines(ViewOrientation.SIDE_1))
+        .contains("replay: crawl.jsonl.zst line 1");
+    assertThat(printed())
+        .contains(
+            "replays: " + file.toAbsolutePath().normalize() + ", 1 records, 1 readable",
+            "switched from data version 1.0.0 to 2.0.0");
+    assertThat(Files.readAllBytes(file)).isEqualTo(before);
+  }
+
+  @Test
+  @DisplayName("each record is opened on its own data, the first readable one first")
+  void eachRecordOnItsData() throws IOException {
+    String firstSha = versions.current().contentSha();
+    Path file =
+        zstd(
+            "crawl.jsonl.zst",
+            List.of(
+                "{not json",
+                record(replayText(), version(), OTHER_SHA),
+                record(replayText(), version(), firstSha)));
+    ReplayArchive archive = ReplayArchive.read(file);
+
+    ReplayFile opened = DesktopLauncher.openFirst(archive, versions, out, err);
+    assertThat(opened.line()).isEqualTo(2);
+    assertThat(versions.currentFolder()).isEqualTo(second);
+
+    ReplayFile third =
+        DesktopLauncher.openEntry(archive, archive.entries().get(2), versions, out, err);
+    assertThat(third.playable()).isTrue();
+    assertThat(versions.currentFolder()).isEqualTo(first);
+
+    assertThat(DesktopLauncher.openEntry(archive, archive.entries().get(0), versions, out, err))
+        .isNull();
+    assertThat(errBytes.toString(StandardCharsets.UTF_8))
+        .contains("Cannot read line 1 of " + file.toAbsolutePath().normalize() + ": not JSON: ");
+  }
+
+  @Test
+  @DisplayName("a replay that already holds a capture block is not read: the record names its data")
+  void aBlockInTheReplayIsRefused() throws IOException {
+    ObjectNode replay = (ObjectNode) MAPPER.readTree(replayText());
+    replay.putObject("capture").put("content_sha", OTHER_SHA);
+    Path file =
+        zstd("crawl.jsonl.zst", List.of(record(MAPPER.writeValueAsString(replay), "2.0.0", "x")));
+
+    ReplayArchive.Entry entry = ReplayArchive.read(file).entries().get(0);
+
+    assertThat(entry.problem()).isEqualTo("its replay already holds a capture block");
+    assertThatThrownBy(entry::document).isInstanceOf(IllegalStateException.class);
+  }
+
+  /**
+   * The record of a replay whose data version was dated from its battle time and is not settled:
+   * its battle names candidates, each with its content sha or null, instead of a version.
+   */
+  private static String unsureRecord(boolean complete, boolean none) throws IOException {
+    ObjectNode record = (ObjectNode) MAPPER.readTree(record(replayText(), "x", "x"));
+    ObjectNode battle = record.putObject("battle");
+    battle.put("source", "time");
+    ObjectNode candidates = battle.putObject("candidates");
+    if (!none) {
+      candidates.put("16.402.19", OTHER_SHA);
+      candidates.putNull("16.402.21");
+    }
+    battle.put("candidates_complete", complete);
+    return MAPPER.writeValueAsString(record);
+  }
+
+  @Test
+  @DisplayName("a record whose data version is unsure is not read, even on a candidate's tables")
+  void anUnsureVersionIsRefused() throws IOException {
+    // The second version's tables are a candidate's, and still the replay is not played on them.
+    // The third names no candidate at all: a replay without a battle time.
+    Path file =
+        zstd(
+            "crawl.jsonl.zst",
+            List.of(
+                unsureRecord(false, false), unsureRecord(true, false), unsureRecord(false, true)));
+
+    ReplayArchive archive = ReplayArchive.read(file);
+
+    assertThat(archive.readable()).isZero();
+    assertThat(archive.entries().get(0).problem())
+        .isEqualTo("its data version is unsure: 16.402.19 or 16.402.21, or a version not listed");
+    assertThat(archive.entries().get(1).problem())
+        .isEqualTo("its data version is unsure: 16.402.19 or 16.402.21");
+    assertThat(archive.entries().get(2).problem())
+        .isEqualTo("its data version is unknown: no candidate");
+    assertThatThrownBy(archive.entries().get(0)::document)
+        .isInstanceOf(IllegalStateException.class);
+    assertThat(DesktopLauncher.openFirst(archive, versions, out, err)).isNull();
+    // Listed like any battle, the candidates as its data; "?" when a version not listed may be it.
+    List<String> rows = archive.rows(versions.current());
+    String battle = " {4}\\d  04-01 \\d\\d:\\d\\d  Ladder +  \\S.* +    400  ";
+    assertThat(rows.get(0)).matches(battle + "16\\.402\\.19/16\\.402\\.21/\\?");
+    assertThat(rows.get(1)).matches(battle + "16\\.402\\.19/16\\.402\\.21");
+    assertThat(rows.get(2)).matches(battle + "\\?");
+  }
+
+  @Test
+  @DisplayName("the list gives each record's time, game mode, arena, ticks and data, or why not")
+  void theListsRows() throws IOException {
+    Path file =
+        zstd(
+            "crawl.jsonl.zst",
+            List.of(record(replayText(), version(), OTHER_SHA), "", "{not json"));
+
+    List<String> rows = ReplayArchive.read(file).rows(versions.current());
+
+    assertThat(rows).hasSize(2);
+    assertThat(rows.get(0))
+        .matches(
+            "    1  04-01 \\d\\d:\\d\\d  Ladder +  \\S.* +    400  "
+                + version().replace(".", "\\."));
+    assertThat(rows.get(1)).startsWith("    3  not read: not JSON: ");
+    assertThat(ReplayArchive.columns().indexOf("game mode"))
+        .isEqualTo(rows.get(0).indexOf("Ladder"));
+  }
+
+  @Test
+  @DisplayName("a crawl's output is named .jsonl, .jsonl.zst or .jsonl.gz")
+  void theNames() {
+    assertThat(ReplayArchive.isArchive(Path.of("2026-10-07T140327Z-tv.jsonl.zst"))).isTrue();
+    assertThat(ReplayArchive.isArchive(Path.of("2026-10-07T140327Z.jsonl.gz"))).isTrue();
+    assertThat(ReplayArchive.isArchive(Path.of("CRAWL.JSONL"))).isTrue();
+    assertThat(ReplayArchive.isArchive(Path.of("replay.json"))).isFalse();
+    assertThat(ReplayArchive.isArchive(Path.of("tables.gz"))).isFalse();
+  }
+}

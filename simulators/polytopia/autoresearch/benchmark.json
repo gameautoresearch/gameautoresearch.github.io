@@ -1,0 +1,122 @@
+{
+  "schema_version": 1,
+  "game": "polytopia",
+  "benchmark_id": "polytopia-bardur-1v1-11-drylands-v1",
+  "session_contract": "polytopia-autoresearch-v2",
+  "task": {
+    "ruleset": "polytopia-2.17.3",
+    "tribes": [
+      "Bardur",
+      "Bardur"
+    ],
+    "players": 2,
+    "board": [
+      11,
+      11
+    ],
+    "fog": true,
+    "maps": "drylands",
+    "map_seeds": [
+      200000,
+      300000
+    ],
+    "round_limit": 30,
+    "mode_definition": "starter/src/polytopia_bot/rl/mode.py",
+    "cap_adjudication": "higher_in_game_score_wins_equal_draw",
+    "resignation": false,
+    "diplomacy": "engine_default_enabled",
+    "max_actions_per_turn": 10000
+  },
+  "resources": {
+    "gpu": "L40S",
+    "cpu_cores": 4,
+    "memory_gib": 16,
+    "practice_worker": "4 CPU cores and 16 GiB without a GPU; separate workers outside the research budget, one practice job at a time",
+    "leases": "0 or 1 L40S, 1-32 CPU cores, 2-64 GiB, researcher commands, shared /scratch Volume",
+    "concurrency": "seconds mode (default): one training run or lease at a time; usd mode: 4 active jobs, at most 2 with a GPU and 64 CPU cores in total. Practice is one job at a time in either mode",
+    "charging": "seconds mode: seconds of the training worker = worker seconds x harness.budget.seconds_weight(shape, training worker); usd mode: US dollars = worker seconds x cost(shape), at the frozen Modal sandbox list prices in contract.py PRICE"
+  },
+  "budget": {
+    "default_mode": "seconds",
+    "modes": "seconds or usd, chosen per session (harness --budget-mode, --research-seconds or --research-usd); the ledger records the mode and a resumed session keeps it",
+    "seconds_mode": {
+      "research_seconds": 14400,
+      "smoke_research_seconds": 600,
+      "wall_seconds": "harness default: 2 x research seconds + 3600",
+      "concurrency": "one job at a time"
+    },
+    "research_usd": 23.0,
+    "research_wall_seconds": 18000,
+    "fresh_final_train_seconds": 3600,
+    "smoke_research_usd": 1.0,
+    "min_run_seconds": 300,
+    "min_lease_seconds": 60,
+    "accounting": "allocated_worker_wall_time",
+    "historical_ledgers": "preserved; sessions of the earlier contract (v1, seconds of one worker with its own ledger files) cannot be continued or graded under this contract",
+    "usd_mode": {
+      "research_usd": 23.0,
+      "smoke_research_usd": 1.0,
+      "wall_seconds": 18000,
+      "smoke_wall_seconds": 4800,
+      "concurrency": "parallel: up to 4 jobs, 2 GPUs, 64 CPU cores"
+    }
+  },
+  "starter": {
+    "recipe": "recipes/starter.json",
+    "editable_files": [
+      "starter/src/polytopia_bot/rl/network.py",
+      "starter/src/polytopia_bot/rl/ppo.py",
+      "starter/src/polytopia_bot/rl/gpu_resident.py",
+      "starter/experiments/gpu_resident_train.py"
+    ],
+    "initialization": "random",
+    "architecture": {
+      "blocks": 2,
+      "width": 32
+    },
+    "policy_parameter_cap": 500000,
+    "critic_parameter_cap": 500000,
+    "early_end": "a run the researcher stops, or one cut off at its time limit, is packaged from the last complete policy it wrote and is complete (stopped_early, cut_short); a run that wrote none fails"
+  },
+  "agent": {
+    "brief": "task/brief.md",
+    "rules": "task/game_rules/README.md"
+  },
+  "evaluation": {
+    "primary_metric": "balanced paired-seat game points",
+    "score_scale": [
+      0,
+      100
+    ],
+    "win": 1,
+    "draw": 0.5,
+    "loss": 0,
+    "capped_outcomes": "score adjudicated, separately counted",
+    "normalized_reference_score": null,
+    "calibration_gate": "three full-budget seeds and independent stronger panel not yet qualified",
+    "private_smoke_maps": 2,
+    "practice_smoke_maps": 1,
+    "smoke_opponents": "independently initialized minimal random policy; weak diagnostic panel",
+    "interval": "2000 map-cluster bootstrap resamples",
+    "illegal_actions": "evaluation fails; no valid score",
+    "simulator_faults": "evaluation fails; no valid score",
+    "isolation": "UID-isolated inference processes with visible features/masks only; trusted Rust state remains root-only",
+    "full_release_maps_per_opponent": 128,
+    "full_release_opponents": [
+      "starter-200m",
+      "starter-1h",
+      "research-mid",
+      "research-top"
+    ],
+    "panel_inventory": "host-private-panel/inventory.json in prepared host release; never mounted in public agent image",
+    "strong_reference_qualification": false,
+    "practice_full_maps_per_opponent": 64
+  },
+  "commands": {
+    "prepare": ".venv-polytopia-ar/bin/python -m harness prepare polytopia --out NEW_RELEASE",
+    "prepare_bootstrap": ".venv-polytopia-ar/bin/python -m harness prepare polytopia --out NEW_RELEASE --option panel=false",
+    "smoke": ".venv-polytopia-ar/bin/python -m harness run polytopia network --release RELEASE --out NEW_SESSION --smoke --model MODEL --execute",
+    "session": ".venv-polytopia-ar/bin/python -m harness run polytopia recipe --release RELEASE --out NEW_SESSION --model MODEL --execute",
+    "grade": ".venv-polytopia-ar/bin/python -m harness grade --session SESSION"
+  }
+}

@@ -1,0 +1,57 @@
+{
+  "schema": "tavern-ppo-recipe-v1",
+  "seed": 12345,
+  "device": "cpu",
+  "machine": {
+    "label": "local-validation-unreserved",
+    "attached_cpu_threads": 1,
+    "attached_ram_gib": 8,
+    "gpu_model": null
+  },
+  "allocated_worker_hours": null,
+  "n_games": 8,
+  "native_threads": 1,
+  "learning_seats": [
+    0
+  ],
+  "opponent": "scripted",
+  "opponent_checkpoint": null,
+  "rules": {
+    "num_players": 8,
+    "content": "Implemented",
+    "turn_action_caps": [
+      30
+    ],
+    "max_actions_per_turn": 30,
+    "max_turns": 100,
+    "record_log": false
+  },
+  "network": {
+    "hidden": 128,
+    "embedding": 8
+  },
+  "updates": 4,
+  "profile_updates": 2,
+  "max_batch_steps": 6000,
+  "learning_rate": 0.0003,
+  "gamma": 0.99,
+  "gae_lambda": 0.95,
+  "ppo_epochs": 3,
+  "minibatch_size": 256,
+  "clip": 0.2,
+  "entropy_coef": 0.01,
+  "value_coef": 0.5,
+  "max_grad_norm": 0.5,
+  "snapshot_every": 1,
+  "copy_observations": false,
+  "evaluation": {
+    "label": "public-practice",
+    "seeds": [
+      10101,
+      10102
+    ],
+    "games_per_seat": 2,
+    "opponent": "scripted",
+    "deterministic": false
+  }
+}

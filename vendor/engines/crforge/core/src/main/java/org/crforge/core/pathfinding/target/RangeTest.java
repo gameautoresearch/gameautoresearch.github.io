@@ -1,0 +1,92 @@
+/*
+ * crforge - https://github.com/voonhous/crforge
+ * SPDX-License-Identifier: Apache-2.0
+ * Porting this code? Please cite this file and the commit you read: see the README.
+ */
+
+package org.crforge.core.pathfinding.target;
+
+import org.crforge.core.fidelity.Fidelity;
+import org.crforge.core.fidelity.FidelityStatus;
+import org.crforge.core.pathfinding.math.FixedMath;
+
+/**
+ * The geometric test that decides whether an attacker may hit a target.
+ *
+ * <p>Distances are compared squared and in 32-bit integers throughout. The squared distance
+ * saturates rather than overflowing, so a target far outside the arena simply reads as unreachable;
+ * the squared thresholds are ordinary wrapping products, matching the arithmetic the rest of the
+ * targeting code uses.
+ */
+@Fidelity(
+    status = FidelityStatus.TRACED,
+    note =
+        "The range test, the squared distance, the minimum range and the reference-in-range"
+            + " answer agree with the reference line for line and decide the lock tick of every"
+            + " walk of the reference battles. The touch test agrees with its record; whether"
+            + " a reference battle turns on its answer is not checked.")
+public final class RangeTest {
+
+  private RangeTest() {
+    // Utility class
+  }
+
+  /**
+   * Squared distance between two points, saturating at {@link Integer#MAX_VALUE} once either
+   * separation leaves the range -46340..46340 or the sum would not fit in a signed 32-bit value.
+   */
+  public static int squaredDistance(int px, int py, int x, int y) {
+    return FixedMath.squaredDistance(px, py, x, y);
+  }
+
+  /**
+   * Tests a point against a target.
+   *
+   * <p>The point must lie within {@code target radius + range} of the target's centre and, when the
+   * minimum is positive, at or beyond {@code target radius + minimum}. With {@code innerOnly} set,
+   * only the minimum half of the test applies, and with no minimum an {@code innerOnly} test
+   * accepts everything.
+   *
+   * @param target the entity being tested against
+   * @param x position of the attacker along the arena's width
+   * @param y position of the attacker along the arena's length
+   * @param range attack range measured to the target's edge
+   * @param minimumRange closest accepted distance to the target's edge, 0 for none
+   * @param innerOnly true to drop the outer half of the test
+   */
+  public static boolean rangeTest(
+      TargetView target, int x, int y, int range, int minimumRange, boolean innerOnly) {
+    int radius = target.radius();
+    int outer = (radius + range) * (radius + range);
+    int squared = squaredDistance(target.x(), target.y(), x, y);
+    if (minimumRange >= 1) {
+      int inner = (radius + minimumRange) * (radius + minimumRange);
+      boolean beyondInner = squared >= inner;
+      return innerOnly ? beyondInner : squared <= outer && beyondInner;
+    }
+    return squared <= outer || innerOnly;
+  }
+
+  /**
+   * Tests the owner's own position against a target with the component's current attack range, the
+   * range widened by {@code extension}, and the component's minimum range applied.
+   */
+  public static boolean referenceInRange(TargetingState t, TargetView target, int extension) {
+    int range = AttackRange.attackRange(t);
+    int minimum = AttackRange.minRange(t);
+    return rangeTest(
+        target, t.getOwner().getX(), t.getOwner().getY(), range + extension, minimum, false);
+  }
+
+  /**
+   * The touch test of a not-attacking countdown whose row has no range gate: the owner stands
+   * within the target's radius plus half its own current sight range of the target. The half is a C
+   * division, and the bound is squared in 32 bits and compared signed, so a bound of 46,341 or more
+   * wraps. The state visit asks it only with a reference.
+   */
+  public static boolean touch(TargetingState t, TargetView target) {
+    int bound = target.radius() + SightRange.sightRange(t) / 2;
+    int squared = squaredDistance(t.getOwner().getX(), t.getOwner().getY(), target.x(), target.y());
+    return squared <= bound * bound;
+  }
+}

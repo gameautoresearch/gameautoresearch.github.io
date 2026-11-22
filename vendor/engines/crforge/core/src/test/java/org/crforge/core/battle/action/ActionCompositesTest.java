@@ -1,0 +1,570 @@
+/*
+ * crforge - https://github.com/voonhous/crforge
+ * SPDX-License-Identifier: Apache-2.0
+ * Porting this code? Please cite this file and the commit you read: see the README.
+ */
+
+package org.crforge.core.battle.action;
+
+import static org.assertj.core.api.Assertions.assertThat;
+
+import java.util.ArrayList;
+import java.util.List;
+import org.crforge.core.pathfinding.combat.HitPoints;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+
+/**
+ * The composite actions as their recorded cases pin them: the group and the select, which schedule
+ * other actions when they are scheduled; the filter, the run on the instigator and the check of the
+ * instigator, which schedule one when they start; and the four that last - the duration, the
+ * interval, the wait and the flip flop.
+ */
+class ActionCompositesTest {
+
+  private final List<String> log = new ArrayList<>();
+
+  /** A leaf that records its start. */
+  private final class Leaf implements BattleAction {
+    private final String name;
+
+    private Leaf(String name) {
+      this.name = name;
+    }
+
+    @Override
+    public String name() {
+      return name;
+    }
+
+    @Override
+    public ActionInstance start(ActionHolder holder) {
+      log.add("perform " + name);
+      return null;
+    }
+  }
+
+  /** An owner of a data row, by its global id, that records every check of an action's cause. */
+  private final class RowOwner implements ActionOwner {
+    private final int globalId;
+
+    private RowOwner(int globalId) {
+      this.globalId = globalId;
+    }
+
+    @Override
+    public HitPoints actionHitPoints() {
+      return null;
+    }
+
+    @Override
+    public int variable(int key) {
+      return 0;
+    }
+
+    @Override
+    public void setVariable(int key, int value) {}
+
+    @Override
+    public void killBy(ActionOwner killer) {}
+
+    @Override
+    public void queueTypedHit(ActionOwner source, int amount, DamageType type) {}
+
+    @Override
+    public int actionUnitGlobalId() {
+      return globalId;
+    }
+
+    @Override
+    public void instigatorChecked(String action, ActionOwner instigator, String scheduled) {
+      log.add(
+          "checked "
+              + action
+              + " "
+              + (instigator == null
+                  ? null
+                  : instigator == this ? "itself" : instigator.actionUnitGlobalId())
+              + " "
+              + scheduled);
+    }
+  }
+
+  private List<String> take() {
+    List<String> out = List.copyOf(log);
+    log.clear();
+    return out;
+  }
+
+  private static List<String> queue(ActionHolder holder) {
+    return holder.queued().stream().map(q -> q.action().name() + " " + q.ticks()).toList();
+  }
+
+  private static ActionRow row(String name) {
+    return ActionRow.named(name);
+  }
+
+  // ---------------------------------------------------------------------------------------------
+  // Group and select: they act when they are scheduled
+  // ---------------------------------------------------------------------------------------------
+
+  @Test
+  @DisplayName(
+      "a group schedules every part at once, in order, each at the group's delay plus its own")
+  void group() {
+    Leaf a = new Leaf("a");
+    Leaf b = new Leaf("b");
+    Leaf c = new Leaf("c");
+    Group group = new Group(row("group"), List.of(a, b, c), List.of(0, 100, 250));
+
+    ActionHolder h = new ActionHolder();
+    h.schedule(group, 0, true);
+    assertThat(take())
+        .as("the group does nothing but schedule its parts")
+        .containsExactly("perform a");
+    assertThat(queue(h)).containsExactly("b 2", "c 5");
+
+    ActionHolder h2 = new ActionHolder();
+    h2.schedule(group, 1000, true);
+    assertThat(queue(h2))
+        .as("a delayed group queues its parts at once, each at its own offset")
+        .containsExactly("group 20", "a 20", "b 22", "c 25");
+
+    Group short1 = new Group(row("group"), List.of(a, b, c), List.of(0));
+    ActionHolder h3 = new ActionHolder();
+    h3.schedule(short1, 1000, true);
+    assertThat(queue(h3))
+        .as("parts past the end of the delay list take the group's delay alone")
+        .containsExactly("group 20", "a 20", "b 20", "c 20");
+
+    Group blocked =
+        new Group(row("group").toBuilder().executeIf(() -> 0).build(), List.of(a, b, c), List.of());
+    ActionHolder h4 = new ActionHolder();
+    take();
+    h4.schedule(blocked, 0, true);
+    assertThat(take()).as("a false start gate stops the group scheduling anything").isEmpty();
+    assertThat(queue(h4)).isEmpty();
+  }
+
+  /** The part a select queued, with its ticks, and nothing else it queued. */
+  private static List<String> parts(ActionHolder holder) {
+    return queue(holder).stream().filter(q -> !q.startsWith("select ")).toList();
+  }
+
+  @Test
+  @DisplayName(
+      "a select picks one part as it is scheduled: the condition modulo the list, or the first"
+          + " true per-part one, else the part past the last condition")
+  void select() {
+    Leaf sa = new Leaf("sa");
+    Leaf sb = new Leaf("sb");
+    Leaf sc = new Leaf("sc");
+    List<BattleAction> parts = List.of(sa, sb, sc);
+    int[][] cases = {{0, 0}, {1, 1}, {2, 2}, {3, 0}, {5, 2}};
+    for (int[] c : cases) {
+      int value = c[0];
+      ActionHolder h = new ActionHolder();
+      h.schedule(new Select(row("select"), parts, () -> value, null, false), 0, false);
+      assertThat(parts(h)).as("condition %d", value).containsExactly(parts.get(c[1]).name() + " 0");
+    }
+    ActionHolder negative = new ActionHolder();
+    negative.schedule(new Select(row("select"), parts, () -> -1, null, false), 0, false);
+    assertThat(parts(negative)).as("a negative condition selects nothing").isEmpty();
+    ActionHolder none = new ActionHolder();
+    none.schedule(new Select(row("select"), parts, null, null, false), 0, false);
+    assertThat(parts(none)).as("no condition at all selects nothing").isEmpty();
+
+    ActionHolder first = new ActionHolder();
+    first.schedule(
+        new Select(row("select"), parts, () -> -1, List.of(() -> 0, () -> 1, () -> 1), false),
+        0,
+        false);
+    assertThat(parts(first)).as("the first true per-part condition wins").containsExactly("sb 0");
+    ActionHolder otherwise = new ActionHolder();
+    otherwise.schedule(
+        new Select(row("select"), parts, () -> 0, List.of(() -> 0, () -> 0), false), 0, false);
+    assertThat(parts(otherwise))
+        .as("every condition false and a part past them: that part, the else")
+        .containsExactly("sc 0");
+    ActionHolder nothing = new ActionHolder();
+    nothing.schedule(
+        new Select(row("select"), parts, () -> 0, List.of(() -> 0, () -> 0, () -> 0), false),
+        0,
+        false);
+    assertThat(parts(nothing)).as("no true condition and no part past them").isEmpty();
+  }
+
+  @Test
+  @DisplayName(
+      "a select's part is scheduled with no delay, whatever the select's delay or the part's own,"
+          + " unless the select passes its delay on, and with the select's cause")
+  void selectPartDelay() {
+    Leaf own = new Leaf("own");
+    BattleAction delayedPart =
+        new RowAction(row("delayed").toBuilder().delayMs(300).build()) {
+          @Override
+          public ActionInstance start(ActionHolder holder) {
+            return null;
+          }
+        };
+    ActionHolder h = new ActionHolder();
+    h.schedule(
+        new Select(
+            row("select").toBuilder().delayMs(500).build(),
+            List.<BattleAction>of(delayedPart, own),
+            () -> 0,
+            null,
+            false),
+        ActionHolder.OWN_DELAY,
+        false);
+    assertThat(queue(h))
+        .as("the select waits its own 10 ticks; its part is queued with none")
+        .containsExactly("select 10", "delayed 0");
+
+    ActionHolder passed = new ActionHolder();
+    passed.schedule(
+        new Select(
+            row("select").toBuilder().delayMs(500).build(),
+            List.<BattleAction>of(delayedPart, own),
+            () -> 0,
+            null,
+            true),
+        ActionHolder.OWN_DELAY,
+        false);
+    assertThat(queue(passed))
+        .as("a select that passes its delay on: its part waits the select's 10 ticks too")
+        .containsExactly("select 10", "delayed 10");
+
+    ActionHolder cause = new ActionHolder();
+    ActionHolder owner = new ActionHolder();
+    owner.schedule(new Select(row("select"), List.of(own), () -> 0, null, false), 0, false, cause);
+    assertThat(owner.queuedInstigators()).containsOnly(cause);
+  }
+
+  @Test
+  @DisplayName(
+      "a select whose start gate is false chooses nothing and evaluates nothing, though it is"
+          + " itself queued")
+  void selectGate() {
+    int[] evaluated = {0};
+    Select gated =
+        new Select(
+            row("select").toBuilder().executeIf(() -> 0).build(),
+            List.of(new Leaf("sa")),
+            () -> {
+              evaluated[0]++;
+              return 0;
+            },
+            null,
+            false);
+    ActionHolder h = new ActionHolder();
+    h.schedule(gated, 0, false);
+    assertThat(queue(h)).containsExactly("select 0");
+    assertThat(evaluated[0]).as("the condition is not evaluated").isZero();
+  }
+
+  // ---------------------------------------------------------------------------------------------
+  // Filter and run on the instigator: they act when they start
+  // ---------------------------------------------------------------------------------------------
+
+  @Test
+  @DisplayName("a filter schedules its true or false branch; its condition defaults to true")
+  void filter() {
+    Leaf onTrue = new Leaf("true");
+    Leaf onFalse = new Leaf("false");
+    ActionHolder h = new ActionHolder();
+
+    h.schedule(new Filter(row("filter"), () -> 1, onTrue, onFalse), 0, true);
+    h.schedule(new Filter(row("filter"), () -> 0, onTrue, onFalse), 0, true);
+    h.schedule(new Filter(row("filter"), null, onTrue, onFalse), 0, true);
+    assertThat(queue(h))
+        .as("each branch is scheduled, to start at the next pending pass")
+        .containsExactly("true 0", "false 0", "true 0");
+
+    ActionHolder h2 = new ActionHolder();
+    h2.schedule(new Filter(row("filter"), () -> 1, null, onFalse), 0, true);
+    assertThat(queue(h2)).as("a missing branch schedules nothing").isEmpty();
+  }
+
+  /**
+   * A cause whose holder takes what a run on the instigator hands it: the row named, built for it
+   * as a leaf of that name, scheduled with the handing holder as its cause.
+   */
+  private final class HandedOwner implements ActionOwner {
+    private final ActionHolder holder = new ActionHolder(this);
+
+    @Override
+    public HitPoints actionHitPoints() {
+      return null;
+    }
+
+    @Override
+    public int variable(int key) {
+      return 0;
+    }
+
+    @Override
+    public void setVariable(int key, int value) {}
+
+    @Override
+    public void killBy(ActionOwner killer) {}
+
+    @Override
+    public void queueTypedHit(ActionOwner source, int amount, DamageType type) {}
+
+    @Override
+    public void runFromInstigated(
+        BattleAction action, String actionToExecute, ActionHolder instigated) {
+      holder.schedule(new Leaf(actionToExecute), ActionHolder.OWN_DELAY, false, instigated);
+    }
+  }
+
+  @Test
+  @DisplayName(
+      "a run on the instigator hands its action to the instigator, which builds it for itself, the"
+          + " owner its instigator")
+  void runOnInstigator() {
+    ActionHolder owner = new ActionHolder();
+    HandedOwner cause = new HandedOwner();
+    ActionHolder instigator = cause.holder;
+
+    owner.schedule(new RunOnInstigator(row("run"), "t1"), 0, true, instigator);
+    assertThat(queue(owner)).as("nothing on the owner").isEmpty();
+    assertThat(queue(instigator)).containsExactly("t1 0");
+    assertThat(instigator.queuedInstigators()).containsExactly(owner);
+
+    ActionHolder alone = new ActionHolder();
+    alone.schedule(new RunOnInstigator(row("run"), "t1"), 0, true);
+    assertThat(queue(alone)).as("with no instigator nothing is scheduled").isEmpty();
+  }
+
+  @Test
+  @DisplayName(
+      "a check of the instigator schedules its match branch on the owner, the owner its"
+          + " instigator, when the cause's row is named")
+  void instigatorMatches() {
+    Leaf won = new Leaf("won");
+    Leaf lost = new Leaf("lost");
+    ActionHolder owner = new ActionHolder(new RowOwner(1));
+    ActionHolder bandit = new ActionHolder(new RowOwner(7));
+
+    owner.schedule(
+        new RunIfInstigatorMatches(row("check"), null, List.of(5, 7), won, lost), 0, true, bandit);
+    assertThat(queue(owner)).containsExactly("won 0");
+    assertThat(owner.queuedInstigators()).containsExactly(owner);
+    assertThat(queue(bandit)).as("nothing on the cause").isEmpty();
+    assertThat(take()).containsExactly("checked check 7 won");
+  }
+
+  @Test
+  @DisplayName(
+      "a check of the instigator runs its miss branch for a cause of another row or of none, and"
+          + " nothing without one")
+  void instigatorMisses() {
+    Leaf won = new Leaf("won");
+    Leaf lost = new Leaf("lost");
+    ActionHolder owner = new ActionHolder(new RowOwner(1));
+    ActionHolder knight = new ActionHolder(new RowOwner(3));
+    ActionHolder shot = new ActionHolder(new RowOwner(ActionOwner.NO_UNIT_ROW));
+
+    owner.schedule(
+        new RunIfInstigatorMatches(row("check"), null, List.of(7), won, lost), 0, true, knight);
+    owner.schedule(
+        new RunIfInstigatorMatches(row("check"), null, List.of(7), won, null), 0, true, shot);
+    owner.schedule(new RunIfInstigatorMatches(row("check"), null, List.of(7), won, lost), 0, true);
+    assertThat(queue(owner))
+        .as("the miss branch once; nothing without one")
+        .containsExactly("lost 0");
+    assertThat(take())
+        .as("no check is told without a cause")
+        .containsExactly("checked check 3 lost", "checked check -1 null");
+  }
+
+  @Test
+  @DisplayName("a check of the instigator that names no row matches any cause, of a row or not")
+  void instigatorMatchesAnythingWithoutNames() {
+    Leaf won = new Leaf("won");
+    ActionHolder owner = new ActionHolder(new RowOwner(1));
+    ActionHolder shot = new ActionHolder(new RowOwner(ActionOwner.NO_UNIT_ROW));
+
+    owner.schedule(
+        new RunIfInstigatorMatches(row("check"), null, List.of(), won, null), 0, true, shot);
+    assertThat(queue(owner)).containsExactly("won 0");
+    assertThat(take()).containsExactly("checked check -1 won");
+  }
+
+  // ---------------------------------------------------------------------------------------------
+  // The four that last
+  // ---------------------------------------------------------------------------------------------
+
+  @Test
+  @DisplayName("a duration counts thousandths of a millisecond and ends the step after its length")
+  void withDuration() {
+    ActionHolder h = new ActionHolder();
+    WithDuration hundred = new WithDuration(row("d"), 100, false, () -> 100, false);
+    h.start(hundred);
+    ActionInstance run = h.running().get(0);
+    h.runPass(1);
+    assertThat(counter(run)).isEqualTo(50_000);
+    h.runPass(2);
+    assertThat(counter(run)).isEqualTo(100_000);
+    assertThat(run.isFinished()).as("tested before it is advanced").isFalse();
+    h.runPass(3);
+    assertThat(run.isFinished()).isTrue();
+    assertThat(counter(run)).as("and left where it was").isEqualTo(100_000);
+
+    for (int[] c : new int[][] {{500, 250_000}, {50, 25_000}}) {
+      int percent = c[0];
+      ActionHolder hs = new ActionHolder();
+      hs.start(new WithDuration(row("d"), 100, true, () -> percent, false));
+      hs.runPass(1);
+      assertThat(counter(hs.running().get(0))).as("hit speed %d%%", percent).isEqualTo(c[1]);
+    }
+
+    for (boolean reset : new boolean[] {true, false}) {
+      WithDuration long1 =
+          new WithDuration(
+              row("d").toBuilder().singleton(true).build(), 1000, false, () -> 100, reset);
+      ActionHolder hr = new ActionHolder();
+      hr.start(long1);
+      hr.runPass(1);
+      hr.start(long1);
+      assertThat(counter(hr.running().get(0)))
+          .as("re-triggered, reset %s", reset)
+          .isEqualTo(reset ? 0 : 50_000);
+    }
+  }
+
+  @Test
+  @DisplayName(
+      "an interval counts down from its start and fires every interval, held by its pause tag")
+  void interval() {
+    Leaf t1 = new Leaf("t1");
+    ActionHolder h = new ActionHolder();
+    h.start(new Interval(row("i"), 150, 100, t1, 0, () -> 0, () -> 100));
+    ActionInstance run = h.running().get(0);
+    assertThat(counter(run)).isEqualTo(100);
+    h.runPass(1);
+    assertThat(counter(run)).isEqualTo(50);
+    assertThat(queue(h)).as("nothing fired yet").isEmpty();
+    h.runPass(2);
+    assertThat(queue(h)).as("reaching zero fires the action").containsExactly("t1 0");
+    assertThat(h.queuedInstigators()).as("with its owner as the cause").containsExactly(h);
+    assertThat(counter(run)).as("and reloads by adding the interval").isEqualTo(150);
+    assertThat(run.isFinished()).as("never ends on its own").isFalse();
+
+    ActionHolder paused = new ActionHolder();
+    paused.start(new Interval(row("i"), 150, 50, t1, 0x40, () -> 0x40, () -> 100));
+    paused.runPass(1);
+    assertThat(counter(paused.running().get(0))).as("a matching pause tag holds it").isEqualTo(50);
+    assertThat(queue(paused)).isEmpty();
+
+    ActionHolder other = new ActionHolder();
+    other.start(new Interval(row("i"), 150, 50, t1, 0x40, () -> 0x80, () -> 100));
+    other.runPass(1);
+    assertThat(counter(other.running().get(0))).isEqualTo(150);
+    assertThat(queue(other)).containsExactly("t1 0");
+  }
+
+  @Test
+  @DisplayName(
+      "an interval asks its rate each step and takes off half of it; a rate below 1 moves nothing"
+          + " and fires nothing, even with the counter at zero")
+  void intervalRate() {
+    Leaf t1 = new Leaf("t1");
+    int[] rate = {130};
+    ActionHolder h = new ActionHolder();
+    h.start(new Interval(row("i"), 150, 100, t1, 0, () -> 0, () -> rate[0]));
+    ActionInstance run = h.running().get(0);
+    h.runPass(1);
+    assertThat(counter(run)).as("half of 130").isEqualTo(35);
+    rate[0] = 0;
+    h.runPass(2);
+    assertThat(counter(run)).as("a stopped rate holds the counter").isEqualTo(35);
+    rate[0] = 70;
+    h.runPass(3);
+    assertThat(counter(run)).as("half of 70 reaches zero, fires and reloads").isEqualTo(150);
+    assertThat(queue(h)).containsExactly("t1 0");
+
+    ActionHolder stopped = new ActionHolder();
+    stopped.start(new Interval(row("i"), 150, 0, t1, 0, () -> 0, () -> 0));
+    stopped.runPass(1);
+    assertThat(counter(stopped.running().get(0))).isZero();
+    assertThat(queue(stopped)).as("a counter at zero does not fire on a stopped step").isEmpty();
+  }
+
+  @Test
+  @DisplayName("a wait ends the step its condition holds, scheduling its action if it has one")
+  void waitToActivate() {
+    Leaf t1 = new Leaf("t1");
+    int[] condition = {0};
+    ActionHolder h = new ActionHolder();
+    h.start(new WaitToActivate(row("w"), () -> condition[0], t1));
+    ActionInstance run = h.running().get(0);
+    h.runPass(1);
+    assertThat(run.isFinished()).isFalse();
+    condition[0] = 1;
+    h.runPass(2);
+    assertThat(run.isFinished()).isTrue();
+    assertThat(queue(h)).containsExactly("t1 0");
+
+    ActionHolder h2 = new ActionHolder();
+    h2.start(new WaitToActivate(row("w"), () -> 1, null));
+    h2.runPass(1);
+    assertThat(h2.running().get(0).isFinished()).as("ends with no action too").isTrue();
+
+    ActionHolder h3 = new ActionHolder();
+    h3.start(new WaitToActivate(row("w"), null, t1));
+    h3.runPass(1);
+    assertThat(h3.running().get(0).isFinished()).as("the condition defaults to false").isFalse();
+  }
+
+  @Test
+  @DisplayName(
+      "a flip flop turns only after its condition disagrees for the whole time, and never ends")
+  void flipFlop() {
+    Leaf on = new Leaf("t1");
+    Leaf off = new Leaf("t2");
+    int[] condition = {0};
+    ActionHolder h = new ActionHolder();
+    h.start(new FlipFlop(row("f"), () -> condition[0], 100, 150, on, off));
+    ActionInstance run = h.running().get(0);
+    FlipFlop.Run state = (FlipFlop.Run) run;
+    assertThat(state.isActive()).isFalse();
+    assertThat(state.getTimerMs()).isZero();
+
+    h.runPass(1);
+    assertThat(state.getTimerMs()).as("false while off changes nothing").isZero();
+    condition[0] = 1;
+    h.runPass(2);
+    assertThat(state.getTimerMs()).isEqualTo(50);
+    assertThat(state.isActive()).isFalse();
+    h.runPass(3);
+    assertThat(state.isActive()).as("turns on at the activation time").isTrue();
+    assertThat(queue(h)).containsExactly("t1 0");
+    assertThat(state.getTimerMs()).isZero();
+
+    h.runPass(4);
+    assertThat(state.getTimerMs()).as("true while on changes nothing").isZero();
+    condition[0] = 0;
+    h.runPass(5);
+    assertThat(state.getTimerMs()).isEqualTo(50);
+    h.runPass(6);
+    assertThat(state.getTimerMs()).isEqualTo(100);
+    assertThat(state.isActive()).isTrue();
+    h.runPass(7);
+    assertThat(state.isActive()).as("turns off at the deactivation time").isFalse();
+    assertThat(queue(h)).containsExactly("t1 0", "t2 0");
+    assertThat(run.isFinished()).isFalse();
+
+    condition[0] = 1;
+    h.runPass(8);
+    condition[0] = 0;
+    h.runPass(9);
+    assertThat(state.getTimerMs()).as("flipping back resets the timer").isZero();
+  }
+
+  private static long counter(ActionInstance run) {
+    return ((CountingRun) run).counter();
+  }
+}

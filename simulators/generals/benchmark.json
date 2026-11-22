@@ -1,0 +1,72 @@
+{
+  "schema_version": 1,
+  "environment_id": "generals-research-1v1-8x8-v1",
+  "upstream": {
+    "url": "https://github.com/strakam/generals-bots.git",
+    "commit": "954927f508aa47899019d66317cc313af3e9cc19",
+    "license": "MIT; upstream assets retain their individual notices"
+  },
+  "rules_source": "environment.py:RULESET",
+  "seeds": "seeds.json",
+  "action_count": 513,
+  "observation_shape": [
+    8,
+    8,
+    14
+  ],
+  "modes": {
+    "train": "JAX batched PPO; one learner seat per game, alternating at episode reset",
+    "evaluate": "both physical seats for each map/opponent; no shaping; player-visible policy",
+    "profile": "random legal-action simulator separately from current/history inference + PPO"
+  },
+  "training_opponents": [
+    "current",
+    "episode-frozen historical snapshots",
+    "uniform legal random",
+    "visible expansion heuristic"
+  ],
+  "heldout_opponents": [
+    "upstream MIT HunterAgent (never used by train/development eval)",
+    "external source-bound checkpoint"
+  ],
+  "score": {
+    "primary": "(capture_wins + 0.5*cap_draws) / games",
+    "diagnostics": [
+      "capture wins",
+      "capture losses",
+      "cap draws",
+      "illegal actions",
+      "seed-cluster bootstrap CI",
+      "per-seat score",
+      "final public land"
+    ],
+    "faults": "illegal actions, unresolved games, checksum/rules mismatches and simulator exceptions fail validation; never convert to policy loss"
+  },
+  "budgets": {
+    "unit": "allocated worker wall seconds / 3600 on one GPU machine with fixed attached CPU and RAM",
+    "included": [
+      "CPU simulation",
+      "transfers",
+      "compilation",
+      "inference",
+      "updates",
+      "development evaluation",
+      "idle GPU",
+      "checkpoint IO",
+      "setup inside allocation"
+    ],
+    "supervisor": "lease.py persists cumulative elapsed worker seconds and terminates at deadline; external scheduler defines actual hardware reservation",
+    "sample_limit": "optional bounded local smoke only; not a substitute for allocated-worker budget"
+  },
+  "recipes": {
+    "starter": "recipes/starter.json",
+    "reference": "recipes/reference.json",
+    "local_smoke": "recipes/smoke.json"
+  },
+  "caveats": [
+    "Own frozen small-map benchmark, not live generals.io matchmaking or the upstream competition modifier mode",
+    "Public reserved heldout fixtures are not secret; final grader needs unpublished seeds/opponents",
+    "Reference recipe is runnable but has not been trained into a strong reference",
+    "Only local CPU validation; no paid compute or GPU throughput measurements"
+  ]
+}

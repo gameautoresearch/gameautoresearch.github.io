@@ -1,0 +1,66 @@
+{
+  "schema": "tavern-ppo-recipe-v1",
+  "seed": 12345,
+  "device": "cuda",
+  "machine": {
+    "label": "CONFIGURE-APPROVED-MACHINE-BEFORE-RUN",
+    "attached_cpu_threads": 8,
+    "attached_ram_gib": 32,
+    "gpu_model": "CONFIGURE-EXACT-GPU"
+  },
+  "allocated_worker_hours": null,
+  "n_games": 64,
+  "native_threads": 8,
+  "learning_seats": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7
+  ],
+  "opponent": "selfplay",
+  "opponent_checkpoint": null,
+  "rules": {
+    "num_players": 8,
+    "content": "Implemented",
+    "turn_action_caps": [
+      30
+    ],
+    "max_actions_per_turn": 30,
+    "max_turns": 100,
+    "record_log": false
+  },
+  "network": {
+    "hidden": 128,
+    "embedding": 8
+  },
+  "updates": 1000,
+  "profile_updates": 3,
+  "max_batch_steps": 6000,
+  "learning_rate": 0.0003,
+  "gamma": 0.99,
+  "gae_lambda": 0.95,
+  "ppo_epochs": 3,
+  "minibatch_size": 2048,
+  "clip": 0.2,
+  "entropy_coef": 0.01,
+  "value_coef": 0.5,
+  "max_grad_norm": 0.5,
+  "snapshot_every": 20,
+  "copy_observations": false,
+  "evaluation": {
+    "label": "held-out-protocol-public-example-not-secret",
+    "seeds": [
+      1000000007,
+      1000000009,
+      1000000021,
+      1000000033
+    ],
+    "games_per_seat": 4,
+    "opponent": "scripted",
+    "deterministic": false
+  }
+}

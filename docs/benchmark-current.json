@@ -1,0 +1,12 @@
+{
+  "benchmark_id": "game-autoresearch-from-scratch-hero-2k-v2",
+  "selected_on": "2026-11-09",
+  "config": "docs/benchmark-hero-2k-v2.json",
+  "readable_design": "docs/benchmark-hero-2k-v2.md",
+  "cost_report": "reports/benchmark-hero-2k-cost-analysis-2026-11-09.md",
+  "cost_result": "reports/benchmark-hero-2k-cost-analysis-2026-11-09.json",
+  "price_snapshot": "reports/benchmark-hero-2k-prices-2026-11-09.json",
+  "global_incremental_cash_hard_cap_usd": 2000,
+  "launch_authorized": false,
+  "supersedes": "docs/benchmark-final-v1.json"
+}

@@ -1,0 +1,1782 @@
+/*
+ * crforge - https://github.com/voonhous/crforge
+ * SPDX-License-Identifier: Apache-2.0
+ * Porting this code? Please cite this file and the commit you read: see the README.
+ */
+
+package org.crforge.core.battle.projectile;
+
+import static org.crforge.core.util.ValidationUtils.checkArgument;
+
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import lombok.Getter;
+import org.crforge.core.battle.BattleEntity;
+import org.crforge.core.battle.EntityActions;
+import org.crforge.core.battle.action.ActionHolder;
+import org.crforge.core.battle.action.ActionInstance;
+import org.crforge.core.battle.action.ActionOwner;
+import org.crforge.core.battle.action.BattleAction;
+import org.crforge.core.battle.action.CaptureCharacter;
+import org.crforge.core.battle.action.CreateParallelProjectiles;
+import org.crforge.core.battle.action.DamageType;
+import org.crforge.core.battle.action.ExecutionerEvoProjectile;
+import org.crforge.core.battle.action.GiantBufferBuff;
+import org.crforge.core.battle.action.MirroredExtraSpell;
+import org.crforge.core.battle.action.OverrideAbilityButtonState;
+import org.crforge.core.battle.action.ProjectileDeflected;
+import org.crforge.core.battle.action.RollingProjectile;
+import org.crforge.core.battle.action.TakeDamage;
+import org.crforge.core.battle.filter.GameObjectFilter;
+import org.crforge.core.battle.spawn.SpawnArguments;
+import org.crforge.core.battle.spawn.SpawnHost;
+import org.crforge.core.battle.unit.AreaEffectEntity;
+import org.crforge.core.battle.unit.BattleWorld;
+import org.crforge.core.battle.unit.WorldEntity;
+import org.crforge.core.fidelity.Fidelity;
+import org.crforge.core.fidelity.FidelityStatus;
+import org.crforge.core.pathfinding.GridEntity;
+import org.crforge.core.pathfinding.combat.HitPoints;
+import org.crforge.core.pathfinding.combat.PackedLevel;
+import org.crforge.core.pathfinding.combat.RarityTable;
+import org.crforge.core.pathfinding.combat.ScalingGlobals;
+import org.crforge.core.pathfinding.math.FixedMath;
+import org.crforge.core.pathfinding.state.FollowedObject;
+import org.crforge.core.pathfinding.target.TargetView;
+import org.crforge.core.pathfinding.target.TargetingState;
+
+/**
+ * A projectile in flight: an entity of its own kind in the same holder as the characters, so that
+ * it is visited in the same passes and removed by the same cleanup.
+ *
+ * <p>A projectile has no components. Its flight is its post-hook, which the holder runs for every
+ * projectile before any character's, because a projectile's id band precedes the characters'. Its
+ * id is given the moment its launcher hands it to the holder, in the attack tick, and it enters the
+ * live list at that tick's closing cleanup, so it first flies on the tick after its launch and
+ * arrives when the distance left to its aim is no more than one step of its speed. On arrival it is
+ * released, which is what makes it removable, and its impact deals its damage to its target, or,
+ * for a row with a radius, to everything in the circle around its aim.
+ *
+ * <p>The launch fixes the start and the aim, at the row's constant height when it has one; a homing
+ * projectile re-pins its aim onto its target every step, and, when the target leaves the battle,
+ * the removal notice leaves the aim where the target last stood and forgets the target, so the
+ * projectile flies on and lands on nothing. One that does not home keeps its target too and lands
+ * on it wherever it stands, unless the target has left.
+ *
+ * <p>A homing projectile with a target puts the damage it will deal on the target as pending, with
+ * its flight time, when the holder admits it, and again at each chained hop; it hands the damage
+ * back as it arrives, or as it is released or finished early. A target the damage will kill is then
+ * refused to a projectile attacker, and kept by the one whose shot it is.
+ *
+ * <p>A projectile that kills something is the cause of the death hooks it runs, so it has an action
+ * holder too, made the first time it causes one, which carries its level and nothing else.
+ */
+@Fidelity(
+    status = FidelityStatus.PARTIAL,
+    note =
+        "Settled: the projectile's kind and id band, its flight as the post-hook from the tick"
+            + " after its launch, the launch geometry from the owner's launch columns, the level"
+            + " re-based on the projectile row's rarity, the constant height, the homing re-aim,"
+            + " the straight flight with the arc height, the arrival on the step that reaches the"
+            + " aim, the release that makes it removable, the single impact on a target that"
+            + " still has hit points with the crown-tower damage for a crown tower, the area"
+            + " impact of a row with a radius, and the removal notice for a target, a homing"
+            + " target, an owner and a root owner that left. Held by the projectile positions and"
+            + " the hit points every reference battle observes, among them card_Musketeer,"
+            + " musketeer_s1 and card_Wizard, and by BattleProjectileFlightTest; the constant"
+            + " height by the reference battles card_RoyalGiant and card_EliteArcher; an action"
+            + " holder, made when the projectile first causes an action, as the cause of the"
+            + " death hooks of what it kills, held by card_Tombstone. Supplied, not settled: the"
+            + " projectile's own collision radius is zero, and no buff changes its damage. A"
+            + " deflection's redirect at the root owner - the damage registered on its target"
+            + " handed back, the deflector's side, the relaunch from where it stands with the"
+            + " deflector as launcher and owner, the damage registered on the root owner - and"
+            + " the deflected share of its damage at the impact, held by ability_monk, where the"
+            + " princess tower's arrows come back, and random_battle16_s0048; the hand-back, the"
+            + " side and the registration by BattleMonkTest. A pingpong projectile's first"
+            + " deflection on its sweep - its launcher's hold cleared whether the targeting is on"
+            + " or off, its sweep time started over, no hold on the deflector, and a relaunch aimed"
+            + " at the root owner's position itself, stretched neither to the range nor to the"
+            + " least distance, as every deflection's relaunch is - by"
+            + " BattlePingpongDeflectTest; that the hold clears at the deflection rather than at"
+            + " the projectile's removal by no run, the sweep's resume delay outlasting both. A"
+            + " spell's cast from the king tower, its delay, its chain and ring point, a thrown projectile's aim at its spawned"
+            + " one's body height, and a spawned projectile's launch from its parent are held by"
+            + " the spell reference battles (the card_ cases of the spells and the"
+            + " spell_*_into_push battles); the limited-time homing by card_EliteArcher. The"
+            + " chained hop is held by card_ElectroDragon, and the pingpong launch that holds the"
+            + " launcher's targeting until the projectile comes back by card_AxeMan. The random"
+            + " delay a unit's launch draws is held by card_Hunter. The launch at a target"
+            + " indicator attack's signal, to its point, the signal kept as what it was fired at"
+            + " and forgotten as it leaves, by card_GoblinMachine. The pending damage a homing"
+            + " shot registers as it starts, with its flight time from where it stands, is held"
+            + " by every tower's re-lock after its arrow's kill in the battle references, and the"
+            + " registration at a chained hop by card_ElectroDragon and"
+            + " evo_electrodragon_chain_vs_musketeer_giant; the crown-tower amount, the homing"
+            + " gate and the hand-backs at a release and a collision's finish by unit tests"
+            + " alone, since every reference shot hands its damage back as it arrives. The row's"
+            + " starting action, scheduled on the projectile's own holder as the holder admits"
+            + " it, itself the cause, so it runs in the projectile's phase-1 pending pass of the"
+            + " next tick before its first flight step; the listening runs of its holder changing"
+            + " a hit's damage along its way and hearing of each hit before its damage is taken"
+            + " off; and a swap of its row for one alike in the battle, held by"
+            + " evo_axeman_vs_musketeer. Its own variable map, empty when it is made, which its"
+            + " expressions read; a button state override's perform handed to its launcher and"
+            + " the run's writes by its own side, held by hero_barb_log, where no variable is"
+            + " written for it. Not modelled: a pingpong projectile, or one with a random delay,"
+            + " that a spell casts or an impact spawns, the angular delay, the drag-back hook,"
+            + " the custom movement, the far-distance clamp with its cell pull, and a redirect to"
+            + " a point. A deflection by the row's own deflection action that finds the"
+            + " projectile at the most it takes counts, hands the side and releases it, held by"
+            + " snowball-ev1-roll-deflect-max-v1."
+            + " Traced on client 16.635.1 and held by no reference yet: the cast id a spell's"
+            + " cast, a unit's volley, a barrage's drop and an impact's spawn stamp on the"
+            + " projectile, and a deflection hands it the deflector's, read by a cast-specific"
+            + " buff; any other launch carries none here.")
+public class ProjectileEntity extends BattleEntity
+    implements ActionOwner, SpawnHost, FollowedObject {
+
+  /** Game time one flight step advances, in milliseconds. */
+  static final int STEP_MS = 50;
+
+  /** How long a hopping projectile waits after a hop before it flies on, in milliseconds. */
+  static final int HOP_DELAY_MS = 150;
+
+  private static final int PERCENT = 100;
+
+  /** The share of its damage a deflected projectile deals a unit, in percent. */
+  private static final String DEFLECTED_UNITS = "DEFLECTED_PRJ_UNITS_DMG_MUL";
+
+  /** The share of its crown-tower damage a deflected projectile deals a crown tower. */
+  private static final String DEFLECTED_TOWERS = "DEFLECTED_PRJ_TOWERS_DMG_MUL";
+
+  /** The same share for a row that takes a spell's. */
+  private static final String DEFLECTED_SPELL_TOWERS = "DEFLECTED_SPELL_TOWERS_DMG_MUL";
+
+  private final BattleWorld world;
+
+  /** The projectile's published columns. */
+  /** Its row's columns; a data-changing action may swap the row for one alike in the battle. */
+  @Getter private ProjectileData data;
+
+  /**
+   * The side of the launcher, which the projectile fights for; a deflection turns it to the
+   * deflector's.
+   */
+  @Getter private int side;
+
+  /**
+   * How many times a deflecting area effect has turned the projectile around; from the first, its
+   * impact deals the deflected share of its damage.
+   */
+  @Getter private int deflections;
+
+  /**
+   * The group of the volley the projectile was launched in, shared by every projectile of that
+   * volley, for a launcher whose row links them into one; null for none.
+   */
+  @Getter private ProjectileGroup group;
+
+  /**
+   * The entity that launched the projectile, or null once it has left the battle, or for one
+   * another projectile's impact spawned.
+   */
+  @Getter private WorldEntity owner;
+
+  /**
+   * The play that cast the projectile, by its king's count of card plays before it: a spell's cast
+   * stamps it, and a projectile its impact spawns, a mirrored extra spell's and a character its
+   * impact makes carry it on; -1 for none. A unit's shot carries none here: the stamp its launch
+   * copies from its owner is read by nothing a reference holds.
+   */
+  @Getter private int deployIndex = -1;
+
+  /** The cast it belongs to; see {@link #castId()}. */
+  private int castId = UNMODELLED_CAST_ID;
+
+  /** The projectile's variables, which its actions write and its expressions read. */
+  private final Map<Integer, Integer> variables = new HashMap<>();
+
+  /**
+   * The id of the entity that launched the projectile, kept after it leaves the battle; 0 for none.
+   * The evolved Dart Goblin's poison controller tells its darts by it.
+   */
+  @Getter private int ownerId;
+
+  /** The launcher, or the launcher's own root for a projectile fired by a projectile. */
+  @Getter private WorldEntity root;
+
+  /**
+   * The area effect that launched the projectile, which is its owner and root as well, while it is
+   * in the battle; null for one a unit, a cast or an impact launched. The owner and the root are
+   * then null: they hold units only.
+   */
+  @Getter private AreaEffectEntity areaLauncher;
+
+  /** What the projectile was fired at, or null once it has left or was never aimed at one. */
+  @Getter private WorldEntity target;
+
+  /**
+   * The area effect the projectile was fired at, as a target indicator attack fires at its signal
+   * and a barrage drops its bomb onto its area, or null once it has left or for one fired at none.
+   * Its flight never takes it as a live target: the projectile flies to the point it was aimed at.
+   */
+  @Getter private AreaEffectEntity areaTarget;
+
+  /** The target a limited-time homing projectile still follows, or null. */
+  @Getter private WorldEntity homingTarget;
+
+  /** Milliseconds of limited-time homing left. */
+  @Getter private int homingTimeMs;
+
+  @Getter private int x;
+  @Getter private int y;
+
+  /** Height above the ground, in game units. */
+  @Getter private int z;
+
+  /** Where the flight started. */
+  @Getter private int startX;
+
+  @Getter private int startY;
+  @Getter private int startZ;
+
+  /** Where the flight ends. */
+  @Getter private int aimX;
+
+  @Getter private int aimY;
+
+  /** The height the flight ends at. */
+  @Getter private int aimZ;
+
+  /** The projectile's level, packed against its row's rarity; see {@link PackedLevel}. */
+  @Getter private int packedLevel;
+
+  /** The heading the projectile was launched at, in degrees. */
+  @Getter private int facing;
+
+  /** True once the projectile has arrived: it is removable and takes no further step. */
+  @Getter private boolean released;
+
+  /**
+   * True once a hooking projectile has hooked its target: it flies back to its owner, or holds
+   * still while it drags its owner to a building.
+   */
+  @Getter private boolean hooked;
+
+  /**
+   * True once a hooking projectile, before it hooked, found its target held by someone else's lock
+   * on one of its steps: an arrival after the lock is gone is refused, as no reference holds it.
+   */
+  @Getter private boolean targetHeldInFlight;
+
+  /** True until the first flight step has run. */
+  private boolean firstVisit = true;
+
+  /** Milliseconds its flight still waits before it moves, 50 off each visit. */
+  @Getter private int delayMs;
+
+  /**
+   * The speed its launch or a speed override action gave it in place of its row's, or 0 for none.
+   */
+  @Getter private int speedOverride;
+
+  /** The ids of the entities its flying body has hit, which it does not hit again. */
+  @Getter private final List<Integer> hitIds = new ArrayList<>();
+
+  /** How many targets a hopping projectile has been launched at, its first included. */
+  @Getter private int chainedHits;
+
+  /** How many links of spawned projectiles its impact may still launch. */
+  @Getter private int spawnChain;
+
+  /**
+   * The group id it shares with the projectiles its impacts spawn, 0 for none. Every hit it deals
+   * carries it as its dedupe id, so the projectiles of one group land on an entity once: an entity
+   * one of them has hit takes nothing from the others. A projectile that spawns ones that do not
+   * fly to a point, and does not fly to a point itself, takes a fresh id from the battle's group
+   * counter as it is launched, unless it already holds one; a spawned projectile takes its parent's
+   * before its launch, unless the parent's row makes each a new projectile.
+   */
+  @Getter private int groupId;
+
+  /** True for a projectile another one's impact spawned, which may take a group id of its own. */
+  private boolean spawnedByImpact;
+
+  /** The chain it belongs to, or null for a projectile on its own. */
+  @Getter private ProjectileChain chain;
+
+  /** The point its damage lands on as part of a chain, when the chain lands on ring points. */
+  @Getter private int ringX;
+
+  @Getter private int ringY;
+
+  /** How far into its sweep a pingpong projectile is, in milliseconds. */
+  @Getter private int pingpongTimeMs;
+
+  /**
+   * How far a pingpong projectile stood from its start before its last sweep step, which an
+   * expression on it reads.
+   */
+  @Getter private int pingpongDistance;
+
+  /** How much of its sweep a pingpong projectile covers each step, fixed at its launch. */
+  @Getter private int pingpongStepMs;
+
+  /** The projectile's action holder, made the first time it causes an action; null until then. */
+  private ActionHolder actionHolder;
+
+  /**
+   * True for a clone's projectile: the death projectile a clone launches, which takes its
+   * launcher's clone mark as it is launched. Only the impact's character spawn reads it here: each
+   * child it makes is set up as a clone (see {@link CharacterSpawns#impactSpawn}). The game marks
+   * the projectile of a clone whose hit destroys it as well; such a clone is cloned only when its
+   * projectile deals its damage alone, which reads no mark, so that launch leaves it unset.
+   */
+  @Getter private boolean clone;
+
+  /**
+   * True while the projectile's damage is registered on its target as pending: from its start, or a
+   * hop's relaunch, until it hands the damage back.
+   */
+  @Getter private boolean pendingRegistered;
+
+  /**
+   * Creates an unlaunched projectile. The launch places it; see {@link ProjectileLauncher}.
+   *
+   * @param world the battle's shared arena state, where the impact's damage goes
+   * @param data the projectile's published columns
+   * @param side the side that fires it
+   */
+  public ProjectileEntity(BattleWorld world, ProjectileData data, int side) {
+    super(KIND_PROJECTILE);
+    checkArgument(data != null, "a projectile needs its columns");
+    this.world = world;
+    this.data = data;
+    this.side = side;
+  }
+
+  /**
+   * The cast the projectile belongs to (see {@link SpawnHost#castId()}): a spell's cast stamps it,
+   * a unit's shot, a barrage's bomb and a projectile an impact spawns take their maker's, and a
+   * deflection hands it the deflector's; any other projectile carries none here.
+   *
+   * @param castId the cast id
+   */
+  public void setCastId(int castId) {
+    this.castId = castId;
+  }
+
+  @Override
+  public int castId() {
+    return castId;
+  }
+
+  /** The projectile's name in logs, refusals and the visualizer: its kind's prefix and its id. */
+  public String name() {
+    return "proj_" + getId();
+  }
+
+  /** The projectile's level, counted from 1. */
+  public int level() {
+    return PackedLevel.level(packedLevel);
+  }
+
+  /**
+   * Places the projectile at its start and aims it: the level is the launcher's re-based on the
+   * row's rarity, the aim is the hit position, and a homing projectile with a range instead flies
+   * that range from the launcher toward the hit position and forgets its target.
+   *
+   * @param launcher the entity firing the projectile
+   * @param target what the projectile is fired at, or null
+   * @param sx start position along the arena's width
+   * @param sy start position along the arena's length
+   * @param sz start height
+   * @param hx the hit position along the arena's width
+   * @param hy the hit position along the arena's length
+   */
+  void launch(WorldEntity launcher, WorldEntity target, int sx, int sy, int sz, int hx, int hy) {
+    GridEntity view = launcher.getView();
+    place(
+        launcher,
+        launcher,
+        target,
+        launcher.getPackedLevel(),
+        sx,
+        sy,
+        sz,
+        hx,
+        hy,
+        view.getX(),
+        view.getY());
+    if (data.randomDelayMs() >= 1) {
+      // A row with a random delay waits a draw from the battle's random source below it.
+      delayMs = world.getRandom().next(data.randomDelayMs());
+    }
+    if (data.pingpongVisualTimeMs() >= 1) {
+      // A pingpong projectile is held by its launcher's targeting component, whose visit returns
+      // early until the projectile comes back; the resume delay is started at the sweep's time.
+      TargetingState t = launcher.getTargeting();
+      t.setVisitSuspended(true);
+      t.setResumeDelayElapsedMs(0);
+      t.setResumeDelayMs(data.pingpongVisualTimeMs());
+      // Its sweep advances by the step the launcher's buffs make of 50 ms, as its attack does.
+      pingpongStepMs = launcher.getBuffs().hitSpeed(STEP_MS);
+    } else if (data.dragBackSpeed() >= 1) {
+      // A hooking projectile is held by its launcher's targeting component too, with no resume
+      // delay: the visit returns early until the projectile leaves the battle.
+      launcher.hold(this);
+    }
+  }
+
+  /**
+   * Places a projectile a unit's action fires at a point, as the hero Barbarian Barrel's reroll
+   * fires its barrel: launched as a unit's shot is, with no target, the unit as launcher and owner,
+   * and carrying the unit's play, which the launch copies from it.
+   *
+   * @param unit the unit firing it
+   * @param play the unit's play, by its king's count of card plays before it; -1 for none
+   * @param sx start position along the arena's width
+   * @param sy start position along the arena's length
+   * @param sz start height
+   * @param hx the point it is fired at along the width
+   * @param hy the point it is fired at along the length
+   */
+  public void launchFromUnit(WorldEntity unit, int play, int sx, int sy, int sz, int hx, int hy) {
+    launch(unit, null, sx, sy, sz, hx, hy);
+    this.deployIndex = play;
+  }
+
+  /**
+   * Places a spell's projectile, cast by a card play: owned by its side's king tower, with no
+   * target, at the card's level re-based on the row's rarity, from the start the cast works out to
+   * the placed point.
+   *
+   * @param king the side's king tower, the owner and the root
+   * @param cardLevel the card's level, packed, as the play gives it
+   * @param sx start position along the arena's width
+   * @param sy start position along the arena's length
+   * @param sz start height
+   * @param hx the placed point along the arena's width
+   * @param hy the placed point along the arena's length
+   * @param delayMs how long its flight waits before it moves
+   * @param play the play that casts it, by its king's count of card plays before it; -1 for none
+   */
+  public void cast(
+      WorldEntity king,
+      int cardLevel,
+      int sx,
+      int sy,
+      int sz,
+      int hx,
+      int hy,
+      int delayMs,
+      int play) {
+    refuseUnitOnly("cast");
+    // The cast has no launcher: a projectile that aims by its range would aim from its start.
+    place(king, king, null, cardLevel, sx, sy, sz, hx, hy, sx, sy);
+    this.delayMs = delayMs;
+    this.deployIndex = play;
+  }
+
+  /**
+   * Places the projectile a mirrored extra spell throws for a cast projectile: owned by the cast's
+   * owner, which is its root as well, with no target and no delay, at the cast's packed level
+   * re-based on this row's rarity, from where the cast stands and at its height, to the given
+   * point.
+   *
+   * @param source the cast projectile the extra spell mirrors
+   * @param hx the point it is thrown to along the arena's width
+   * @param hy the point it is thrown to along the arena's length
+   */
+  public void castMirrored(ProjectileEntity source, int hx, int hy) {
+    refuseUnitOnly("thrown by a mirrored extra spell");
+    if (source.owner == null) {
+      throw new UnsupportedOperationException(
+          data.name() + " mirrors " + source.name() + ", which has no owner, not modelled");
+    }
+    // Like the cast, it has no launcher: it aims from its start.
+    place(
+        source.owner,
+        source.owner,
+        null,
+        source.packedLevel,
+        source.x,
+        source.y,
+        source.z,
+        hx,
+        hy,
+        source.x,
+        source.y);
+    this.delayMs = 0;
+    this.deployIndex = source.deployIndex;
+  }
+
+  /**
+   * Places a projectile another one shoots across its line as it sets off, as the hero Elite
+   * Archer's ability shot shoots its side shots: from the given start, on the ground but for a
+   * constant height, with no target and no delay, at the source's packed level re-based on this
+   * row's rarity, carrying the source's play, aimed from where the source stands. The source is its
+   * launcher and owner, and the source's root, a unit or tower, its root. A projectile owns no
+   * projectile here: the owner is left empty, which is what every reader of a projectile's owner
+   * makes of one that is not a character - the shooter that counts its hits, the initial collision
+   * check's segment, the hooks - and the source has no running action that hears of it.
+   *
+   * @param source the projectile that shoots it
+   * @param sx start position along the arena's width
+   * @param sy start position along the arena's length
+   * @param hx the point it is shot at along the arena's width
+   * @param hy the point it is shot at along the arena's length
+   */
+  public void launchAcross(ProjectileEntity source, int sx, int sy, int hx, int hy) {
+    refuseUnitOnly("shot by a projectile");
+    if (source.root == null) {
+      throw new UnsupportedOperationException(
+          data.name()
+              + " is shot by "
+              + source.name()
+              + ", which has no root, so the shooter would be its root, not modelled");
+    }
+    place(null, source.root, null, source.packedLevel, sx, sy, 0, hx, hy, source.x, source.y);
+    this.delayMs = 0;
+    this.deployIndex = source.deployIndex;
+  }
+
+  /**
+   * Places a projectile an area effect launches: with the area effect as its launcher, owner and
+   * root, at the area effect's level re-based on the row's rarity, from the start to the hit
+   * position, at a target or none.
+   *
+   * @param area the area effect
+   * @param target what the projectile is dropped onto, or null
+   * @param sx start position along the arena's width
+   * @param sy start position along the arena's length
+   * @param sz start height
+   * @param hx the hit position along the arena's width
+   * @param hy the hit position along the arena's length
+   */
+  public void launchFromArea(
+      AreaEffectEntity area, WorldEntity target, int sx, int sy, int sz, int hx, int hy) {
+    refuseUnitOnly("launched by an area effect");
+    place(null, null, target, area.getPackedLevel(), sx, sy, sz, hx, hy, area.getX(), area.getY());
+    areaLauncher = area;
+  }
+
+  /**
+   * Places a projectile a target indicator attack fires at its signal: with the unit as launcher
+   * and owner, at its level re-based on the row's rarity, from the start to the signal's point. The
+   * signal is kept as what it was fired at, which its flight never takes as a live target. Refused:
+   * a homing, pingpong or hooking row, or one with a random delay.
+   *
+   * @param launcher the unit running the attack
+   * @param signal the signal it fires at
+   * @param sx start position along the arena's width
+   * @param sy start position along the arena's length
+   * @param sz start height
+   */
+  public void launchAtSignal(
+      WorldEntity launcher, AreaEffectEntity signal, int sx, int sy, int sz) {
+    refuseUnitOnly("fired at a signal");
+    if (data.homing() || data.homingTimeMs() >= 1 || data.dragBackSpeed() >= 1) {
+      throw new UnsupportedOperationException(
+          data.name() + " homes or hooks and is fired at a signal, not modelled");
+    }
+    GridEntity view = launcher.getView();
+    place(
+        launcher,
+        launcher,
+        null,
+        launcher.getPackedLevel(),
+        sx,
+        sy,
+        sz,
+        signal.getX(),
+        signal.getY(),
+        view.getX(),
+        view.getY());
+    areaTarget = signal;
+  }
+
+  /**
+   * Places a bomb a barrage drops onto its area effect, as {@link #launchFromArea} does, the area
+   * effect kept as what it was dropped onto, and gives it the speed the drop works out in place of
+   * its row's.
+   *
+   * @param area the area effect it is dropped onto, its launcher
+   * @param sz the height it is dropped from
+   * @param speed the speed it flies at
+   */
+  public void dropOnto(AreaEffectEntity area, int sz, int speed) {
+    launchFromArea(area, null, area.getX(), area.getY(), sz, area.getX(), area.getY());
+    areaTarget = area;
+    speedOverride = speed;
+    // The drop stamps it with the cast of the area effect it is dropped onto, its maker.
+    castId = area.castId();
+  }
+
+  /**
+   * Takes a speed in place of its row's, as a speed override action writes it: the flight reads it
+   * while it is above 0.
+   */
+  @Override
+  public void overrideProjectileSpeed(String action, int speed) {
+    speedOverride = speed;
+  }
+
+  /** The name of what the projectile was fired at while it is in the battle, or null for none. */
+  public String targetName() {
+    if (target != null) {
+      return target.name();
+    }
+    return areaTarget == null ? null : areaTarget.name();
+  }
+
+  /**
+   * The name of what launched the projectile while it is in the battle: its owner, or the area
+   * effect that launched it; null for none.
+   */
+  public String launcherName() {
+    if (owner != null) {
+      return owner.name();
+    }
+    return areaLauncher == null ? null : areaLauncher.name();
+  }
+
+  /**
+   * Makes the projectile part of a chain whose damage lands on ring points: its own is the given
+   * point, and the chain lands on ring points from now on.
+   *
+   * @param chain the wave's shared state
+   * @param x the ring point along the width
+   * @param y the ring point along the length
+   */
+  public void joinChain(ProjectileChain chain, int x, int y) {
+    this.chain = chain;
+    this.ringX = x;
+    this.ringY = y;
+    chain.markRingPoints();
+  }
+
+  /** Marks the projectile a clone's: what its impact spawns is a clone. */
+  public void markClone() {
+    clone = true;
+  }
+
+  /**
+   * Refuses a pingpong projectile or one with a random delay that no unit launches: a pingpong one
+   * would be held by a king tower's targeting component, or, spawned, by none, and a cast one would
+   * draw its delay; no row either way is known.
+   */
+  private void refuseUnitOnly(String how) {
+    if (data.pingpongVisualTimeMs() >= 1) {
+      throw new UnsupportedOperationException(
+          data.name() + " is a pingpong projectile " + how + " without a unit, not modelled");
+    }
+    if (data.randomDelayMs() >= 1) {
+      throw new UnsupportedOperationException(
+          data.name() + " has a random delay and is " + how + " without a unit, not modelled");
+    }
+  }
+
+  /** One visit's step of the delay before the flight, which stops at zero. */
+  void stepDelay() {
+    delayMs = Math.max(delayMs, STEP_MS) - STEP_MS;
+  }
+
+  /**
+   * Launches a projectile another one's impact spawns: from where the parent stands, at the height
+   * the parent aimed at, with no target and no launcher - so a projectile that aims by its range
+   * aims from its start - at the parent's level re-based on this row's rarity, with the parent's
+   * root, and one link fewer of its spawn chain.
+   *
+   * @param parent the projectile that landed
+   * @param hx the point it aims beyond the parent's aim, along the width
+   * @param hy the point it aims beyond the parent's aim, along the length
+   */
+  public void launchSpawned(ProjectileEntity parent, int hx, int hy) {
+    refuseUnitOnly("spawned");
+    // The group is handed on before the launch, which then keeps it; a row whose spawns are new
+    // projectiles hands on none, and the launch gives each a group of its own.
+    spawnedByImpact = true;
+    if (!parent.data.chainIsNewProjectile()) {
+      groupId = parent.groupId;
+    }
+    place(
+        null,
+        parent.root,
+        null,
+        parent.packedLevel,
+        parent.x,
+        parent.y,
+        parent.aimZ,
+        hx,
+        hy,
+        parent.x,
+        parent.y);
+    spawnChain = parent.spawnChain - 1;
+    deployIndex = parent.deployIndex;
+    // The impact stamps it with the parent's cast as it makes it.
+    castId = parent.castId;
+  }
+
+  /**
+   * The launch body: the level re-based, the start, the owner and root, the aim from its origin,
+   * its height, and the facing.
+   */
+  private void place(
+      WorldEntity launcher,
+      WorldEntity rootOwner,
+      WorldEntity target,
+      int launcherLevel,
+      int sx,
+      int sy,
+      int sz,
+      int hx,
+      int hy,
+      int originX,
+      int originY) {
+    this.packedLevel = PackedLevel.pack(launcherLevel, data.rarity());
+    this.x = sx;
+    this.y = sy;
+    this.z = sz;
+    this.target = target;
+    this.owner = launcher;
+    this.ownerId = launcher == null ? 0 : launcher.getId();
+    this.root = rootOwner;
+    this.spawnChain = data.spawnChain();
+    // A deflection's relaunch of a projectile that flies to a point, as the Magic Archer's arrow,
+    // or has a range without flying to one, as the evolved Bomber's bounce, and neither inverts its
+    // direction, sweeps out and back nor stops at collisions, is aimed as a first launch is, but
+    // from where it stands: stretched to its range toward the hit position, forgetting the target,
+    // and held to its least distance.
+    boolean aimsFromItself =
+        deflections >= 1
+            && (data.homingLike() || data.projectileRange() >= 1)
+            && (data.deflectBehaviour() & ProjectileData.INVERT_DIRECTION) == 0
+            && data.pingpongVisualTimeMs() < 1
+            && !data.checkCollisions();
+    if (aimsFromItself) {
+      aim(sx, sy, hx, hy);
+    } else if (deflections >= 1) {
+      // Any other deflection's relaunch aims at the hit position itself: neither stretched to the
+      // row's range nor to its least distance, and it keeps its target.
+      aimX = hx;
+      aimY = hy;
+    } else {
+      aim(originX, originY, hx, hy);
+    }
+    this.startX = x;
+    this.startY = y;
+    this.startZ = z;
+    if (target != null && data.homingTimeMs() >= 1) {
+      GridEntity targetView = target.getView();
+      int dx = targetView.getX() - startX;
+      int dy = targetView.getY() - startY;
+      if (FixedMath.guardedDistance(dx, dy) > data.homingMinDistance()) {
+        homingTarget = target;
+        homingTimeMs = data.homingTimeMs();
+      }
+    }
+    if (data.minDistance() != 0 && (deflections < 1 || aimsFromItself)) {
+      int[] vec = {aimX - startX, aimY - startY};
+      if (FixedMath.guardedDistance(vec[0], vec[1]) < data.minDistance()) {
+        FixedMath.normalize(vec, data.minDistance());
+        aimX = startX + vec[0];
+        aimY = startY + vec[1];
+      }
+    }
+    ProjectileData spawned =
+        data.spawnProjectile() == null
+            ? null
+            : world.getRecords().projectile(data.spawnProjectile());
+    if (data.homingLike()) {
+      aimZ = startZ;
+    } else if (spawned != null && spawned.homingLike()) {
+      // A projectile that spawns one flying to a point aims at that one's body height.
+      aimZ =
+          spawned.projectileRadiusY() == 0
+              ? spawned.projectileRadius()
+              : Math.min(spawned.projectileRadius(), spawned.projectileRadiusY());
+    } else if ((spawned != null || spawnedByImpact) && groupId == 0) {
+      // Neither it nor what it spawns flies to a point: it takes a fresh group id, which the
+      // projectiles its impact spawns share.
+      groupId = world.nextProjectileGroupId();
+    }
+    if (data.constantHeight() != 0) {
+      // A constant height replaces the launcher's height as the start and the aim: the flight's arc
+      // runs from it to the aim height, which a homing projectile's re-aim still moves onto its
+      // target's. No hit test reads a height, so it moves no hit and no arrival.
+      z = data.constantHeight();
+      startZ = z;
+      aimZ = z;
+    }
+    if (data.chainedHitRadius() >= 1) {
+      // A hopping projectile counts every launch and lists each target, which it does not hop to
+      // again.
+      chainedHits++;
+      if (this.target != null) {
+        hitIds.add(this.target.getId());
+      }
+    }
+    boolean homingNow = this.target != null && data.homing();
+    int dx = (homingNow ? this.target.getView().getX() : aimX) - x;
+    int dy = (homingNow ? this.target.getView().getY() : aimY) - y;
+    facing = FixedMath.guardedDistance(dx, dy) >= 1 ? FixedMath.angleOfVector(dx, dy) : 0;
+    if (homingTimeMs >= 1) {
+      // A limited-time homing projectile measures its flight from the launcher, not the start.
+      startX = originX;
+      startY = originY;
+    }
+  }
+
+  /**
+   * Points the flight: at the hit position, or, for a projectile that flies to a point, its range
+   * from the origin toward the hit position, forgetting the target.
+   */
+  void aim(int originX, int originY, int hx, int hy) {
+    aimX = hx;
+    aimY = hy;
+    if (!data.homingLike() && data.projectileRange() < 1) {
+      return;
+    }
+    int[] vec = {hx - originX, hy - originY};
+    // A row with a random distance would add a draw here; no row carried here has one.
+    FixedMath.normalize(vec, data.projectileRange());
+    target = null;
+    aimX = originX + vec[0];
+    aimY = originY + vec[1];
+  }
+
+  /**
+   * The chained hop, after an impact: the projectile is launched again from where it is, at the
+   * height it aimed at, at its next target, aimed at its old aim mirrored past its start - a homing
+   * projectile then re-pins that aim onto the target - with its owner, root and level. The launch
+   * counts it and lists the target. It is no longer released, and waits {@value #HOP_DELAY_MS} ms
+   * before it flies on.
+   *
+   * <p>A projectile whose launcher has left - the Electro Spirit dies on its launch - is launched
+   * with itself as its owner, and as its root when that has left too: its owner id becomes its own
+   * id, and the owner and root stay empty here, as they hold units only. A projectile owner is what
+   * every reader of the owner on this flight makes of none: the shooter its hits count for and a
+   * kill reaches is a character owner only, the impact's owner tests ask for a character or for the
+   * owner as its own target, and the rest read it only for a hooking or pingpong row. Its side,
+   * level, damage and hop count are its own, and its next target is searched for around where it
+   * landed, with itself as the asker, as with a launcher.
+   *
+   * @param next the character it hops to
+   */
+  void hop(WorldEntity next) {
+    int hx = 2 * aimX - startX;
+    int hy = 2 * aimY - startY;
+    target = null;
+    boolean orphaned = owner == null;
+    place(owner, root, next, packedLevel, x, y, aimZ, hx, hy, x, y);
+    if (orphaned) {
+      ownerId = getId();
+    }
+    // The relaunch registers its damage on the next target, from where the hop starts.
+    registerPending();
+    released = false;
+    delayMs = HOP_DELAY_MS;
+  }
+
+  /**
+   * The redirect of a deflection back at the projectile's source: a homing projectile with a target
+   * hands the damage registered on it back; the target and the root are forgotten, the deflections
+   * counted, and the projectile takes the deflector's side. It is launched again from where it
+   * stands, at its height, at the source and its position, the deflector its launcher and owner, at
+   * its own level, and registers its damage, now the deflected share, on the source. A row with a
+   * random delay draws a fresh one from the battle's random source, as every launch with a launcher
+   * does, so the turned projectile waits where it was turned before it flies back. A projectile
+   * whose impact spawns others counts their chain from its row's spawn chain again, as every launch
+   * does: a turned bounce of the evolved Bomber's bomb bounces on as often as the bomb itself.
+   *
+   * <p>A projectile that flies to a point, or has a range without flying to one, and neither
+   * inverts its direction, sweeps out and back nor stops at collisions, as the Magic Archer's arrow
+   * and the evolved Bomber's bounce, is aimed from where it stands instead, stretched to its range
+   * toward the source, and forgets the source as its target; a row that homes for a time homes on
+   * the source again when it stands farther than the row's least homing distance, and its flight is
+   * then measured from the deflector, as from a launcher.
+   *
+   * <p>A hooking projectile, as the Fisherman's hook, is not redirected at all: after its action on
+   * the deflector its flight ends where it is, as a release ends it (its action on reaching its
+   * target scheduled, a damage still registered on its target handed back), with its target, root,
+   * owner, side and count of deflections as they were.
+   *
+   * <p>A pingpong projectile not deflected before first lets its owner's targeting go on, whether
+   * the component is on or off, and its sweep time starts over; the relaunch sets no hold on the
+   * deflector. Deflected, it no longer sweeps (see {@link ProjectileFlight}).
+   *
+   * @param deflector the deflecting area effect's parent, which sends it back
+   * @param source the projectile's root owner, which it is sent back at
+   */
+  public void deflect(WorldEntity deflector, WorldEntity source) {
+    GridEntity at = source.getView();
+    turnAround(deflector, source, at.getX(), at.getY());
+  }
+
+  /**
+   * The redirect of a deflection at a point, as {@link #deflect} sends a projectile back at its
+   * source, but with no target: launched again from where it stands, at its height, at the point,
+   * the deflector its launcher, owner and root, at its own level. A spell-like projectile is sent
+   * at the enemy crown tower the deflection picked this way, a bomb at the area effect it was
+   * dropped onto, which stays what it was dropped onto, and a rolling body, as the Bowler's ball,
+   * back the way it came. Its new start is where it stands.
+   *
+   * @param deflector the deflecting area effect's parent, which sends it on
+   * @param px the point along the width
+   * @param py the point along the length
+   */
+  public void deflectAt(WorldEntity deflector, int px, int py) {
+    turnAround(deflector, null, px, py);
+  }
+
+  /**
+   * The redirect both deflections share, at a target and its point or at a point alone. A row's
+   * action on its deflector, as the Firecracker's rocket's damage on the deflector, is scheduled
+   * first on the deflector's parent, the projectile its cause: outside a pending pass it waits for
+   * the next one, and the damage it queues falls on the parent at the drain after it, scaled by the
+   * projectile's level. Refused: an action on the deflector that deals no damage to its owner,
+   * which no recording holds.
+   *
+   * <p>A row with its own deflection action, as the evolved Snowball's rolling snowball, is not
+   * turned at all: the action is scheduled on the projectile, the deflector its cause - outside a
+   * pending pass it waits for the next one - and nothing else of the redirect runs, neither the
+   * count, the side, the target nor the launch; the action counts the deflection and hands over the
+   * side as it starts (see {@link #projectileDeflected}).
+   */
+  private void turnAround(WorldEntity deflector, WorldEntity source, int px, int py) {
+    if (data.actionOnDeflector() != null) {
+      BattleAction onDeflector =
+          world.getActions().build(data.actionOnDeflector(), world.binding(deflector));
+      if (!(onDeflector instanceof TakeDamage)) {
+        throw new UnsupportedOperationException(
+            name()
+                + " is deflected, which runs "
+                + data.actionOnDeflector()
+                + " on its deflector, not modelled");
+      }
+      deflector.actionHolder().schedule(onDeflector, ActionHolder.OWN_DELAY, false, actionHolder());
+    }
+    if (data.customDeflectAction() != null) {
+      BattleAction custom =
+          world.getActions().build(data.customDeflectAction(), new ProjectileBinding(world, this));
+      actionHolder().schedule(custom, ActionHolder.OWN_DELAY, false, deflector.actionHolder());
+      return;
+    }
+    if (data.dragBackSpeed() >= 1) {
+      // A hooking projectile, as the Fisherman's hook, is not turned: its flight ends where it is,
+      // as one turned past the most a projectile takes ends. Its target, side, owner and count of
+      // deflections stay as they were.
+      finishOverDeflected();
+      return;
+    }
+    if (data.pingpongVisualTimeMs() >= 1 && deflections == 0 && owner != null) {
+      owner.pingpongDeflected(this);
+    }
+    if (data.homing() && target != null) {
+      handBackPending();
+    }
+    target = null;
+    root = null;
+    deflections++;
+    pingpongTimeMs = 0;
+    side = deflector.side();
+    // The deflector's cast as well: the redirect stamps the projectile with it beside its side.
+    castId = deflector.castId();
+    GridEntity from = deflector.getView();
+    place(deflector, deflector, source, packedLevel, x, y, z, px, py, from.getX(), from.getY());
+    if (data.randomDelayMs() >= 1) {
+      // The relaunch draws a fresh random delay, as every launch with a launcher does: the turned
+      // projectile waits it out where it was turned before it flies on.
+      delayMs = world.getRandom().next(data.randomDelayMs());
+    }
+    registerPending();
+  }
+
+  /** Moves the projectile. */
+  void moveTo(int newX, int newY, int newZ) {
+    x = newX;
+    y = newY;
+    z = newZ;
+  }
+
+  /** Notes that the target was held by someone else's lock on a step before the hook. */
+  void markTargetHeldInFlight() {
+    targetHeldInFlight = true;
+  }
+
+  /** Marks the projectile as having hooked its target. */
+  void hook() {
+    hooked = true;
+  }
+
+  void setAim(int newAimX, int newAimY, int newAimZ) {
+    aimX = newAimX;
+    aimY = newAimY;
+    aimZ = newAimZ;
+  }
+
+  void setStart(int newStartX, int newStartY) {
+    startX = newStartX;
+    startY = newStartY;
+  }
+
+  void setHomingTimeMs(int ms) {
+    homingTimeMs = ms;
+  }
+
+  void setPingpongTimeMs(int ms) {
+    pingpongTimeMs = ms;
+  }
+
+  void setPingpongDistance(int distance) {
+    pingpongDistance = distance;
+  }
+
+  /** The battle the projectile belongs to. */
+  BattleWorld world() {
+    return world;
+  }
+
+  /**
+   * Loses the target, handing no damage back, as a projectile whose row allows it does when its
+   * target goes into a pathfinding state: it flies on to its aim and lands on nothing.
+   */
+  public void dropTarget() {
+    target = null;
+  }
+
+  void forgetHomingTarget() {
+    homingTarget = null;
+    homingTimeMs = 0;
+  }
+
+  /**
+   * Ends the flight: the projectile takes no further step and leaves at the next cleanup. Its row's
+   * action on reaching its target is scheduled on its own holder, itself the cause, and a damage
+   * still registered on its target is handed back. Outside every pending pass the action waits for
+   * the next one of that holder: an arrival's, from the projectile's step, runs in the last pending
+   * pass of the same tick, after the impact and before the projectile leaves.
+   */
+  void release() {
+    released = true;
+    targetReached();
+    releasePending();
+  }
+
+  /**
+   * Ends the flight of a projectile a deflection turned around once more than the most a projectile
+   * takes, as a release does: it takes no further step and leaves at the next cleanup, without an
+   * impact; its action on reaching its target is scheduled and a damage still registered on its
+   * target is handed back.
+   */
+  public void finishOverDeflected() {
+    release();
+  }
+
+  /**
+   * Ends the flight of a projectile a deflection turned around without a root owner, its shooter
+   * gone: it takes no further step and leaves at the next cleanup, without an impact. Unlike a
+   * release, its action on reaching its target is not scheduled; a damage still registered on its
+   * target is handed back, though the redirect has already dropped the target. A projectile already
+   * released, by a deflection past the most a projectile takes, is left as it is.
+   */
+  public void finishRootless() {
+    if (released) {
+      return;
+    }
+    released = true;
+    releasePending();
+  }
+
+  /**
+   * Ends the flight of a projectile that stops at collisions, on the first hit its body lands: it
+   * takes no further hit or step and leaves at the next cleanup, without an impact; as a release,
+   * its action on reaching its target is scheduled and a damage still registered on its target is
+   * handed back.
+   */
+  public void finishOnCollision() {
+    released = true;
+    targetReached();
+    releasePending();
+  }
+
+  /** Schedules the row's action on reaching its target on the projectile, itself the cause. */
+  private void targetReached() {
+    if (data.onTargetReachedAction() == null) {
+      return;
+    }
+    BattleAction reached =
+        world.getActions().build(data.onTargetReachedAction(), new ProjectileBinding(world, this));
+    actionHolder().schedule(reached, ActionHolder.OWN_DELAY, false, actionHolder());
+  }
+
+  /**
+   * The projectile's start, as the holder admits it to its live list at the closing cleanup of its
+   * launch tick: first its row's starting action is scheduled on its own holder, itself the cause,
+   * so outside every pending pass it waits for the projectile's phase-1 pending pass of the next
+   * tick, before its first flight step; then a homing projectile registers its damage on its
+   * target, from where it stands.
+   */
+  @Override
+  protected void onRegistered() {
+    if (data.onStartingAction() != null) {
+      BattleAction starting =
+          world.getActions().build(data.onStartingAction(), new ProjectileBinding(world, this));
+      world.getEvents().projectileStarting(this, starting.name());
+      actionHolder().schedule(starting, ActionHolder.OWN_DELAY, false, actionHolder());
+    }
+    registerPending();
+  }
+
+  /**
+   * Schedules a row on the entity that launched the projectile, built for it, with the projectile
+   * as its cause, as a run on the shooter does; nothing once the launcher has left the battle or
+   * for a projectile no entity launched.
+   */
+  @Override
+  public void runOnShooter(BattleAction action, String actionToExecute) {
+    if (owner == null) {
+      return;
+    }
+    BattleAction built = world.getActions().build(actionToExecute, world.binding(owner));
+    owner.actionHolder().schedule(built, ActionHolder.OWN_DELAY, false, actionHolder());
+  }
+
+  /**
+   * Schedules a row a run on the instigator hands back to the projectile, built for it, so its
+   * expressions read the projectile, with the handing holder as its cause.
+   */
+  @Override
+  public void runFromInstigated(
+      BattleAction action, String actionToExecute, ActionHolder instigated) {
+    BattleAction built =
+        world.getActions().build(actionToExecute, new ProjectileBinding(world, this));
+    actionHolder().schedule(built, ActionHolder.OWN_DELAY, false, instigated);
+  }
+
+  /**
+   * Creates the area effect an action's spawn row names at the projectile's point, moved by the
+   * row's offsets, as the hero Wizard's air projectile does from its action on reaching its target.
+   */
+  @Override
+  public void spawnAreaEffect(
+      String action, String areaEffect, SpawnHost source, int offsetX, int offsetY, int phase) {
+    world.spawnAreaEffect(this, action, areaEffect, source, offsetX, offsetY, phase);
+  }
+
+  /**
+   * Throws the mirrored extra spell with this projectile as its cause, as the evolved Goblin
+   * Barrel's cast runs it on its king.
+   */
+  @Override
+  public void mirroredExtraSpell(MirroredExtraSpell action) {
+    world.castMirroredExtraSpell(this, action.getProjectile(), action.name());
+  }
+
+  /** Shoots the action's projectiles across the line from this projectile to its aim. */
+  @Override
+  public void shootProjectilesAcross(CreateParallelProjectiles action) {
+    world.shootProjectilesAcross(this, action);
+  }
+
+  /**
+   * Takes another projectile row, as a data-changing action gives it: only the row changes, so a
+   * row whose battle columns differ from this one's, but for its starting action, which does not
+   * run again, is refused.
+   *
+   * @param rowName the row it takes
+   */
+  @Override
+  public void changeProjectileData(String rowName) {
+    ProjectileData next = world.getRecords().projectile(rowName);
+    if (!battleColumns(next).equals(battleColumns(data))) {
+      throw new UnsupportedOperationException(
+          name() + " swaps " + data.name() + " for " + rowName + ", whose columns differ");
+    }
+    world.getEvents().projectileSwapped(this, data.name(), rowName);
+    data = next;
+  }
+
+  /** A row's battle columns: everything but its name and its starting action. */
+  private static ProjectileData battleColumns(ProjectileData row) {
+    return row.toBuilder().name("").onStartingAction(null).build();
+  }
+
+  /**
+   * A row's own deflection action on the projectile: one more deflection counted and the side of
+   * its cause, the deflector's parent, taken; nothing else changes, so whatever moves it reads the
+   * count, as a roll does (see {@link RollingRun}). A deflection that finds the projectile already
+   * at the most it takes (MAX_DEFLECTION_TIMES) counts and hands the side all the same and then
+   * releases it: it leaves at this tick's cleanup without an impact, its action on reaching its
+   * target scheduled, as a roll's arrival releases it. Refused: a cause that is not a unit.
+   */
+  @Override
+  public void projectileDeflected(ProjectileDeflected action, ActionOwner cause) {
+    if (!(cause instanceof WorldEntity deflector)) {
+      throw new UnsupportedOperationException(
+          action.name() + " deflects " + name() + " without a unit as its cause, not modelled");
+    }
+    // The count before this deflection decides the release.
+    int before = deflections;
+    deflections++;
+    side = deflector.side();
+    // Whether the action hands on the deflector's cast with its side is not known.
+    castId = UNMODELLED_CAST_ID;
+    world.getEvents().projectileSelfDeflected(this, action.name(), deflector);
+    if (before >= world.globalNumber("MAX_DEFLECTION_TIMES")) {
+      release();
+    }
+  }
+
+  /** Starts the evolved Executioner's axe controller on the projectile. */
+  @Override
+  public ActionInstance executionerController(ExecutionerEvoProjectile action, int phase) {
+    world.getEvents().executionerStarted(this, action.name(), phase);
+    return new ExecutionerRun(action, this);
+  }
+
+  /** Starts a roll on the projectile, which moves it in place of its flight. */
+  @Override
+  public ActionInstance rollingProjectile(RollingProjectile action, int phase) {
+    RollingRun run = new RollingRun(action, this);
+    world
+        .getEvents()
+        .rollStarted(this, action.name(), phase, run.destinationX(), run.destinationY());
+    return run;
+  }
+
+  /** Starts a capture on the projectile. */
+  @Override
+  public ActionInstance captureCharacter(CaptureCharacter action, int phase) {
+    world.getEvents().captureStarted(this, action.name(), phase);
+    return new CaptureRun(action, captureHost());
+  }
+
+  /**
+   * What a capture on the projectile asks of it: it always claims, queries at its point, buffs its
+   * captures as their parent and source, and keeps no tag word and no buffs, so its hit timer steps
+   * by 50. Refused as it runs: a hit on a capture, which no projectile row deals.
+   */
+  private CaptureHost captureHost() {
+    ProjectileEntity projectile = this;
+    return new CaptureHost() {
+      @Override
+      public BattleEntity owner() {
+        return projectile;
+      }
+
+      @Override
+      public int id() {
+        return getId();
+      }
+
+      @Override
+      public String name() {
+        return projectile.name();
+      }
+
+      @Override
+      public int x() {
+        return getX();
+      }
+
+      @Override
+      public int y() {
+        return getY();
+      }
+
+      @Override
+      public BattleWorld world() {
+        return world;
+      }
+
+      @Override
+      public ActionHolder actionHolder() {
+        return projectile.actionHolder();
+      }
+
+      @Override
+      public boolean claims() {
+        return true;
+      }
+
+      @Override
+      public List<WorldEntity> query(int radius, GameObjectFilter filter) {
+        return world.captureQuery(projectile, radius, filter);
+      }
+
+      @Override
+      public boolean passes(WorldEntity unit, GameObjectFilter filter) {
+        return world.capturePasses(projectile, unit, filter);
+      }
+
+      @Override
+      public void buff(WorldEntity unit, String buff, int timeMs) {
+        world.captureBuff(projectile, unit, buff, timeMs);
+      }
+
+      @Override
+      public void scheduleOnOwner(WorldEntity cause, String action) {
+        projectile
+            .actionHolder()
+            .schedule(
+                world.getActions().build(action, new ProjectileBinding(world, projectile)),
+                ActionHolder.OWN_DELAY,
+                false,
+                cause.actionHolder());
+      }
+
+      @Override
+      public void hasCapture() {
+        // A projectile keeps no tag word: nothing reads its HAS_CAPTURE.
+      }
+
+      @Override
+      public int hitStep(int stepMs) {
+        return stepMs;
+      }
+
+      @Override
+      public void hit(WorldEntity unit, int damagePerHit) {
+        throw new UnsupportedOperationException(
+            projectile.name() + " hits its capture " + unit.name() + ", not modelled");
+      }
+    };
+  }
+
+  /**
+   * Tells the projectile's listening runs, from the last listed down, of a hit it lands, before the
+   * hit's damage is taken off.
+   *
+   * @param hitId the hit's id
+   * @param target what the hit lands on
+   */
+  public void hitHeard(int hitId, WorldEntity target) {
+    if (actionHolder == null) {
+      return;
+    }
+    List<ActionInstance> runs = actionHolder.running();
+    for (int i = runs.size() - 1; i >= 0; i--) {
+      if (runs.get(i) instanceof ExecutionerRun controller) {
+        controller.hit(hitId, target);
+      }
+    }
+  }
+
+  /**
+   * Registers the projectile's damage on its target as pending, when the projectile is homing and
+   * still has a target: its damage, and its flight time, the distance from where it stands to the
+   * target over its speed per 50 ms.
+   */
+  private void registerPending() {
+    if (!data.homing() || target == null) {
+      return;
+    }
+    GridEntity at = target.getView();
+    int distance = FixedMath.guardedDistance(x - at.getX(), y - at.getY());
+    int flightMs = FixedMath.divOrZero(distance * STEP_MS, data.speed());
+    target.addPendingDamage(pendingAmount(), flightMs);
+    pendingRegistered = true;
+  }
+
+  /**
+   * Hands the damage registered on the target back, as a homing projectile does as it arrives,
+   * before its impact: its damage off the target, recomputed, and the pending duration left alone.
+   * A projectile whose target has left hands nothing back.
+   */
+  void handBackPending() {
+    target.addPendingDamage(-pendingAmount(), -1);
+    pendingRegistered = false;
+  }
+
+  /**
+   * The damage the projectile has registered on its target as pending, which its arrival hands
+   * back: 0 when none is registered or it has no target.
+   *
+   * @return its registered part of the target's pending damage
+   */
+  public int registeredPendingAmount() {
+    return pendingRegistered && target != null ? pendingAmount() : 0;
+  }
+
+  /** The release's hand-back: only while the damage is registered and the target is still there. */
+  private void releasePending() {
+    if (pendingRegistered && target != null) {
+      handBackPending();
+    }
+  }
+
+  /**
+   * What the projectile will deal its target: its damage at its level, or its crown-tower damage
+   * for a crown tower. The enchanting copies it carries are asked with no hit, so they change
+   * nothing.
+   */
+  private int pendingAmount() {
+    return target.getTargetView().isCrownTowerTarget() ? towerDamage() : damage();
+  }
+
+  /** True on the first flight step only. */
+  boolean takeFirstVisit() {
+    boolean first = firstVisit;
+    firstVisit = false;
+    return first;
+  }
+
+  /** The battle's scaling values, for the damage the impact computes. */
+  ScalingGlobals scalingGlobals() {
+    return ScalingGlobals.standard();
+  }
+
+  /**
+   * The projectile's damage at its level, as the impact computes it; once deflected, the share
+   * DEFLECTED_PRJ_UNITS_DMG_MUL gives of it.
+   */
+  public int damage() {
+    int damage = ProjectileAmounts.damage(scalingGlobals(), data, packedLevel);
+    if (deflections >= 1) {
+      damage = world.globalNumber(DEFLECTED_UNITS) * damage / PERCENT;
+    }
+    return damage;
+  }
+
+  /**
+   * What a crown tower takes from the projectile, as the impact computes it; once deflected, the
+   * share DEFLECTED_PRJ_TOWERS_DMG_MUL gives of it, or DEFLECTED_SPELL_TOWERS_DMG_MUL for a row
+   * that takes a spell's.
+   */
+  public int towerDamage() {
+    int damage = ProjectileAmounts.towerDamage(scalingGlobals(), data, packedLevel);
+    if (deflections >= 1) {
+      boolean spell = (data.deflectBehaviour() & ProjectileData.USE_SPELLS_TOWER_DAMAGE_MUL) != 0;
+      damage =
+          world.globalNumber(spell ? DEFLECTED_SPELL_TOWERS : DEFLECTED_TOWERS) * damage / PERCENT;
+    }
+    return damage;
+  }
+
+  /** The projectile's damage at its level, before any deflection's share. */
+  public int undeflectedDamage() {
+    return ProjectileAmounts.damage(scalingGlobals(), data, packedLevel);
+  }
+
+  /** What a crown tower takes from the projectile at its level, before any deflection's share. */
+  public int undeflectedTowerDamage() {
+    return ProjectileAmounts.towerDamage(scalingGlobals(), data, packedLevel);
+  }
+
+  /**
+   * The projectile as the owner of the area its impact damages: an entity of the projectile's kind
+   * on its side, which is all the validator asks of an owner that is not a character.
+   */
+  /**
+   * The projectile as it asks a target whether it may hit it: an entity of the projectile's type
+   * and side.
+   */
+  public GridEntity askerView() {
+    return areaOwner().getOwner();
+  }
+
+  public TargetingState areaOwner() {
+    GridEntity view = new GridEntity();
+    view.setFlagBits(world.getFlagBits());
+    view.setName(name());
+    view.setType(KIND_PROJECTILE);
+    view.setSide(side);
+    TargetingState owner = new TargetingState();
+    owner.setOwner(view);
+    return owner;
+  }
+
+  /**
+   * The projectile's target as the impact and the flight read it, or null when it has no target
+   * left.
+   */
+  TargetView targetView() {
+    return target == null ? null : target.getTargetView();
+  }
+
+  @Override
+  public int x() {
+    return x;
+  }
+
+  @Override
+  public int actionX() {
+    return x();
+  }
+
+  @Override
+  public int y() {
+    return y;
+  }
+
+  @Override
+  public int side() {
+    return side;
+  }
+
+  @Override
+  public int kind() {
+    return getKind();
+  }
+
+  @Override
+  public boolean isCharacter() {
+    return false;
+  }
+
+  @Override
+  public int prestige() {
+    return 0;
+  }
+
+  @Override
+  public int packedLevel() {
+    return packedLevel;
+  }
+
+  /** A projectile's children come from its impact, not from a spawn row. */
+  @Override
+  public List<SpawnHost> spawnCharacters(SpawnArguments arguments) {
+    throw new UnsupportedOperationException(name() + " runs no spawn row");
+  }
+
+  /** The flight: one step toward the aim, or the arrival and the impact. */
+  @Override
+  protected void postHook() {
+    ProjectileFlight.fly(this, world);
+  }
+
+  /**
+   * The projectile's notice of a removal: a homing projectile whose target left pins its aim where
+   * the target last stood; the target, the homing target, the owner, the root and the area effect
+   * that launched it are forgotten when they are the one that left, and a projectile of its group
+   * that left leaves the group.
+   */
+  @Override
+  protected void entityRemoved(BattleEntity removed) {
+    if (removed == areaLauncher) {
+      areaLauncher = null;
+    }
+    if (removed == areaTarget) {
+      areaTarget = null;
+    }
+    // A projectile of its group that left the battle leaves the group.
+    if (group != null && removed instanceof ProjectileEntity member && member.group == group) {
+      group.leave(member);
+    }
+    if (!(removed instanceof WorldEntity gone)) {
+      return;
+    }
+    if (target == gone) {
+      if (data.homing()) {
+        GridEntity view = gone.getView();
+        // The projectile's own collision radius, half of which would raise the aim height, is
+        // zero for every row carried here.
+        setAim(view.getX(), view.getY(), view.getZ());
+      }
+      target = null;
+    }
+    if (homingTarget == gone) {
+      forgetHomingTarget();
+    }
+    if (root == gone) {
+      root = null;
+    }
+    if (owner == gone) {
+      owner = null;
+    }
+  }
+
+  @Override
+  public boolean isRemovable() {
+    return released;
+  }
+
+  /**
+   * The projectile's action holder, made on first use: what an action it causes names as its cause.
+   */
+  public ActionHolder actionHolder() {
+    if (actionHolder == null) {
+      actionHolder = new ActionHolder(this, world.getHolder()::isInPendingPass);
+    }
+    return actionHolder;
+  }
+
+  /**
+   * The damage of a hit of the projectile as its listening runs change it, from the last listed
+   * down: an enchanting copy it carries, or the evolved Executioner's axe controller; unchanged
+   * without one.
+   *
+   * @param damage the damage so far
+   * @param hitId the hit's id
+   * @param crownTower true for the crown-tower damage
+   * @param target what the hit lands on, or null
+   */
+  public int listenedDamage(int damage, int hitId, boolean crownTower, WorldEntity target) {
+    if (actionHolder == null) {
+      return damage;
+    }
+    List<ActionInstance> runs = actionHolder.running();
+    int out = damage;
+    for (int i = runs.size() - 1; i >= 0; i--) {
+      if (runs.get(i) instanceof GiantBufferBuff.Run copy) {
+        out = copy.damage(out, hitId, crownTower);
+      } else if (runs.get(i) instanceof ExecutionerRun controller) {
+        out = controller.damage(out, hitId, target);
+      }
+    }
+    return out;
+  }
+
+  /**
+   * Tells the projectile's listening runs, from the last listed down, of a projectile its impact
+   * spawned, whose source it is: an enchanting copy it carries, primed on the hit that completes
+   * the count, hands the spawned projectile a copy of its own, listed on that projectile's holder.
+   * Its added damage is then scaled by the spawned row's multiplier, as the copy runs on it.
+   *
+   * @param spawned the projectile being registered
+   */
+  public void projectileRegistered(ProjectileEntity spawned) {
+    if (actionHolder == null) {
+      return;
+    }
+    List<ActionInstance> runs = actionHolder.running();
+    for (int i = runs.size() - 1; i >= 0; i--) {
+      if (runs.get(i) instanceof GiantBufferBuff.Run run) {
+        GiantBufferBuff.Run copy = run.projectileCopy(spawned);
+        if (copy != null) {
+          spawned.actionHolder().list(copy);
+        }
+      }
+    }
+  }
+
+  /**
+   * True for a projectile in its volley's group: only the volley of a hit links its projectiles
+   * into one, for a launcher whose row sets GroupProjectiles (see {@link
+   * ProjectileLauncher#launch}). Any other projectile the same launcher fires, as the evolved
+   * Hunter's net its starting action throws, is in no group.
+   */
+  public boolean isGrouped() {
+    return group != null;
+  }
+
+  /**
+   * Puts the projectile in its volley's group, before it is handed to the holder.
+   *
+   * @param group the group the volley's projectiles share
+   */
+  public void joinGroup(ProjectileGroup group) {
+    this.group = group;
+    group.join(this);
+  }
+
+  /** Whether the projectile has an action holder, whose runs listen to its hits. */
+  public boolean hasActionHolder() {
+    return actionHolder != null;
+  }
+
+  /** True when an action runs on the projectile, as the evolved Executioner's axe controller. */
+  public boolean carriesRuns() {
+    return actionHolder != null && !actionHolder.running().isEmpty();
+  }
+
+  @Override
+  public EntityActions actions() {
+    return actionHolder == null ? EntityActions.NONE : actionHolder;
+  }
+
+  /** A projectile has no hit points, so it counts as alive. */
+  @Override
+  public HitPoints actionHitPoints() {
+    return null;
+  }
+
+  @Override
+  public int actionPackedLevel() {
+    return packedLevel;
+  }
+
+  @Override
+  public int actionId() {
+    return getId();
+  }
+
+  /** A projectile was launched by another object. */
+  @Override
+  public boolean actionCreated() {
+    return true;
+  }
+
+  /**
+   * Its launcher, a unit or an area effect, while it is still in the battle; the removal notice
+   * forgets it.
+   */
+  @Override
+  public ActionOwner actionCreator() {
+    return owner != null ? owner : areaLauncher;
+  }
+
+  @Override
+  public RarityTable actionRarity() {
+    return data.rarity();
+  }
+
+  @Override
+  public String actionRowName() {
+    return data.name();
+  }
+
+  /**
+   * A variable as the projectile's own map holds it: every game object has one, empty when it is
+   * made, so a variable never written for the projectile reads its start value (its row's
+   * DefaultValue, 0 when the row sets none).
+   */
+  @Override
+  public int variable(int key) {
+    return variables.getOrDefault(key, world.variableStart(key));
+  }
+
+  /** Writes a variable into the projectile's own map, replacing what it held. */
+  @Override
+  public void setVariable(int key, int value) {
+    variables.put(key, value);
+  }
+
+  /**
+   * The button state override's later writes, from its run: into the slots of the projectile's own
+   * side.
+   */
+  @Override
+  public void overrideAbilityButton(OverrideAbilityButtonState action) {
+    world.overrideAbilityButton(side(), action);
+  }
+
+  /**
+   * The button state override's first write, as the row is performed: handed to the object that
+   * launched the projectile, and nothing when it is gone or none launched it - one another
+   * projectile's impact spawned, whose launcher is that projectile, or one an area effect launched,
+   * neither of which is a character or a building.
+   */
+  @Override
+  public void performAbilityButtonOverride(OverrideAbilityButtonState action) {
+    if (owner != null) {
+      owner.overrideAbilityButton(action);
+    }
+  }
+
+  @Override
+  public void killBy(ActionOwner killer) {
+    throw new UnsupportedOperationException("killing a projectile is not modelled");
+  }
+
+  @Override
+  public void queueTypedHit(ActionOwner source, int amount, DamageType type) {
+    throw new UnsupportedOperationException("a typed hit on a projectile is not modelled");
+  }
+}

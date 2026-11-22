@@ -1,0 +1,17 @@
+{
+  "seed": 1729,
+  "training_seed_start": 100000,
+  "environments": 64,
+  "rollout_steps": 16,
+  "reset_schedule_length": 4096,
+  "network": {"hidden": 32, "embedding": 4},
+  "learning_rate": 0.0003,
+  "gamma": 0.99,
+  "gae_lambda": 0.95,
+  "ppo_epochs": 2,
+  "minibatch": 512,
+  "clip": 0.2,
+  "value_coef": 0.5,
+  "entropy_coef": 0.01,
+  "max_grad_norm": 0.5
+}

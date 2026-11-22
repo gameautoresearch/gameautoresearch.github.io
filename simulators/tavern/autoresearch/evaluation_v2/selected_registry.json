@@ -1,0 +1,16 @@
+{
+  "schema": "tavern-selected-mixed-pool-public-v2",
+  "path": "evidence/strong-bots-20261109-0516Z/tavern/evaluator/public-strong-pool266-v1",
+  "manifest_sha256": "c7ddc33515320a82e5118f1ae1f5f879c4b682d55ded3c0803795f06b7eea6d4",
+  "selection_basis": "Public-only measured update266 gain+3.6458points on192matched full lobbies;95%environment-group interval[1.4137,6.5476]. New actual opposition compositions qualified on2x48natural public lobbies, private-path and exact true-terminal replay protocols.",
+  "retained_incumbent": "deepseek-r3",
+  "selected_new_learned": "new-plain266",
+  "comparison_receipt_sha256": "05ba45dc36b853de0248f0c257026b0fec57bbcd60d78fa9d9af70ef74acaebd",
+  "qualification_attempts": [
+    "pool266-public-incumbent-v1",
+    "pool266-public-learned-v1"
+  ],
+  "private_final_seed_values": false,
+  "strong_human_expert_claim": false,
+  "selection_still_open": true
+}

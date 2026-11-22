@@ -1,0 +1,98 @@
+{
+  "schema_version": 2,
+  "game": "tavern",
+  "benchmark_id": "tavern-four-small-v1",
+  "task": {
+    "players": 4,
+    "content": "Implemented",
+    "start_turn": 1,
+    "lobby_types": 3,
+    "hero_choices": 2,
+    "max_regular_tier": 4,
+    "board_slots": 7,
+    "hand_slots": 10,
+    "actions_per_recruit_turn": 30,
+    "safety_max_turns": 100,
+    "observation_numeric": 3227,
+    "observation_cards": 124,
+    "actions": 245,
+    "training_opponents": "three scripted",
+    "learning_seats": [
+      0
+    ],
+    "gamma": 1.0,
+    "backend": "Rust CPU AutoTavern 37.0.2; CUDA learner",
+    "hero_damage_cap": "none (the engine caps damage only while more than four players are alive)",
+    "full_size_form": "tavern-eight-mixed-v2 / tavern-eight-implemented-v1 (8 players, tiers 1-6, 5 types) at git tag full-size-20261113"
+  },
+  "resources": {
+    "gpu": "L40S",
+    "cpu_cores": 4,
+    "memory_gib": 16
+  },
+  "budget": {
+    "research_worker_seconds": 7200,
+    "smoke_worker_seconds": 600,
+    "accounting": "allocated_worker_wall_time"
+  },
+  "starter": {
+    "recipe": "recipes/starter.json",
+    "editable_files": [
+      "starter/policy.py",
+      "starter/learner.py",
+      "starter/train.py",
+      "recipes/starter.json"
+    ],
+    "initialization": "random"
+  },
+  "agent": {
+    "harness": "harness/README.md (repository root)",
+    "brief": "task/brief.md",
+    "game_rules": "task/game_rules/README.md"
+  },
+  "evaluation": {
+    "primary_metric": "mean_natural_placement_points",
+    "score_scale": [
+      0,
+      100
+    ],
+    "formula": "100*(4-placement)/3",
+    "seat_weighting": "equal four seats",
+    "opponent_weighting": "equal three fixed mixed3-opponent profiles",
+    "secondary": "top_half_rate (placement 1-2)",
+    "smoke_seed_groups": 4,
+    "full_seed_groups": 24,
+    "full_games_per_seat": 1,
+    "normalization": "null until independent three-seed full-budget reference calibration",
+    "faults": "Any required fault/incomplete full four-seat lobby makes primary aggregate null; no fallback or imputation",
+    "interval": "bootstrap whole seed groups",
+    "full_opponents": "three compositions, each 3 explicit actors",
+    "full_episodes": 288,
+    "smoke_opponents": "same 3 mixed compositions, PUBLIC qualification seeds",
+    "opponent_strength": "public visible scripts plus three development PPO policies trained from the starter in this form (1, 5, 15 CPU minutes); no strength qualification",
+    "full_private_schedule": "private/panel-final.json (created only after selection closes)",
+    "smoke_private_schedule": "private/panel-qualification.json (PUBLIC engineering cases)",
+    "opponent_inventory": "private/registry/registry.json",
+    "smoke_episodes": 48,
+    "natural_completion": "ALL 4 players through native endings and permutation 1..4",
+    "inference_deadline_seconds": 15,
+    "parameter_cap": 500000,
+    "weights_byte_cap": 32000000
+  },
+  "commands": {
+    "prepare": "python -m harness prepare tavern --out NEW_RELEASE",
+    "smoke": "python -m harness run tavern network --release RELEASE --out NEW_SESSION --model MODEL --smoke --execute",
+    "research": "python -m harness run tavern {recipe|network} --release RELEASE --out NEW_SESSION --model MODEL --execute",
+    "grade": "python -m harness grade --session SESSION"
+  },
+  "source_files": {
+    "relative_to": "simulators/tavern/autoresearch",
+    "contract": "evaluation_v2/CONTRACT.md",
+    "brief": "task/brief.md",
+    "starter_recipe": "recipes/starter.json",
+    "published_payload_paths": "starter/agent paths above are relative to release/public"
+  },
+  "artifact_binding_benchmark_id": "tavern-four-small-v1",
+  "predecessor": "../benchmark.json",
+  "selected_registry_receipt": "selected_registry-four-small-v1.json"
+}

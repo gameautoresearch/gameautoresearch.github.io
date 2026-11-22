@@ -1,0 +1,111 @@
+{
+  "schema_version": 1,
+  "game": "doudizhu",
+  "benchmark_id": "doudizhu-fixed-role-research-v2",
+  "task": {
+    "rules_id": "douzero-fixed-role-v1",
+    "players": 3,
+    "teams": [
+      [
+        "landlord"
+      ],
+      [
+        "landlord_down",
+        "landlord_up"
+      ]
+    ],
+    "deck_cards": 54,
+    "initial_hand_sizes": [
+      20,
+      17,
+      17
+    ],
+    "bidding": false,
+    "termination": "natural_empty_hand",
+    "decision_fault_guard": 162,
+    "observation": "own hand and public features only; static319/430, history5x162; action54",
+    "legal_actions": "complete canonical ragged card multisets; no clipping",
+    "engine": "frozen native CPU and resident CUDA; pinned DouZero oracle"
+  },
+  "resources": {
+    "gpu": "L40S",
+    "cpu_cores": 4,
+    "memory_gib": 16
+  },
+  "budget": {
+    "research_worker_seconds": 7200,
+    "smoke_worker_seconds": 600,
+    "accounting": "allocated_worker_wall_time",
+    "smoke_teardown_reserve_seconds": 20,
+    "smoke_model_liability_usd": 2,
+    "default_mode": "seconds",
+    "modes": {
+      "seconds": "one job at a time; research_worker_seconds of the worker",
+      "usd": "up to 4 jobs and 2 GPUs at once (every worker has one GPU); usd_mode_research_usd of worker time at usd_per_worker_second; a queued or running job holds its whole grant"
+    },
+    "usd_per_worker_second": 0.0008064,
+    "usd_mode_research_usd": 5.81,
+    "usd_mode_smoke_research_usd": 0.48,
+    "usd_mode_wall_seconds": 18000,
+    "usd_mode_smoke_wall_seconds": 4800,
+    "seconds_mode": {
+      "research_seconds": 7200,
+      "smoke_research_seconds": 600,
+      "concurrency": "one job at a time"
+    },
+    "usd_mode": {
+      "research_usd": 5.81,
+      "smoke_research_usd": 0.48,
+      "wall_seconds": 18000,
+      "smoke_wall_seconds": 4800,
+      "concurrency": "parallel: up to 4 jobs, 2 GPUs, 64 CPU cores"
+    }
+  },
+  "starter": {
+    "recipe": "recipes/starter.json",
+    "editable_files": [
+      "starter/policy.py",
+      "starter/learner.py",
+      "starter/train.py"
+    ],
+    "initialization": "random",
+    "algorithm": "terminal WP three-role DMC; RMSprop; pure self-play",
+    "architecture": {
+      "hidden": 128,
+      "depth": 3,
+      "history": 64
+    }
+  },
+  "agent": {
+    "brief": "task/brief.md"
+  },
+  "evaluation": {
+    "primary_metric": "role_opponent_balanced_win_probability_times_100",
+    "score_scale": [
+      0,
+      100
+    ],
+    "practice_deals": 32,
+    "private_deals": 256,
+    "smoke_practice_deals": 8,
+    "smoke_private_deals": 16,
+    "roles_equal_weight": true,
+    "candidate_controls": "one role per game; both other seats use same panel bot, including peasant teammate",
+    "secondary": "economic score by role",
+    "uncertainty": "2000 complete-deal cluster bootstrap replicates",
+    "reference_normalized": "null until independent multi-seed calibration qualifies",
+    "inference_batch": 32,
+    "inference_timeout_seconds": 10,
+    "milestones": [
+      0.3333333333333333,
+      0.6666666666666666,
+      1
+    ],
+    "faults": "no ordinary score for illegal, timeout, simulator fault or incomplete schedule"
+  },
+  "commands": {
+    "prepare": ".venv-doudizhu/bin/python -m harness prepare doudizhu --out RELEASE",
+    "smoke": ".venv-doudizhu-ar/bin/python -m harness run doudizhu network --release RELEASE --out SESSION --smoke --model MODEL --execute",
+    "grade": ".venv-doudizhu-ar/bin/python -m harness grade --session SESSION"
+  }
+}

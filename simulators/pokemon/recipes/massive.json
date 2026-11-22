@@ -1,0 +1,54 @@
+{
+  "recipe": "gen9randombattle-massive-experimental-v1",
+  "hardware": {
+    "device": "cuda:0",
+    "cpu_threads": 1,
+    "workers": 31,
+    "environments_per_worker": 32,
+    "machine": "Modal-L4-32-physical-cores-32GiB",
+    "attached_ram_gb": 32,
+    "attached_cpu_count": 32
+  },
+  "allocation_seconds": 600,
+  "seed": 1729,
+  "training_seed_start": 10000,
+  "iterations": 1000,
+  "network": {
+    "hidden": 64,
+    "embedding": 8
+  },
+  "learning_rate": 0.001,
+  "max_decision_phases": 512,
+  "gamma": 0.99,
+  "gae_lambda": 0.95,
+  "ppo_epochs": 4,
+  "minibatch": 4096,
+  "clip": 0.2,
+  "value_coef": 0.5,
+  "entropy_coef": 0.01,
+  "max_grad_norm": 0.5,
+  "faint_reward": 0.1,
+  "opponents": [
+    {
+      "kind": "random",
+      "weight": 0.5
+    },
+    {
+      "kind": "power",
+      "weight": 0.5
+    }
+  ],
+  "history_size": 2,
+  "snapshot_every": 40,
+  "development_evaluation": {
+    "every": 50,
+    "schedule": "practice.json"
+  },
+  "optimization": "shared",
+  "mon_cache": false,
+  "fast_callbacks": false,
+  "worker_timeout_seconds": 60,
+  "rollout_scheduler": "static",
+  "lazy_observations": true,
+  "batched_scripted": true
+}

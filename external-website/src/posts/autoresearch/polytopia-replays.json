@@ -1,0 +1,50 @@
+[
+ {
+  "id": "polytopia-v3a-opus-vs-luna",
+  "title": "Claude Opus 5.5 vs GPT-6 Luna's unchanged starter (Nov 15 recipe finals)",
+  "players": [
+   "Claude Opus 5.5 (Nov 15 recipe final)",
+   "GPT-6 Luna (Nov 15 recipe final, unchanged starter)"
+  ],
+  "winner": 1,
+  "reason": "elimination",
+  "scores": [
+   12880,
+   1055
+  ],
+  "rounds": 27,
+  "actions": 412
+ },
+ {
+  "id": "polytopia-v3a-astra-vs-starter",
+  "title": "GPT-6 Astra's research network vs the unmodified starter",
+  "players": [
+   "GPT-6 Astra (Nov 14 network, research-top)",
+   "Unmodified starter (starter-200m)"
+  ],
+  "winner": 1,
+  "reason": "round_cap_score",
+  "scores": [
+   6925,
+   3905
+  ],
+  "rounds": 30,
+  "actions": 382
+ },
+ {
+  "id": "polytopia-v3a-opus-vs-sol",
+  "title": "Claude Opus 5.5 vs GPT-6.1 Sol (Nov 15 recipe finals)",
+  "players": [
+   "Claude Opus 5.5 (Nov 15 recipe final)",
+   "GPT-6.1 Sol (Nov 15 recipe final)"
+  ],
+  "winner": 2,
+  "reason": "round_cap_score",
+  "scores": [
+   5510,
+   7605
+  ],
+  "rounds": 30,
+  "actions": 891
+ }
+]

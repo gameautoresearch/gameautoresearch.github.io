@@ -1,0 +1,26 @@
+{
+  "_doc": "Starter recipe: plain PPO self-play (rl/gpu_resident.py LearnerConfig fields). \"trainer\" holds gpu_resident_train.py options.",
+  "size": 11,
+  "gamma": 0.999,
+  "gae_lambda": 0.95,
+  "segment": 32,
+  "batch": 65536,
+  "minibatch": 8192,
+  "epochs": 1,
+  "learning_rate": 0.0003,
+  "entropy_coef": 0.01,
+  "clip": 0.2,
+  "seed": 801,
+  "checkpoint_every": 25,
+  "snapshot_every": 50,
+  "trainer": {
+    "games": 2048,
+    "sets": 4,
+    "ring": 160
+  },
+  "players": 2,
+  "max_turns": 30,
+  "maps": "drylands",
+  "map_seed_low": 200000,
+  "map_seed_high": 300000
+}

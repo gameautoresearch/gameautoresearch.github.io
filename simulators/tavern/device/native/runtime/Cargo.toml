@@ -1,0 +1,9 @@
+[package]
+name = "cuda_std"
+version = "0.2.2"
+edition = "2024"
+license = "MIT"
+[features]
+external-allocator = []
+[dependencies]
+tavern-native-macros = { path = "../runtime-macros" }

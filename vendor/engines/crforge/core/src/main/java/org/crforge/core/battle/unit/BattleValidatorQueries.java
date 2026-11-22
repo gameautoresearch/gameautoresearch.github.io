@@ -1,0 +1,135 @@
+/*
+ * crforge - https://github.com/voonhous/crforge
+ * SPDX-License-Identifier: Apache-2.0
+ * Porting this code? Please cite this file and the commit you read: see the README.
+ */
+
+package org.crforge.core.battle.unit;
+
+import lombok.AccessLevel;
+import lombok.RequiredArgsConstructor;
+import org.crforge.core.fidelity.Fidelity;
+import org.crforge.core.fidelity.FidelityStatus;
+import org.crforge.core.pathfinding.combat.HitPoints;
+import org.crforge.core.pathfinding.combat.LevelScaling;
+import org.crforge.core.pathfinding.combat.ScalingGlobals;
+import org.crforge.core.pathfinding.target.TargetView;
+import org.crforge.core.pathfinding.target.ValidatorQueries;
+
+/**
+ * The validator's questions about a target that only the battle can answer: the four the
+ * pending-damage rule asks of a target with damage on its way, and the attack sequence test. Every
+ * other question keeps the standard answer of a one-against-one battle.
+ *
+ * <p>The rule refuses a projectile attacker a target the damage on its way will kill: the lethal
+ * test must hold, and the damage must land soon enough. It keeps the target all the same when the
+ * target will dash out of the damage's way in time, or is being healed while its row's full hit
+ * points at its level exceed the damage.
+ */
+@Fidelity(
+    status = FidelityStatus.PARTIAL,
+    note =
+        "Settled: the lethal test with its shield and untouchable gates, the dash test, the"
+            + " healing test and the full hit points at the target's level. Held by the"
+            + " references' selections and drops, and the shield gate by the reference battles"
+            + " status_guards_shields_vs_valkyrie_and_archers and card_SkeletonWarriors;"
+            + " the dash and healing tests by no run; the damage reduction of the target's buffs"
+            + " on the amount by BattleMonkTest alone, since no damage on its way to a Monk"
+            + " under its ability is lethal in the references. An unkillable target spared the"
+            + " rule: translated, held by no run. The attack sequence test (an untouchable target"
+            + " refused) by the coverage battles where an Inferno or Mighty Miner lets a dashing"
+            + " Bandit, Boss Bandit or Golden Knight go, and by BattleDashTargetHoldTest.")
+@RequiredArgsConstructor(access = AccessLevel.PACKAGE)
+final class BattleValidatorQueries implements ValidatorQueries {
+
+  private final BattleWorld world;
+
+  /**
+   * The lethal test: nothing is lethal while the target's shield is up or while it is untouchable;
+   * otherwise the damage, through the target's damage reduction and at least 1, is lethal when it
+   * reaches the hit points it has left.
+   */
+  @Override
+  public boolean pendingDamageAccepted(TargetView target, int amount) {
+    return lethal(world.entityOf(target.getEntity()), amount);
+  }
+
+  /**
+   * The lethal test on an entity with hit points: false while its shield is up or while it is
+   * untouchable; otherwise whether the amount, through its damage reduction and at least 1, reaches
+   * the hit points it has left. The pending-damage rule asks it, and so does the expression
+   * function is_enough_to_kill_target, which calls the same function in the game.
+   *
+   * @param entity the entity the amount would reach
+   * @param amount the amount
+   */
+  static boolean lethal(WorldEntity entity, int amount) {
+    HitPoints hitPoints = entity.getHitPoints();
+    if (hitPoints.getShield() > 0) {
+      return false;
+    }
+    if (entity.untouchable()) {
+      return false;
+    }
+    return Math.max(entity.getBuffs().damageReduction(amount), 1) >= hitPoints.getHitPoints();
+  }
+
+  /**
+   * The dash test: the target's targeting component is on, its dash wind-up is running, its row is
+   * immune to damage while it dashes, and the wind-up ends no later than the damage lands, so the
+   * dash starts before the shot does.
+   */
+  @Override
+  public boolean pendingDamageIsRecent(TargetView target, int duration) {
+    WorldEntity entity = world.entityOf(target.getEntity());
+    if (!entity.isActive(CharacterEntity.TARGETING_SLOT)) {
+      return false;
+    }
+    int windup = entity.getTargeting().getDashWindupMs();
+    return windup > 0 && entity.getData().dashImmuneToDamageTimeMs() >= 1 && windup <= duration;
+  }
+
+  /**
+   * The attack sequence test: a unit whose row runs an attack sequence (a continuous-damage
+   * attacker such as an Inferno Tower or Inferno Dragon, or a unit with an AttackSequence column)
+   * neither takes nor keeps a target that is untouchable, the immunity left after a dash counted.
+   * So such an attacker lets a Bandit, Boss Bandit or Golden Knight go once its dash has started,
+   * takes none still dashing or immune after its dash, and takes it again after; an ordinary
+   * attacker keeps it through the dash.
+   */
+  @Override
+  public boolean attackSequenceRejects(TargetView target) {
+    return world.entityOf(target.getEntity()).untouchable(true);
+  }
+
+  /** The target's tag word holds UNKILLABLE, as a buff of the Berserker hero form sets it. */
+  @Override
+  public boolean unkillable(TargetView target) {
+    return world.entityOf(target.getEntity()).unkillable();
+  }
+
+  /** The healing test: a buff the target carries heals at its first level. */
+  @Override
+  public boolean pendingDamageBuffHolds(TargetView target) {
+    WorldEntity entity = world.entityOf(target.getEntity());
+    for (BuffInstance instance : entity.getBuffs().items()) {
+      if (instance.getBuff().healPerSecond() >= 1) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  /** The target row's full hit points at the level the validator hands over, the target's own. */
+  @Override
+  public int committedDamage(TargetView target, int key) {
+    UnitData data = world.entityOf(target.getEntity()).getData();
+    return LevelScaling.hitpoints(
+        ScalingGlobals.standard(),
+        data.hitpoints(),
+        key,
+        data.rarity(),
+        data.king(),
+        data.summonerTower());
+  }
+}

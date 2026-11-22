@@ -1,0 +1,158 @@
+{
+  "schema_version": 1,
+  "games": {
+    "clash": {
+      "name": "Clash Royale",
+      "directory": "simulators/clash",
+      "readme": "simulators/clash/README.md",
+      "tests": "simulators/clash/tests",
+      "readout": "reports/clash/native-rewrite-2026-11-08.md",
+      "venv": ".venv-clash",
+      "working_directory": ".",
+      "upstream": [
+        "vendor/engines/crforge"
+      ],
+      "autoresearch": "simulators/clash/autoresearch",
+      "research_venv": ".venv-clash-ar",
+      "benchmark_contract": "simulators/clash/autoresearch/benchmark.json",
+      "agent_brief": "simulators/clash/autoresearch/task/brief.md",
+      "benchmark_readout": "reports/clash/benchmark-contract-smoke-2026-11-08.md",
+      "benchmark_smoke_receipt": null,
+      "game_rules": "simulators/clash/autoresearch/task/game_rules/README.md",
+      "current_harness": "harness/README.md",
+      "current_benchmark_contract": "simulators/clash/autoresearch/benchmark-short-v1.json",
+      "harness_backend": "harness/games/clash"
+    },
+    "doudizhu": {
+      "name": "Dou Dizhu",
+      "directory": "simulators/doudizhu",
+      "readme": "simulators/doudizhu/README.md",
+      "tests": "simulators/doudizhu/tests",
+      "readout": "reports/doudizhu/autoresearch-research30-2026-11-08.md",
+      "venv": ".venv-doudizhu",
+      "working_directory": ".",
+      "upstream": [
+        "vendor/engines/DouZero"
+      ],
+      "autoresearch": "simulators/doudizhu/autoresearch",
+      "research_venv": ".venv-doudizhu-ar",
+      "benchmark_contract": "simulators/doudizhu/autoresearch/benchmark.json",
+      "agent_brief": "simulators/doudizhu/autoresearch/task/brief.md",
+      "benchmark_readout": "reports/doudizhu/benchmark-contract-smoke-2026-11-08.md",
+      "benchmark_smoke_receipt": null,
+      "game_rules": "simulators/doudizhu/autoresearch/task/game_rules/README.md",
+      "current_harness": "harness/README.md",
+      "current_benchmark_contract": "simulators/doudizhu/autoresearch/benchmark.json",
+      "harness_backend": "harness/games/doudizhu"
+    },
+    "generals": {
+      "name": "Generals.io",
+      "directory": "simulators/generals",
+      "readme": "simulators/generals/README.md",
+      "tests": "simulators/generals/tests",
+      "readout": "reports/generals/autoresearch-preparation-2026-11-08.md",
+      "venv": ".venv-generals",
+      "working_directory": ".",
+      "upstream": [
+        "vendor/engines/generals-bots"
+      ],
+      "autoresearch": "simulators/generals/autoresearch",
+      "research_venv": ".venv-generals-ar",
+      "benchmark_contract": "simulators/generals/autoresearch/benchmark.json",
+      "agent_brief": "simulators/generals/autoresearch/task/brief.md",
+      "benchmark_readout": "reports/generals/benchmark-contract-smoke-2026-11-08.md",
+      "benchmark_smoke_receipt": null,
+      "game_rules": "simulators/generals/autoresearch/task/game_rules/README.md",
+      "current_harness": "harness/README.md",
+      "current_benchmark_contract": "simulators/generals/autoresearch/benchmark.json",
+      "harness_backend": "harness/games/generals"
+    },
+    "pokemon": {
+      "name": "Pok\u00e9mon",
+      "directory": "simulators/pokemon",
+      "readme": "simulators/pokemon/README.md",
+      "tests": "simulators/pokemon/tests",
+      "readout": "reports/pokemon/native-rewrite-2026-11-08.md",
+      "venv": ".venv-pokemon",
+      "working_directory": ".",
+      "upstream": [
+        "vendor/engines/pokemon-showdown",
+        "vendor/engines/poke-env"
+      ],
+      "autoresearch": "simulators/pokemon/autoresearch",
+      "research_venv": ".venv-pokemon",
+      "benchmark_contract": "simulators/pokemon/autoresearch/benchmark.json",
+      "agent_brief": "simulators/pokemon/autoresearch/task/brief.md",
+      "benchmark_readout": "reports/pokemon/benchmark-contract-smoke-2026-11-08.md",
+      "benchmark_smoke_receipt": null,
+      "game_rules": "simulators/pokemon/autoresearch/task/game_rules/README.md",
+      "current_harness": "harness/README.md",
+      "current_benchmark_contract": "simulators/pokemon/autoresearch/benchmark.json",
+      "harness_backend": "harness/games/pokemon"
+    },
+    "polytopia": {
+      "name": "Polytopia",
+      "directory": "simulators/polytopia",
+      "readme": "simulators/polytopia/README.md",
+      "tests": "simulators/polytopia/autoresearch/tests",
+      "readout": "simulators/polytopia/docs/autoresearch-s120-readout-2026-11-08.md",
+      "venv": ".venv-polytopia",
+      "working_directory": "simulators/polytopia",
+      "upstream": [],
+      "autoresearch": "simulators/polytopia/autoresearch",
+      "research_venv": ".venv-polytopia-ar",
+      "benchmark_contract": "simulators/polytopia/autoresearch/benchmark.json",
+      "agent_brief": "simulators/polytopia/autoresearch/task/brief.md",
+      "benchmark_readout": "reports/polytopia/benchmark-contract-smoke-2026-11-08.md",
+      "benchmark_smoke_receipt": null,
+      "game_rules": "simulators/polytopia/autoresearch/task/game_rules/README.md",
+      "current_harness": "harness/README.md",
+      "current_benchmark_contract": "simulators/polytopia/autoresearch/benchmark.json",
+      "harness_backend": "harness/games/polytopia"
+    },
+    "tavern": {
+      "name": "Hearthstone Battlegrounds",
+      "directory": "simulators/tavern",
+      "readme": "simulators/tavern/README.md",
+      "tests": "simulators/tavern/tests",
+      "readout": "reports/tavern/small-form-2026-11-13.md",
+      "venv": ".venv-tavern",
+      "working_directory": ".",
+      "upstream": [
+        "vendor/engines/AutoTavern"
+      ],
+      "autoresearch": "simulators/tavern/autoresearch",
+      "research_venv": ".venv-tavern-ar",
+      "benchmark_contract": "simulators/tavern/autoresearch/benchmark.json",
+      "agent_brief": "simulators/tavern/autoresearch/task/brief.md",
+      "benchmark_readout": "reports/tavern/benchmark-contract-smoke-2026-11-08.md",
+      "benchmark_smoke_receipt": null,
+      "game_rules": "simulators/tavern/autoresearch/task/game_rules/README.md",
+      "current_harness": "harness/README.md",
+      "current_benchmark_contract": "simulators/tavern/autoresearch/evaluation_v2/benchmark.json",
+      "harness_backend": "harness/games/tavern"
+    },
+    "hex": {
+      "name": "Hex 13x13",
+      "directory": "simulators/hex",
+      "readme": "simulators/hex/README.md",
+      "tests": "simulators/hex/tests",
+      "readout": "reports/hex/hex13-2026-11-14.md",
+      "venv": ".venv-hex",
+      "working_directory": ".",
+      "upstream": [
+        "vendor/engines/benzene"
+      ],
+      "autoresearch": "simulators/hex/autoresearch",
+      "research_venv": ".venv-hex",
+      "benchmark_contract": "simulators/hex/autoresearch/benchmark.json",
+      "agent_brief": "simulators/hex/autoresearch/task/brief.md",
+      "benchmark_readout": "reports/hex/hex13-2026-11-14.md",
+      "benchmark_smoke_receipt": null,
+      "game_rules": "simulators/hex/autoresearch/task/game_rules/README.md",
+      "current_harness": "harness/README.md",
+      "current_benchmark_contract": "simulators/hex/autoresearch/benchmark.json",
+      "harness_backend": "harness/games/hex"
+    }
+  }
+}

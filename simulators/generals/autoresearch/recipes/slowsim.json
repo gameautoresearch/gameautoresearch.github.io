@@ -1,0 +1,6 @@
+{
+  "num_envs": 64,
+  "block_steps": 16,
+  "save_seconds": 30,
+  "progress_seconds": 2
+}

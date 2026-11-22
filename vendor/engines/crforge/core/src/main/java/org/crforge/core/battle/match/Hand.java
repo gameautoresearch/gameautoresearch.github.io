@@ -1,0 +1,169 @@
+/*
+ * crforge - https://github.com/voonhous/crforge
+ * SPDX-License-Identifier: Apache-2.0
+ * Porting this code? Please cite this file and the commit you read: see the README.
+ */
+
+package org.crforge.core.battle.match;
+
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
+import lombok.Getter;
+import org.crforge.core.fidelity.Fidelity;
+import org.crforge.core.fidelity.FidelityStatus;
+
+/**
+ * A king's hand: four slots of deck indices, the queue of the rest in the order they come, and the
+ * cooldown before an empty slot is refilled.
+ *
+ * <p>A played card leaves its slot for the back of the queue at once. Each step the king's visit
+ * counts the cooldown down by 50 ms; once it has run out, the first empty slot takes the queue's
+ * front and the cooldown restarts at the timeline's next-card cooldown. So the replacement enters
+ * on the step of the play when the cooldown has run out, and a second empty slot waits a whole
+ * cooldown more.
+ */
+@Fidelity(
+    status = FidelityStatus.PARTIAL,
+    note =
+        "Agrees with the reference line for line: the refill, the cycle and the slot lookup. Held"
+            + " by the hands every reference battle observes on both sides every tick, among them"
+            + " timeline_spells_through_rates.")
+public final class Hand {
+
+  /** The number of slots. */
+  public static final int SLOTS = 4;
+
+  /** A slot holding no card. */
+  public static final int EMPTY = -1;
+
+  private final int[] slots = {EMPTY, EMPTY, EMPTY, EMPTY};
+
+  private final List<Integer> queue = new ArrayList<>();
+
+  /** What is left of the cooldown before an empty slot is refilled, in milliseconds. */
+  @Getter private int cooldownMs;
+
+  /**
+   * Deals the opening hand from the deck order: the first four into the slots, the rest queued.
+   *
+   * @param order the deck indices in their battle order
+   */
+  void deal(List<Integer> order) {
+    queue.clear();
+    queue.addAll(order);
+    int count = Math.min(queue.size(), SLOTS);
+    for (int k = 0; k < count; k++) {
+      slots[k] = queue.remove(0);
+    }
+  }
+
+  /** The four slots, {@link #EMPTY} for an empty one. */
+  public int[] slots() {
+    return slots.clone();
+  }
+
+  /** The queue, its front the next card. */
+  public List<Integer> queue() {
+    return Collections.unmodifiableList(queue);
+  }
+
+  /**
+   * The first slot holding a deck index, or -1 when none does.
+   *
+   * @param index the deck index
+   */
+  public int slotOf(int index) {
+    for (int k = 0; k < SLOTS; k++) {
+      if (slots[k] == index) {
+        return k;
+      }
+    }
+    return -1;
+  }
+
+  /**
+   * Puts the cards some places of the hand hold in another order: for a tool that samples what a
+   * player cannot see of the other side's hand, such as a search's fork; a battle played as the
+   * game plays it never does.
+   *
+   * @param places the places, 0 to 3 a slot and from 4 the queue, its front first
+   * @param cards the deck index each place takes, the same cards those places hold now
+   * @throws IllegalArgumentException for a place out of range or other cards
+   */
+  public void rearrange(int[] places, int[] cards) {
+    if (places.length != cards.length) {
+      throw new IllegalArgumentException("one card a place");
+    }
+    int[] now = new int[places.length];
+    for (int i = 0; i < places.length; i++) {
+      int place = places[i];
+      if (place < 0 || place >= SLOTS + queue.size()) {
+        throw new IllegalArgumentException("no place " + place + " in " + this);
+      }
+      now[i] = place < SLOTS ? slots[place] : queue.get(place - SLOTS);
+    }
+    int[] given = cards.clone();
+    Arrays.sort(now);
+    Arrays.sort(given);
+    if (!Arrays.equals(now, given)) {
+      throw new IllegalArgumentException(
+          "the places hold " + Arrays.toString(now) + ", not " + Arrays.toString(given));
+    }
+    for (int i = 0; i < places.length; i++) {
+      if (places[i] < SLOTS) {
+        slots[places[i]] = cards[i];
+      } else {
+        queue.set(places[i] - SLOTS, cards[i]);
+      }
+    }
+  }
+
+  /**
+   * Moves the card of a slot to the back of the queue and empties the slot, as a play does. A slot
+   * out of range or already empty changes nothing.
+   *
+   * @param slot the slot
+   * @return the card, or {@link #EMPTY} when nothing moved
+   */
+  int removeFromHand(int slot) {
+    if (slot < 0 || slot >= SLOTS || slots[slot] == EMPTY) {
+      return EMPTY;
+    }
+    int card = slots[slot];
+    queue.add(card);
+    slots[slot] = EMPTY;
+    return card;
+  }
+
+  /**
+   * Counts the cooldown down by one step and, once it has run out, refills the first empty slot
+   * from the queue's front and restarts the cooldown.
+   *
+   * @param nextCardCooldownMs the timeline's next-card cooldown now
+   * @return the slot refilled, or -1 when none was
+   */
+  int refill(int nextCardCooldownMs) {
+    int left = cooldownMs - 50;
+    cooldownMs = Math.max(left, 0);
+    if (left > 0) {
+      return -1;
+    }
+    for (int k = 0; k < SLOTS; k++) {
+      if (slots[k] == EMPTY) {
+        if (!queue.isEmpty()) {
+          slots[k] = queue.remove(0);
+        }
+        cooldownMs = nextCardCooldownMs;
+        return k;
+      }
+    }
+    return -1;
+  }
+
+  @Override
+  public String toString() {
+    return Arrays.toString(slots) + " " + queue + " cd " + cooldownMs;
+  }
+}

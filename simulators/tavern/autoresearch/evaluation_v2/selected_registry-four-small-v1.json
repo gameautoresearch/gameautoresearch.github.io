@@ -1,0 +1,36 @@
+{
+  "schema": "tavern-selected-mixed-pool-public-v2",
+  "path": "evidence/tavern-four-small-20261113/pool-v1/registry",
+  "manifest_sha256": "fc5a4b41bfce5bff9d98729eb6e29966540d1545f58db41b2b29f821f09d81c2",
+  "benchmark_id": "tavern-four-small-v1",
+  "selection_basis": "Three development PPO opponents trained from the public starter on CPU in the four-player rules (seeds 41101-41103; 1, 5 and 15 minutes, 64 lobbies per update), plus the three public visible scripts. Built by evaluation_v2/build_four_pool.py; no strength qualification.",
+  "opponents": {
+    "ppo-1m": {
+      "seed": 41101,
+      "cpu_seconds": 60,
+      "n_games": 64,
+      "updates": 91,
+      "samples": 725109,
+      "last_update_mean_placement": 3.984375
+    },
+    "ppo-5m": {
+      "seed": 41102,
+      "cpu_seconds": 300,
+      "n_games": 64,
+      "updates": 231,
+      "samples": 3777616,
+      "last_update_mean_placement": 3.09375
+    },
+    "ppo-15m": {
+      "seed": 41103,
+      "cpu_seconds": 900,
+      "n_games": 64,
+      "updates": 618,
+      "samples": 11740298,
+      "last_update_mean_placement": 2.234375
+    }
+  },
+  "private_final_seed_values": false,
+  "strong_human_expert_claim": false,
+  "selection_still_open": true
+}

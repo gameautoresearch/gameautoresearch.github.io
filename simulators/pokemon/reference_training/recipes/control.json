@@ -1,0 +1,42 @@
+{
+  "recipe": "reference-current-history-sparse-v1",
+  "hardware": {
+    "device": "cuda:0",
+    "cpu_threads": 1,
+    "workers": 3,
+    "environments_per_worker": 8,
+    "machine": "Modal-L4-fixed-4cpu-8GiB",
+    "attached_ram_gb": 8,
+    "attached_cpu_count": 4
+  },
+  "allocation_seconds": 430,
+  "seed": 1729,
+  "training_seed_start": 41000000,
+  "iterations": 100000,
+  "network": {
+    "hidden": 64,
+    "embedding": 8
+  },
+  "learning_rate": 0.0003,
+  "max_decision_phases": 4096,
+  "gamma": 0.99,
+  "gae_lambda": 0.95,
+  "ppo_epochs": 2,
+  "minibatch": 256,
+  "clip": 0.2,
+  "value_coef": 0.5,
+  "entropy_coef": 0.01,
+  "max_grad_norm": 0.5,
+  "faint_reward": 0,
+  "opponents": [
+    {
+      "kind": "power",
+      "weight": 1.0
+    }
+  ],
+  "history_size": 8,
+  "snapshot_every": 4,
+  "development_evaluation": null,
+  "optimization": "packed",
+  "batched_scripted": true
+}

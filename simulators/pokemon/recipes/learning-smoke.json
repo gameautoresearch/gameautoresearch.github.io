@@ -1,0 +1,47 @@
+{
+  "recipe": "gen9randombattle-local-learning-smoke-v2",
+  "hardware": {
+    "device": "cpu",
+    "cpu_threads": 1,
+    "workers": 2,
+    "environments_per_worker": 2,
+    "machine": "local-validation",
+    "attached_ram_gb": 8,
+    "attached_cpu_count": 4
+  },
+  "allocation_seconds": 180,
+  "seed": 1729,
+  "training_seed_start": 10000,
+  "iterations": 800,
+  "network": {
+    "hidden": 64,
+    "embedding": 8
+  },
+  "learning_rate": 0.001,
+  "max_decision_phases": 180,
+  "gamma": 0.99,
+  "gae_lambda": 0.95,
+  "ppo_epochs": 4,
+  "minibatch": 256,
+  "clip": 0.2,
+  "value_coef": 0.5,
+  "entropy_coef": 0.01,
+  "max_grad_norm": 0.5,
+  "faint_reward": 0.1,
+  "opponents": [
+    {
+      "kind": "random",
+      "weight": 0.5
+    },
+    {
+      "kind": "power",
+      "weight": 0.5
+    }
+  ],
+  "history_size": 4,
+  "snapshot_every": 1,
+  "development_evaluation": {
+    "every": 200,
+    "schedule": "practice.json"
+  }
+}

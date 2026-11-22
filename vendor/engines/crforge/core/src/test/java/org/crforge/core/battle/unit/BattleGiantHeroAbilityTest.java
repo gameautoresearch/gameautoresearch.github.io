@@ -1,0 +1,431 @@
+/*
+ * crforge - https://github.com/voonhous/crforge
+ * SPDX-License-Identifier: Apache-2.0
+ * Porting this code? Please cite this file and the commit you read: see the README.
+ */
+
+package org.crforge.core.battle.unit;
+
+import static org.assertj.core.api.Assertions.assertThat;
+
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
+import org.crforge.core.battle.GameData;
+import org.crforge.core.battle.Shipped;
+import org.crforge.core.battle.match.LadderMatch;
+import org.crforge.core.battle.match.MatchCard;
+import org.crforge.core.battle.match.MatchSide;
+import org.crforge.core.pathfinding.GridEntityState;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+
+/**
+ * The Giant hero form's slap, its ability: no cast time and no trigger delay, so the cast fires in
+ * the casting state's entry and the Giant goes back to walking at once; the selector it starts
+ * waits for an enemy in its circle, stops the Giant for the slap, and pushes the enemy it picked
+ * along the width, away from the side of the arena the Giant stands on; the enemy is knocked into
+ * the air, stunned, and lands where the push took it, on an area effect of the Giant's that hurts
+ * it.
+ */
+class BattleGiantHeroAbilityTest {
+
+  private static final int LEVEL = Standard1v1Battle.DEFAULT_LEVEL;
+
+  /** The Giant first, in the hero slot, and seven other cards. */
+  private static final List<String> GIANT_DECK =
+      List.of("Giant", "Archer", "Goblins", "Knight", "Minions", "Musketeer", "Fireball", "Arrows");
+
+  private static final List<String> KNIGHTS = Collections.nCopies(8, "Knight");
+
+  /** The tick the ability command runs on. */
+  private static final int CAST = 320;
+
+  /** The selector the ability's activation group starts. */
+  private static final String SELECTOR = "GiantHero_Target_Selector";
+
+  /** The push the selector runs on the enemy it picks. */
+  private static final String PUSH = Shipped.actionNames(SELECTOR, "Actions").get(0);
+
+  /** The knock up the push's success group starts first. */
+  private static final String KNOCKBACK =
+      Shipped.actionNames(Shipped.actionName(PUSH, "SuccessAction"), "SubActions").get(0);
+
+  /** The step the selector picks the Knight on, the one after the cast. */
+  private static final int PICK = 2;
+
+  /** A tick the Knight is played on before the Giant, which is played on 220. */
+  private static final int KNIGHT_FIRST = 200;
+
+  @Test
+  @DisplayName(
+      "the slap casts in the casting state's entry and the Giant walks on; it stops for the slap,"
+          + " the Knight it picked is pushed its push's delay later along the width, knocked up and"
+          + " stunned, and lands on the Giant's area effect, which hurts it")
+  void theSlapThrowsTheKnight() {
+    Standard1v1Battle battle = null;
+    LadderMatch match = null;
+    for (int word = 0; match == null || !inHand(match, "Giant"); word++) {
+      battle = new Standard1v1Battle(GameData.tables());
+      match = battle.startLadderMatch(GIANT_DECK, KNIGHTS, word, 0, heroFirst(), new int[8]);
+    }
+    battle.play(220, GameData.card("Giant"), LEVEL, 0, 3500, 14000, "g");
+    battle.play(260, GameData.card("Knight"), LEVEL, 1, 3500, 22000, "k");
+    stepTo(battle, CAST - 20);
+    CharacterEntity giant = named(battle, "GiantHero").get(0);
+    CharacterEntity knight = named(battle, "Knight").get(0);
+    battle.useAbility(CAST, 0, giant.name(), "slap");
+    stepTo(battle, CAST);
+    int elixir = match.side(0).getElixir();
+    int knightX = knight.getView().getX();
+    assertThat(giant.getView().getX()).isLessThan(9000);
+    assertThat(knightX).isGreaterThan(giant.getView().getX());
+
+    // The slap holds the Giant for its stop's duration, the push comes its delay after the pick,
+    // and the Knight lands the knock up's duration after the push.
+    // The stop is the group's timed sub-action, found by its class: the group also lists the
+    // slap's animation and, in later data, the ability's delivery.
+    int stop =
+        Shipped.number(
+            Shipped.actionNames(
+                    Shipped.actionName(SELECTOR, "ActionOnSelfWhenTriggeredLeft"), "SubActions")
+                .stream()
+                .filter(name -> "ActionWithDuration".equals(Shipped.text(name, "ClassType")))
+                .findFirst()
+                .orElseThrow(),
+            "ActionDuration");
+    int lastStanding = PICK + Shipped.ticks(stop) + 1;
+    int push = PICK + Shipped.ticks(Shipped.number(PUSH, "PushbackDelay"));
+    // The knock up lands on the update that finds its duration out, counted down 50 ms an update.
+    int land = push + (Shipped.number(KNOCKBACK, "Duration") + 49) / 50;
+    // Follow both over the slap, one step at a time.
+    int span = land + 2;
+    int[] giantState = new int[span];
+    int[] giantX = new int[span];
+    int[] giantY = new int[span];
+    int[] knightXs = new int[span];
+    int[] knightYs = new int[span];
+    int[] knightHp = new int[span];
+    int[] effects = new int[span];
+    String effectName = null;
+    int effectSide = -1;
+    for (int k = 1; k < span; k++) {
+      stepTo(battle, CAST + k);
+      giantState[k] = giant.getView().getState();
+      giantX[k] = giant.getView().getX();
+      giantY[k] = giant.getView().getY();
+      knightXs[k] = knight.getView().getX();
+      knightYs[k] = knight.getView().getY();
+      knightHp[k] = knight.getHitPoints().getHitPoints();
+      List<AreaEffectEntity> listed = areaEffects(battle);
+      effects[k] = listed.size();
+      if (!listed.isEmpty()) {
+        effectName = listed.get(0).getData().name();
+        effectSide = listed.get(0).side();
+      }
+      if (k == 1) {
+        // The command pays, and the cast fires in the casting state's entry: the Giant is back in
+        // the state it came from on the same step.
+        assertThat(battle.getAbilityUses()).hasSize(1);
+        assertThat(battle.getAbilityUses().get(0).outcome().code()).isZero();
+        assertThat(match.side(0).getElixir()).isLessThan(elixir);
+      }
+    }
+    assertThat(giantState[1]).isEqualTo(GridEntityState.MOVING);
+    // The selector picks the Knight: the Giant stands, unmoved, for the slap's stop.
+    for (int k = PICK; k <= lastStanding; k++) {
+      assertThat(giantState[k]).as("step %d", k).isEqualTo(GridEntityState.STANDING);
+      assertThat(giantX[k]).isEqualTo(giantX[PICK]);
+      assertThat(giantY[k]).isEqualTo(giantY[PICK]);
+    }
+    assertThat(giantState[lastStanding + 1]).isEqualTo(GridEntityState.MOVING);
+    // The Knight, fighting the Giant, stands from the pick on; the push comes its delay after the
+    // pick and moves it along the width only, 250 a step, from where it stands.
+    int pushedFrom = knightXs[PICK];
+    for (int k = PICK; k < push; k++) {
+      assertThat(knightXs[k]).as("step %d", k).isEqualTo(pushedFrom);
+      assertThat(knightYs[k]).isEqualTo(knightYs[PICK]);
+    }
+    for (int k = push; k <= push + 10; k++) {
+      assertThat(knightXs[k]).as("step %d", k).isEqualTo(pushedFrom + 250 * (k - push + 1));
+      assertThat(knightYs[k]).isEqualTo(knightYs[PICK]);
+    }
+    // It lands the knock up's duration after the push on the Giant's area effect, which hurts it
+    // on the next step.
+    String landing =
+        Shipped.text(
+            Shipped.actionNames(Shipped.actionName(KNOCKBACK, "ActionOnLanding"), "SubActions")
+                .get(0),
+            "SpawnData");
+    assertThat(effects[land - 1]).isZero();
+    assertThat(effects[land]).isEqualTo(1);
+    assertThat(effectName).isEqualTo(landing);
+    assertThat(effectSide).isZero();
+    assertThat(knightHp[land]).isEqualTo(knightHp[land - 1]);
+    // Its hit: the area row's base damage scaled by the Giant's row and level.
+    int base =
+        Shipped.column(Shipped.row("area_effect_objects", landing), "Damage")
+            .path("BaseDamage")
+            .asInt();
+    assertThat(knightHp[land + 1]).isEqualTo(knightHp[land] - Shipped.scaled(base, giant));
+    assertThat(knightXs[land + 1]).isEqualTo(pushedFrom + 250 * (land + 2 - push));
+  }
+
+  @Test
+  @DisplayName(
+      "a Giant killed between the pick and the push: the Knight is still pushed along the width,"
+          + " away from where the Giant stood, and lands on an area effect of the Giant's side")
+  void theSlapOutlivesAGiantKilledBeforeThePush() {
+    int push = PICK + Shipped.ticks(Shipped.number(PUSH, "PushbackDelay"));
+    int land = push + (Shipped.number(KNOCKBACK, "Duration") + 49) / 50;
+    Slap slap = slap();
+    // Killed on the step after the pick: gone from the holder before the push is due.
+    stepTo(slap.battle(), CAST + PICK + 1);
+    slap.battle().getWorld().getHits().kill(slap.giant(), null);
+    int pushedFrom = slap.knight().getView().getX();
+    stepTo(slap.battle(), CAST + push - 1);
+    assertThat(named(slap.battle(), "GiantHero")).isEmpty();
+    assertThat(slap.knight().getView().getX()).isEqualTo(pushedFrom);
+    stepTo(slap.battle(), CAST + push);
+    assertThat(slap.knight().getView().getX()).isEqualTo(pushedFrom + 250);
+    assertLanding(slap, land);
+  }
+
+  @Test
+  @DisplayName(
+      "a Giant moved across the centre line after the pick and then killed before the push: the"
+          + " Knight is pushed away from where the Giant stood at the pick, not where it left")
+  void theSlapHoldsWhereAMovedGiantStoodAtThePick() {
+    int push = PICK + Shipped.ticks(Shipped.number(PUSH, "PushbackDelay"));
+    int land = push + (Shipped.number(KNOCKBACK, "Duration") + 49) / 50;
+    Slap slap = slap();
+    stepTo(slap.battle(), CAST + PICK + 1);
+    // The Giant stands left of the centre line from the pick; a warp's one write puts it as far to
+    // the right of it, and it is killed there: it leaves before the push is due.
+    int centre = slap.battle().getWorld().getTileMap().width() * 250;
+    int pickedFrom = slap.giant().getView().getX();
+    assertThat(pickedFrom).isLessThan(centre);
+    slap.giant().warpTo(2 * centre - pickedFrom, slap.giant().getView().getY());
+    assertThat(slap.giant().getView().getX()).isGreaterThan(centre);
+    slap.battle().getWorld().getHits().kill(slap.giant(), null);
+    stepTo(slap.battle(), CAST + push - 1);
+    assertThat(named(slap.battle(), "GiantHero")).isEmpty();
+    int pushedFrom = slap.knight().getView().getX();
+    // Pushed to the right, away from the Giant's point at the pick: its point as it left would
+    // push the Knight to the left.
+    stepTo(slap.battle(), CAST + push);
+    assertThat(slap.knight().getView().getX()).isEqualTo(pushedFrom + 250);
+    assertLanding(slap, land);
+  }
+
+  @Test
+  @DisplayName(
+      "a Giant killed between the push and the landing: the Knight lands on an area effect of the"
+          + " Giant's side, which hurts it as the Giant's own")
+  void theLandingOutlivesAGiantKilledAfterThePush() {
+    int push = PICK + Shipped.ticks(Shipped.number(PUSH, "PushbackDelay"));
+    int land = push + (Shipped.number(KNOCKBACK, "Duration") + 49) / 50;
+    Slap slap = slap();
+    stepTo(slap.battle(), CAST + push + 2);
+    slap.battle().getWorld().getHits().kill(slap.giant(), null);
+    stepTo(slap.battle(), CAST + push + 6);
+    assertThat(named(slap.battle(), "GiantHero")).isEmpty();
+    assertLanding(slap, land);
+  }
+
+  @Test
+  @DisplayName(
+      "a Knight killed between the pick and the push: the push's failure action on the Giant starts"
+          + " the selector again, which slaps the next Knight to come in reach")
+  void aKnightKilledBeforeThePushGivesTheSlapBack() {
+    int push = PICK + Shipped.ticks(Shipped.number(PUSH, "PushbackDelay"));
+    Slap slap = slap();
+    // Killed on the step after the pick: let go from its holder before the push is due.
+    stepTo(slap.battle(), CAST + PICK + 1);
+    slap.battle().getWorld().getHits().kill(slap.knight(), null);
+    slap.battle().play(CAST + PICK + 2, GameData.card("Knight"), LEVEL, 1, 3500, 22000, "k2");
+    stepTo(slap.battle(), CAST + push);
+    assertThat(named(slap.battle(), "Knight")).hasSize(1);
+    CharacterEntity next = named(slap.battle(), "Knight").get(0);
+    assertThat(next).isNotSameAs(slap.knight());
+    // The selector, started again, waits for the next Knight and slaps it: the Giant stands for
+    // the slap and the Knight is pushed along the width, 250 a step.
+    int pushedAt = -1;
+    int lastX = next.getView().getX();
+    int lastY = next.getView().getY();
+    for (int k = push + 1; k <= push + 200 && pushedAt < 0; k++) {
+      stepTo(slap.battle(), CAST + k);
+      int x = next.getView().getX();
+      int y = next.getView().getY();
+      if (x - lastX == 250 && y == lastY) {
+        pushedAt = k;
+      }
+      lastX = x;
+      lastY = y;
+    }
+    assertThat(pushedAt).as("the next Knight's push").isPositive();
+    assertThat(slap.giant().getView().getState()).isEqualTo(GridEntityState.STANDING);
+  }
+
+  @Test
+  @DisplayName(
+      "a Giant killed after the pick and then the Knight before the push: the push is let go with"
+          + " its cause gone, nothing follows it and the battle goes on")
+  void aKnightKilledAfterTheGiantBeforeThePushEndsTheSlap() {
+    int push = PICK + Shipped.ticks(Shipped.number(PUSH, "PushbackDelay"));
+    int land = push + (Shipped.number(KNOCKBACK, "Duration") + 49) / 50;
+    Slap slap = slap();
+    // The Giant leaves on the step after the pick, the Knight on the next: both before the push.
+    stepTo(slap.battle(), CAST + PICK + 1);
+    slap.battle().getWorld().getHits().kill(slap.giant(), null);
+    stepTo(slap.battle(), CAST + PICK + 2);
+    assertThat(named(slap.battle(), "GiantHero")).isEmpty();
+    slap.battle().getWorld().getHits().kill(slap.knight(), null);
+    assertLetGoQuietly(slap, PICK + 3, land);
+  }
+
+  @Test
+  @DisplayName(
+      "a Giant and the Knight it picked leaving in the same removal before the push: the push is"
+          + " let go with its cause leaving too, nothing follows it and the battle goes on")
+  void aGiantAndItsKnightLeavingTogetherEndTheSlap() {
+    int push = PICK + Shipped.ticks(Shipped.number(PUSH, "PushbackDelay"));
+    int land = push + (Shipped.number(KNOCKBACK, "Duration") + 49) / 50;
+    Slap slap = slap();
+    // Both killed between two steps: the next step's cleanup takes them in one removal.
+    stepTo(slap.battle(), CAST + PICK + 1);
+    slap.battle().getWorld().getHits().kill(slap.giant(), null);
+    slap.battle().getWorld().getHits().kill(slap.knight(), null);
+    assertLetGoQuietly(slap, PICK + 2, land);
+  }
+
+  @Test
+  @DisplayName(
+      "a Knight played before the Giant, listed ahead of it, and the Giant leaving in the same"
+          + " removal before the push: the push is let go before the Giant is taken, nothing"
+          + " follows it and the battle goes on")
+  void aKnightListedAheadOfItsGiantLeavingTogetherEndsTheSlap() {
+    int push = PICK + Shipped.ticks(Shipped.number(PUSH, "PushbackDelay"));
+    int land = push + (Shipped.number(KNOCKBACK, "Duration") + 49) / 50;
+    // The Knight is played first, so the holder lists it ahead of the Giant and a removal that
+    // takes both takes the Knight first.
+    Slap slap = slap(KNIGHT_FIRST);
+    assertThat(slap.knight().getId()).isLessThan(slap.giant().getId());
+    stepTo(slap.battle(), CAST + PICK + 1);
+    assertThat(slap.knight().actionHolder().running())
+        .anyMatch(PushbackFromInstigatorRun.class::isInstance);
+    // Both killed between two steps: the next step's cleanup takes them in one removal.
+    slap.battle().getWorld().getHits().kill(slap.giant(), null);
+    slap.battle().getWorld().getHits().kill(slap.knight(), null);
+    assertLetGoQuietly(slap, PICK + 2, land);
+  }
+
+  /** The Giant's slap cast on the Knight, stepped to the cast. */
+  private record Slap(Standard1v1Battle battle, CharacterEntity giant, CharacterEntity knight) {}
+
+  /** The Giant and the Knight played as in the first test, the Knight after the Giant. */
+  private static Slap slap() {
+    return slap(260);
+  }
+
+  /**
+   * The Giant played on 220 and the Knight on the tick given, then the slap cast.
+   *
+   * @param knightPlay the tick the Knight is played on
+   */
+  private static Slap slap(int knightPlay) {
+    Standard1v1Battle battle = null;
+    LadderMatch match = null;
+    for (int word = 0; match == null || !inHand(match, "Giant"); word++) {
+      battle = new Standard1v1Battle(GameData.tables());
+      match = battle.startLadderMatch(GIANT_DECK, KNIGHTS, word, 0, heroFirst(), new int[8]);
+    }
+    battle.play(220, GameData.card("Giant"), LEVEL, 0, 3500, 14000, "g");
+    battle.play(knightPlay, GameData.card("Knight"), LEVEL, 1, 3500, 22000, "k");
+    stepTo(battle, CAST - 20);
+    CharacterEntity giant = named(battle, "GiantHero").get(0);
+    CharacterEntity knight = named(battle, "Knight").get(0);
+    battle.useAbility(CAST, 0, giant.name(), "slap");
+    stepTo(battle, CAST);
+    return new Slap(battle, giant, knight);
+  }
+
+  /**
+   * The landing with the Giant gone: on the landing step an area effect of the Giant's side at the
+   * Knight's point, and the next step the Knight loses the area's hit scaled by the Giant's level.
+   */
+  private static void assertLanding(Slap slap, int land) {
+    String landing =
+        Shipped.text(
+            Shipped.actionNames(Shipped.actionName(KNOCKBACK, "ActionOnLanding"), "SubActions")
+                .get(0),
+            "SpawnData");
+    stepTo(slap.battle(), CAST + land - 1);
+    assertThat(areaEffects(slap.battle())).isEmpty();
+    stepTo(slap.battle(), CAST + land);
+    List<AreaEffectEntity> listed = areaEffects(slap.battle());
+    assertThat(listed).hasSize(1);
+    assertThat(listed.get(0).getData().name()).isEqualTo(landing);
+    assertThat(listed.get(0).side()).isZero();
+    assertThat(listed.get(0).x()).isEqualTo(slap.knight().getView().getX());
+    int hp = slap.knight().getHitPoints().getHitPoints();
+    stepTo(slap.battle(), CAST + land + 1);
+    int base =
+        Shipped.column(Shipped.row("area_effect_objects", landing), "Damage")
+            .path("BaseDamage")
+            .asInt();
+    assertThat(slap.knight().getHitPoints().getHitPoints())
+        .isEqualTo(hp - Shipped.scaled(base, slap.giant()));
+  }
+
+  /**
+   * A push let go with the Giant gone: from the step after the Knight left, the battle steps past
+   * the push and the landing it would have had with neither the Giant nor the Knight listed and no
+   * landing area effect spawned.
+   */
+  private static void assertLetGoQuietly(Slap slap, int from, int land) {
+    for (int k = from; k <= land + 2; k++) {
+      stepTo(slap.battle(), CAST + k);
+      assertThat(named(slap.battle(), "GiantHero")).as("step %d", k).isEmpty();
+      assertThat(named(slap.battle(), "Knight")).as("step %d", k).isEmpty();
+      assertThat(areaEffects(slap.battle())).as("step %d", k).isEmpty();
+    }
+  }
+
+  /** Slot flags with the first card in the hero slot. */
+  private static int[] heroFirst() {
+    int[] slots = new int[8];
+    slots[0] = MatchSide.HERO_SLOT;
+    return slots;
+  }
+
+  private static boolean inHand(LadderMatch match, String card) {
+    List<MatchCard> deck = match.side(0).deck();
+    return Arrays.stream(match.side(0).getHand().slots())
+        .anyMatch(index -> index >= 0 && deck.get(index).name().equals(card));
+  }
+
+  /** The characters of a row the holder lists, in its order. */
+  private static List<CharacterEntity> named(Standard1v1Battle battle, String row) {
+    return battle.getWorld().getHolder().entities().stream()
+        .filter(CharacterEntity.class::isInstance)
+        .map(CharacterEntity.class::cast)
+        .filter(unit -> unit.getData().name().equals(row))
+        .toList();
+  }
+
+  /** The area effects the holder lists. */
+  private static List<AreaEffectEntity> areaEffects(Standard1v1Battle battle) {
+    return battle.getWorld().getHolder().entities().stream()
+        .filter(AreaEffectEntity.class::isInstance)
+        .map(AreaEffectEntity.class::cast)
+        .toList();
+  }
+
+  /** Steps the battle until its tick is the one given. */
+  private static void stepTo(Standard1v1Battle battle, int tick) {
+    while (battle.getBattle().getTick() < tick) {
+      battle.getBattle().step();
+    }
+  }
+}

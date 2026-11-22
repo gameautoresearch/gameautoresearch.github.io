@@ -1,0 +1,498 @@
+/*
+ * crforge - https://github.com/voonhous/crforge
+ * SPDX-License-Identifier: Apache-2.0
+ * Porting this code? Please cite this file and the commit you read: see the README.
+ */
+
+package org.crforge.core.pathfinding.index;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+
+import java.util.ArrayList;
+import java.util.List;
+import org.crforge.core.pathfinding.GridEntity;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+
+/** Bucket sizing, membership and the candidate query of the per-tick spatial index. */
+class SpatialIndexTest {
+
+  private static final int ARENA_CELLS_WIDE = 36;
+  private static final int ARENA_CELLS_HIGH = 64;
+
+  private GridEntity kingTop;
+  private GridEntity princessTopLeft;
+  private GridEntity princessTopRight;
+  private GridEntity kingBottom;
+  private GridEntity princessBottomLeft;
+  private GridEntity princessBottomRight;
+  private GridEntity unit;
+  private SpatialIndex index;
+
+  /**
+   * A tower for the ordering tests. Only the two kings are flagged as crown towers here, so that
+   * the list the queries answer mixes flagged and unflagged towers; in a battle every tower is one.
+   */
+  private static GridEntity tower(String name, int id, int side, int x, int y, boolean crown) {
+    GridEntity e = new GridEntity();
+    e.setName(name);
+    e.setId(id);
+    e.setSide(side);
+    e.setX(x);
+    e.setY(y);
+    e.setCollisionRadius(crown ? 1400 : 1000);
+    e.setCrownTower(crown);
+    e.setBuilding(true);
+    return e;
+  }
+
+  @BeforeEach
+  void setUp() {
+    kingTop = tower("KingTower_0_0", 1, 0, 9000, 3000, true);
+    princessTopLeft = tower("PrincessTower_0_1", 2, 0, 3500, 6500, false);
+    princessTopRight = tower("PrincessTower_0_2", 3, 0, 14500, 6500, false);
+    kingBottom = tower("KingTower_1_0", 4, 1, 9000, 29000, true);
+    princessBottomLeft = tower("PrincessTower_1_1", 5, 1, 3500, 25500, false);
+    princessBottomRight = tower("PrincessTower_1_2", 6, 1, 14500, 25500, false);
+
+    unit = new GridEntity();
+    unit.setName("owner");
+    unit.setId(7);
+    unit.setSide(0);
+    unit.setX(3500);
+    unit.setY(10000);
+    unit.setCollisionRadius(500);
+    unit.setMovementActive(true);
+
+    index = new SpatialIndex(ARENA_CELLS_WIDE, ARENA_CELLS_HIGH);
+    index.rebuild(
+        List.of(
+            kingTop,
+            princessTopLeft,
+            princessTopRight,
+            kingBottom,
+            princessBottomLeft,
+            princessBottomRight,
+            unit));
+  }
+
+  @Test
+  @DisplayName("a negative radius still finds an entity whose own radius more than covers it")
+  void aNegativeRadiusIsNotAnEmptyAnswer() {
+    // The unit's own collision radius is 500, so a radius of -100 still leaves 400 units of reach
+    // and the circle test accepts the unit standing at the query's centre.
+    List<GridEntity> found =
+        index.query(new SpatialQuery(3500, 10_000, -100, 0, false, false, 0, -1));
+
+    assertThat(found).containsExactly(unit);
+    index.release(found);
+
+    // The same radius 450 units away is beyond that reach, so the circle test refuses it. Both
+    // queries scan the same bucket, so it is the circle test deciding and not the bucket guard.
+    List<GridEntity> none =
+        index.query(new SpatialQuery(3950, 10_000, -100, 0, false, false, 0, -1));
+
+    assertThat(none).isEmpty();
+  }
+
+  @Test
+  @DisplayName(
+      "the centre query takes a centre strictly within the radius, adding no collision radius and"
+          + " testing a building like anything else")
+  void centreQueryMeasuresCentreToCentre() {
+    // The right bottom princess tower stands at (14500, 25500): 4001 from the point below, past a
+    // radius of 4000 however wide the tower is, and exactly 4000 from the second point.
+    List<GridEntity> beyond = index.centreQuery(14500, 21499, 4000, e -> true);
+    assertThat(beyond).doesNotContain(princessBottomRight);
+    index.release(beyond);
+    List<GridEntity> onTheEdge = index.centreQuery(14500, 21500, 4000, e -> true);
+    assertThat(onTheEdge).as("strictly within").doesNotContain(princessBottomRight);
+    index.release(onTheEdge);
+    List<GridEntity> inside = index.centreQuery(14500, 21501, 4000, e -> true);
+    assertThat(inside).containsExactly(princessBottomRight);
+    index.release(inside);
+    List<GridEntity> filtered = index.centreQuery(14500, 21501, 4000, e -> false);
+    assertThat(filtered).as("the filter refuses it").isEmpty();
+    index.release(filtered);
+  }
+
+  @Test
+  @DisplayName("the standard arena is covered by 18 by 32 buckets of 1024 units")
+  void dimensionsOfTheStandardArena() {
+    SpatialIndex.Dimensions dimensions =
+        SpatialIndex.dimensions(ARENA_CELLS_WIDE, ARENA_CELLS_HIGH);
+
+    assertThat(dimensions.wide()).isEqualTo(18);
+    assertThat(dimensions.high()).isEqualTo(32);
+  }
+
+  @Test
+  @DisplayName("the candidate query walks x outer and y inner and orders crown towers last")
+  void candidateQueryOrder() {
+    int radius = 2000 + 5500 + 500;
+
+    List<GridEntity> found = index.query(SpatialQuery.targetCandidates(3500, 10000, radius));
+
+    assertThat(found).containsExactly(princessTopLeft, unit, kingTop);
+  }
+
+  @Test
+  @DisplayName(
+      "a candidate is accepted when its own collision radius reaches into the query circle")
+  void collisionRadiusExtendsTheReach() {
+    // The left top princess tower stands 3500 units away with a collision radius of 1000, so a
+    // query radius above 2500 reaches its edge while its centre stays outside.
+    assertThat(index.query(SpatialQuery.targetCandidates(3500, 10000, 2600)))
+        .contains(princessTopLeft);
+    assertThat(index.query(SpatialQuery.targetCandidates(3500, 10000, 2400)))
+        .doesNotContain(princessTopLeft);
+  }
+
+  @Test
+  @DisplayName("an entity without a collision radius is never indexed")
+  void radiusBelowOneIsNotIndexed() {
+    GridEntity ghost = new GridEntity();
+    ghost.setName("ghost");
+    ghost.setId(8);
+    ghost.setX(3500);
+    ghost.setY(10000);
+    ghost.setCollisionRadius(0);
+    index.rebuild(List.of(ghost, unit));
+
+    assertThat(index.query(SpatialQuery.targetCandidates(3500, 10000, 8000))).containsExactly(unit);
+  }
+
+  @Test
+  @DisplayName("the team exclusion drops every entity whose team matches the argument")
+  void teamExclusionDropsMatchingEntities() {
+    SpatialQuery excludeTopSide =
+        new SpatialQuery(3500, 10000, 8000, 0, true, false, 0, SpatialIndex.team(unit));
+
+    assertThat(index.query(excludeTopSide)).isEmpty();
+  }
+
+  @Test
+  @DisplayName("the type mask keeps only the entity types whose bit is set")
+  void typeMaskFiltersByType() {
+    unit.setType(3);
+    SpatialQuery onlyTypeThree = new SpatialQuery(3500, 10000, 8000, 0, true, false, 1 << 3, -1);
+
+    assertThat(index.query(onlyTypeThree)).containsExactly(unit);
+  }
+
+  @Test
+  @DisplayName("an inverted bucket range answers with no candidates")
+  void negativeRadiusAnswersEmpty() {
+    assertThat(index.query(SpatialQuery.targetCandidates(3500, 10000, -2000))).isEmpty();
+  }
+
+  @Test
+  @DisplayName("the whole-list query returns every indexed entity once with crown towers last")
+  void listQueryOrdersCrownTowersLast() {
+    List<GridEntity> all = index.listQuery(true);
+
+    assertThat(all).hasSize(7);
+    assertThat(all.subList(5, 7)).containsExactlyInAnyOrder(kingTop, kingBottom);
+    assertThat(all.subList(0, 5))
+        .containsExactlyInAnyOrder(
+            princessTopLeft, princessTopRight, princessBottomLeft, princessBottomRight, unit);
+  }
+
+  @Test
+  @DisplayName("clearing the index empties every bucket")
+  void clearEmptiesTheIndex() {
+    index.clear();
+
+    assertThat(index.query(SpatialQuery.targetCandidates(3500, 10000, 8000))).isEmpty();
+  }
+
+  @Test
+  @DisplayName("a query without a free result list answers null and a release returns one")
+  void resultListPoolIsBounded() {
+    for (int i = 0; i < SpatialIndex.RESULT_LIST_POOL_SIZE; i++) {
+      assertThat(index.query(SpatialQuery.targetCandidates(3500, 10000, 8000))).isNotNull();
+    }
+    assertThat(index.query(SpatialQuery.targetCandidates(3500, 10000, 8000))).isNull();
+
+    index.release(List.of());
+
+    assertThat(index.query(SpatialQuery.targetCandidates(3500, 10000, 8000))).isNotNull();
+  }
+
+  @Test
+  @DisplayName(
+      "the segment query visits the buckets over the segment's widened box x outer and y inner,"
+          + " tests each entity once, accepted or not, and answers null with no free list")
+  void segmentQueryTestsEachEntityOnce() {
+    List<String> tested = new ArrayList<>();
+    // The segment from the top left princess tower to the unit, widened by 2000: the tower's
+    // square spans several buckets, and the unit is rejected.
+    List<GridEntity> found =
+        index.segmentQuery(
+            3500,
+            6500,
+            3500,
+            10000,
+            2000,
+            entity -> {
+              tested.add(entity.getName());
+              return entity.isBuilding();
+            });
+
+    assertThat(found).containsExactly(princessTopLeft);
+    assertThat(tested).containsExactly("PrincessTower_0_1", "owner");
+
+    for (int i = 1; i < SpatialIndex.RESULT_LIST_POOL_SIZE; i++) {
+      assertThat(index.segmentQuery(0, 0, 0, 0, 0, entity -> true)).isNotNull();
+    }
+    assertThat(index.segmentQuery(0, 0, 0, 0, 0, entity -> true)).isNull();
+  }
+
+  @Test
+  @DisplayName(
+      "the box query tests a building by its square and anything else by its circle, after the"
+          + " filter, each once, from a list of its own")
+  void theBoxQuery() {
+    // The box is 1200 wide and 2000 high about (3500, 8000): its lower edge at 7000 meets the
+    // tower's square, which reaches 7500, and its upper edge at 9000 stops 1000 short of the
+    // unit, whose circle reaches 500.
+    assertThat(index.boxQuery(3500, 8000, 600, 1000, entity -> true))
+        .containsExactly(princessTopLeft);
+    assertThat(index.boxQuery(3500, 8000, 600, 1000, entity -> !entity.isBuilding())).isEmpty();
+    // A box over the corner of the tower's square, 1273 from its centre: the square overlaps it,
+    // the circle of 1000 would not.
+    assertThat(index.boxQuery(4700, 7700, 300, 300, entity -> true))
+        .containsExactly(princessTopLeft);
+
+    // 400 from the upper edge, the unit's circle meets the box; it stands in several buckets and
+    // is answered once.
+    unit.setY(9400);
+    index.rebuild(List.of(princessTopLeft, unit));
+    assertThat(index.boxQuery(3500, 8000, 600, 1000, entity -> true))
+        .containsExactly(princessTopLeft, unit);
+    assertThat(index.boxQuery(3500, 8000, 600, 1000, entity -> entity == unit))
+        .containsExactly(unit);
+
+    // The pool of result lists is not drawn on.
+    for (int i = 0; i < SpatialIndex.RESULT_LIST_POOL_SIZE + 1; i++) {
+      assertThat(index.boxQuery(3500, 8000, 600, 1000, entity -> true)).isNotNull();
+    }
+    assertThat(index.query(SpatialQuery.targetCandidates(3500, 8000, 100))).isNotNull();
+  }
+
+  @Test
+  @DisplayName(
+      "a rebuild answers only the entities of the new tick, also where an old one stood, and a"
+          + " clear leaves nothing")
+  void aRebuildForgetsTheTickBefore() {
+    // The tick after setUp's: the unit has gone and another stands far from where it was.
+    GridEntity other = new GridEntity();
+    other.setName("other");
+    other.setId(8);
+    other.setSide(1);
+    other.setX(15_000);
+    other.setY(15_000);
+    other.setCollisionRadius(500);
+    other.setMovementActive(true);
+    index.rebuild(List.of(kingTop, other));
+
+    List<GridEntity> whereItStood =
+        index.query(new SpatialQuery(3500, 10_000, 1000, 0, false, false, 0, -1));
+    assertThat(whereItStood).as("nothing is left where the unit stood").isEmpty();
+    index.release(whereItStood);
+    List<GridEntity> everything = index.listQuery(false);
+    assertThat(everything).containsExactly(kingTop, other);
+    index.release(everything);
+
+    index.clear();
+    assertThat(index.isPopulated()).isFalse();
+    List<GridEntity> none = index.listQuery(false);
+    assertThat(none).isEmpty();
+    index.release(none);
+  }
+
+  /** An entity standing at the centre of one bucket, small enough to be in that bucket alone. */
+  private static GridEntity atBucket(int id, int cx, int cy) {
+    GridEntity e = new GridEntity();
+    e.setName("at_" + cx + "_" + cy);
+    e.setId(id);
+    e.setSide(0);
+    e.setX(cx * SpatialIndex.BUCKET_UNITS + SpatialIndex.BUCKET_UNITS / 2);
+    e.setY(cy * SpatialIndex.BUCKET_UNITS + SpatialIndex.BUCKET_UNITS / 2);
+    e.setCollisionRadius(1);
+    return e;
+  }
+
+  @Test
+  @DisplayName(
+      "a query visits the buckets that hold an entity column by column and row by row, the edge"
+          + " rows and columns included, whatever the order the entities were put in")
+  void aQueryVisitsTheFilledBucketsInOrderToTheEdges() {
+    GridEntity lastRowFirstColumn = atBucket(11, 0, 31);
+    GridEntity middleRowFirstColumn = atBucket(12, 0, 5);
+    GridEntity firstRowFirstColumn = atBucket(13, 0, 0);
+    GridEntity lastRowLastColumn = atBucket(14, 17, 31);
+    GridEntity firstRowLastColumn = atBucket(15, 17, 0);
+    GridEntity middle = atBucket(16, 9, 16);
+    index.rebuild(
+        List.of(
+            lastRowLastColumn,
+            middle,
+            lastRowFirstColumn,
+            firstRowLastColumn,
+            middleRowFirstColumn,
+            firstRowFirstColumn));
+
+    // A circle over the whole arena and past its edges on every side.
+    List<GridEntity> all =
+        index.query(new SpatialQuery(9000, 16_000, 40_000, 0, false, false, 0, -1));
+    assertThat(all)
+        .containsExactly(
+            firstRowFirstColumn,
+            middleRowFirstColumn,
+            lastRowFirstColumn,
+            middle,
+            firstRowLastColumn,
+            lastRowLastColumn);
+    index.release(all);
+    List<GridEntity> centred = index.centreQuery(9000, 16_000, 40_000, e -> true);
+    assertThat(centred)
+        .containsExactlyElementsOf(
+            List.of(
+                firstRowFirstColumn,
+                middleRowFirstColumn,
+                lastRowFirstColumn,
+                middle,
+                firstRowLastColumn,
+                lastRowLastColumn));
+    index.release(centred);
+
+    // A box reaching off the arena past the first column and the first row finds only the corner.
+    assertThat(index.boxQuery(0, 0, 1500, 1500, e -> true)).containsExactly(firstRowFirstColumn);
+    // Rows 5 to 31 of the first column, the range cut at the arena's last row.
+    List<GridEntity> column =
+        index.query(new SpatialQuery(512, 20_000, 14_900, 0, false, false, 0, -1));
+    assertThat(column).startsWith(middleRowFirstColumn, lastRowFirstColumn);
+    index.release(column);
+
+    // The next tick holds only the middle entity: the buckets the others filled are empty again.
+    index.rebuild(List.of(middle));
+    List<GridEntity> after =
+        index.query(new SpatialQuery(9000, 16_000, 40_000, 0, false, false, 0, -1));
+    assertThat(after).containsExactly(middle);
+    index.release(after);
+  }
+
+  /**
+   * An entity standing on the corner of four buckets, whose collision square reaches into all four:
+   * buckets (4, 4), (4, 5), (5, 4) and (5, 5).
+   */
+  private static GridEntity onBucketCorner(int id) {
+    GridEntity e = new GridEntity();
+    e.setName("corner_" + id);
+    e.setId(id);
+    e.setSide(id & 1);
+    e.setX(5 * SpatialIndex.BUCKET_UNITS);
+    e.setY(5 * SpatialIndex.BUCKET_UNITS);
+    e.setCollisionRadius(500);
+    return e;
+  }
+
+  @Test
+  @DisplayName(
+      "with more than 64 entities in the index, each one standing in four buckets, every query"
+          + " answers each once, in the order they were put in")
+  void moreThanSixtyFourEntitiesAreEachAnsweredOnce() {
+    List<GridEntity> many = new ArrayList<>();
+    for (int id = 0; id < 70; id++) {
+      many.add(onBucketCorner(id));
+    }
+    index.rebuild(many);
+    int x = 5 * SpatialIndex.BUCKET_UNITS;
+
+    List<GridEntity> found = index.query(new SpatialQuery(x, x, 2000, 0, false, false, 0, -1));
+    assertThat(found).containsExactlyElementsOf(many);
+    index.release(found);
+    List<GridEntity> centred = index.centreQuery(x, x, 2000, e -> true);
+    assertThat(centred).containsExactlyElementsOf(many);
+    index.release(centred);
+    assertThat(index.boxQuery(x, x, 2000, 2000, e -> true)).containsExactlyElementsOf(many);
+    List<GridEntity> segment = index.segmentQuery(x - 600, x, x + 600, x, 600, e -> true);
+    assertThat(segment).containsExactlyElementsOf(many);
+    index.release(segment);
+    List<GridEntity> listed = index.listQuery(false);
+    assertThat(listed).containsExactlyElementsOf(many);
+    index.release(listed);
+    // Only the entities of one side, the odd slots above 64 among them.
+    List<GridEntity> oneSide = index.query(new SpatialQuery(x, x, 2000, 0, false, false, 0, 0));
+    assertThat(oneSide)
+        .containsExactlyElementsOf(many.stream().filter(e -> e.getSide() == 1).toList());
+    index.release(oneSide);
+  }
+
+  @Test
+  @DisplayName("an entity put in twice before a clear is answered once by every query")
+  void anEntityPutInTwiceIsAnsweredOnce() {
+    index.clear();
+    index.insert(unit);
+    index.insert(princessTopLeft);
+    index.insert(unit);
+
+    List<GridEntity> found = index.query(SpatialQuery.targetCandidates(3500, 10_000, 8000));
+    assertThat(found).containsExactly(princessTopLeft, unit);
+    index.release(found);
+    List<GridEntity> centred = index.centreQuery(3500, 10_000, 8000, e -> true);
+    assertThat(centred).containsExactly(princessTopLeft, unit);
+    index.release(centred);
+    assertThat(index.boxQuery(3500, 10_000, 4000, 4000, e -> true))
+        .containsExactly(princessTopLeft, unit);
+    List<GridEntity> segment = index.segmentQuery(3500, 6500, 3500, 10_000, 2000, e -> true);
+    assertThat(segment).containsExactly(princessTopLeft, unit);
+    index.release(segment);
+    List<GridEntity> listed = index.listQuery(false);
+    assertThat(listed).containsExactly(princessTopLeft, unit);
+    index.release(listed);
+  }
+
+  @Test
+  @DisplayName(
+      "the centre query tests an entity it rejected again in its next bucket, and a query run"
+          + " from within its filter leaves its answer as it was")
+  void theCentreQueryRetestsARejectedEntityAndAllowsAQueryWithinItsFilter() {
+    GridEntity corner = onBucketCorner(1);
+    GridEntity other = onBucketCorner(2);
+    index.rebuild(List.of(corner, other));
+    int x = 5 * SpatialIndex.BUCKET_UNITS;
+
+    List<String> tested = new ArrayList<>();
+    List<GridEntity> found =
+        index.centreQuery(
+            x,
+            x,
+            2000,
+            entity -> {
+              tested.add(entity.getName());
+              // A query inside the filter, over the same buckets, answering both.
+              List<GridEntity> inner =
+                  index.query(new SpatialQuery(x, x, 2000, 0, false, false, 0, -1));
+              assertThat(inner).containsExactly(corner, other);
+              index.release(inner);
+              return entity == corner;
+            });
+
+    assertThat(found).containsExactly(corner);
+    // The accepted entity once; the rejected one in each of its four buckets.
+    assertThat(tested).containsExactly("corner_1", "corner_2", "corner_2", "corner_2", "corner_2");
+  }
+
+  @Test
+  @DisplayName("an arena of more than 64 bucket rows is refused")
+  void moreThanSixtyFourBucketRowsAreRefused() {
+    // 140 cells of 500 units make 69 buckets of 1024.
+    assertThatThrownBy(() -> new SpatialIndex(ARENA_CELLS_WIDE, 140))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessageContaining("69 bucket rows");
+  }
+}

@@ -1,0 +1,121 @@
+/*
+ * crforge - https://github.com/voonhous/crforge
+ * SPDX-License-Identifier: Apache-2.0
+ * Porting this code? Please cite this file and the commit you read: see the README.
+ */
+
+plugins {
+    application
+    `java-library`
+}
+
+dependencies {
+    implementation(project(":core"))
+
+    // The model opponent (--model): the environment builds the model's observation and mask and
+    // takes its actions as in training, and ONNX Runtime runs the exported policy
+    implementation(project(":env"))
+    implementation(libs.onnxruntime)
+
+    // The configured game tables, their shipped rows and the synthetic replay scenarios of the
+    // core's test fixtures
+    testImplementation(testFixtures(project(":core")))
+
+    // JSON (data selection and replay files)
+    implementation(libs.jackson.databind)
+
+    // A crawl's output is zstd- or gzip-compressed (ReplayArchive): a pure-Java zstd decoder
+    implementation(libs.aircompressor)
+
+    // LibGDX
+    implementation(libs.gdx)
+    implementation(libs.gdx.backend.lwjgl3)
+    implementation("com.badlogicgames.gdx:gdx-platform:${libs.versions.gdx.get()}:natives-desktop")
+    implementation(libs.gdx.freetype)
+    implementation("com.badlogicgames.gdx:gdx-freetype-platform:${libs.versions.gdx.get()}:natives-desktop")
+
+    // Logging
+    api(libs.slf4j.api)
+    implementation(libs.slf4j.simple)
+
+    // Lombok
+    compileOnly(libs.lombok)
+    annotationProcessor(libs.lombok)
+    testCompileOnly(libs.lombok)
+    testAnnotationProcessor(libs.lombok)
+}
+
+application {
+    mainClass.set("org.crforge.desktop.DesktopLauncher")
+
+    // macOS requires this for LWJGL/GLFW
+    if (System.getProperty("os.name").lowercase().contains("mac")) {
+        applicationDefaultJvmArgs = listOf("-XstartOnFirstThread")
+    }
+}
+
+// The debug visualizer runs the battle core, which reads the game tables of one data version. The
+// run builds them first (:tables:gameTables, see the root build for crforge.assetSource and the
+// other settings) and passes the program, as system properties, the folder they are built in
+// (crforge.tablesRoot, one folder per data version, the versions the V key cycles through), the
+// data version to open (crforge.dataVersion: -Pcrforge.dataVersion=<v>, by default the lock's) and
+// the lock's version (crforge.lockVersion). See org.crforge.desktop.DataSelection.
+tasks.named<JavaExec>("run") {
+    dependsOn(":tables:gameTables")
+    systemProperty("crforge.tablesRoot", rootProject.extra["crforge.builtTablesRoot"] as String)
+    systemProperty("crforge.dataVersion", rootProject.extra["crforge.dataVersion"] as String)
+    systemProperty("crforge.lockVersion", rootProject.extra["crforge.lockVersion"] as String)
+}
+
+// Opt-in graphics integration checks. Requires a display/OpenGL; never part of headless check.
+tasks.register<JavaExec>("uiSmoke") {
+    group = "verification"
+    description = "Exercise workspace input and layout in a hidden LWJGL window (the built tables)."
+    dependsOn(tasks.testClasses)
+    classpath = sourceSets.test.get().runtimeClasspath
+    mainClass.set("org.crforge.desktop.WorkspaceSmoke")
+    if (System.getProperty("os.name").lowercase().contains("mac")) jvmArgs("-XstartOnFirstThread")
+    systemProperty("crforge.uiSmokeOutput", layout.buildDirectory.dir("ui-smoke").get().asFile.absolutePath)
+    // the tables the build makes, passed as to the run task
+    dependsOn(":tables:gameTables")
+    systemProperty("crforge.tablesRoot", rootProject.extra["crforge.builtTablesRoot"] as String)
+    systemProperty("crforge.dataVersion", rootProject.extra["crforge.dataVersion"] as String)
+    systemProperty("crforge.lockVersion", rootProject.extra["crforge.lockVersion"] as String)
+    // and the data version's folder, as the test tasks are given it (root build): the smoke's
+    // replay fixtures are the replay tests' own, which read the tables through it
+    systemProperty(
+        "crforge.gameTables",
+        "${rootProject.extra["crforge.builtTablesRoot"]}/${rootProject.extra["crforge.dataVersion"]}",
+    )
+}
+
+// An exported model to play a whole battle against in the desktop tests
+// (-Pcrforge.modelFile=<file.onnx>, ModelOpponentTest); a trained model is never part of this
+// repository, so the test is skipped without one.
+tasks.test {
+    (findProperty("crforge.modelFile") as String?)?.let { systemProperty("crforge.modelFile", it) }
+}
+
+// The example replay the repository ships (examples/replays/ladder.json, ExampleReplay): a battle
+// the battle core plays with a fixed script, written as a replay of the data version the build
+// makes the tables of. A data version bump runs it; ExampleReplayTest holds the shipped file to it.
+val exampleReplay = rootProject.file("examples/replays/ladder.json")
+
+tasks.register<JavaExec>("exampleReplay") {
+    group = "application"
+    description = "Plays the scripted example battle and writes it to examples/replays/ladder.json."
+    classpath = sourceSets.main.get().runtimeClasspath
+    mainClass.set("org.crforge.desktop.replay.ExampleReplay")
+    dependsOn(":tables:gameTables")
+    systemProperty(
+        "crforge.gameTables",
+        "${rootProject.extra["crforge.builtTablesRoot"]}/${rootProject.extra["crforge.dataVersion"]}",
+    )
+    args(exampleReplay.absolutePath)
+}
+
+tasks.test {
+    systemProperty("crforge.exampleReplay", exampleReplay.absolutePath)
+    // an input, so an edit of the file runs the tests again
+    inputs.file(exampleReplay).withPropertyName("exampleReplay")
+}

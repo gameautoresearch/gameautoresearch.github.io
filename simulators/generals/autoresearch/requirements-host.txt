@@ -1,0 +1,14 @@
+modal[api-proxy-support]==1.5.2
+jax==0.12.0.1
+jaxlib==0.12.0.1
+flax==0.12.12
+numpy==2.5.4
+optax==0.2.8
+pygame==2.6.1
+python-socketio==5.18.1
+pytest==9.2.0
+synchronicity==0.12.5
+aiohttp==3.14.2
+h2==4.3.0
+python-socks==2.8.2
+aiohttp-socks==0.11.0

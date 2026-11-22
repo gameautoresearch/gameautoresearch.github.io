@@ -1,0 +1,485 @@
+/*
+ * crforge - https://github.com/voonhous/crforge
+ * SPDX-License-Identifier: Apache-2.0
+ * Porting this code? Please cite this file and the commit you read: see the README.
+ */
+
+package org.crforge.core.battle.unit;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+
+import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+import java.io.IOException;
+import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import org.crforge.core.battle.BattleEntity;
+import org.crforge.core.battle.GameData;
+import org.crforge.core.battle.Shipped;
+import org.crforge.core.battle.action.BattleAction;
+import org.crforge.core.battle.data.BattleRecords;
+import org.crforge.core.battle.data.GameRow;
+import org.crforge.core.battle.data.GameTables;
+import org.crforge.core.battle.match.LadderMatch;
+import org.crforge.core.pathfinding.combat.DamageResult;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
+
+/**
+ * Goblinstein where the reference runs do not take it: a listener's count below its cost, a variant
+ * card's play tested as its option, and counted, the tether over units, the ability's run off an
+ * area effect that follows, and a Mirror of the card while the first pair lives, a champion's card
+ * of two groups.
+ */
+class BattleGoblinsteinTest {
+
+  private static final int LEVEL = Standard1v1Battle.DEFAULT_LEVEL;
+
+  /** The start cooldown: the first tick a card play of a match may run. */
+  private static final int OPEN = Shipped.startCooldownTicks();
+
+  /** A Goblinstein and a Merge Maiden, then the Mirrors the shuffle holds back for the refills. */
+  private static final List<String> GOBLINSTEIN_MAIDEN =
+      List.of(
+          "Goblinstein", "MergeMaiden", "Mirror", "Mirror", "Mirror", "Mirror", "Mirror", "Mirror");
+
+  /** A Goblinstein and an Archer, then the Mirrors the shuffle holds back for the refills. */
+  private static final List<String> GOBLINSTEIN_MIRRORS =
+      List.of("Goblinstein", "Archer", "Mirror", "Mirror", "Mirror", "Mirror", "Mirror", "Mirror");
+
+  private static final List<String> KNIGHTS = Collections.nCopies(8, "Knight");
+
+  @Test
+  @DisplayName(
+      "a listener whose count is below its cost adds the cost of each play of its side in its"
+          + " group, and the play that finds it reached schedules the action and takes the cost"
+          + " off: 0, 5, 10, then 2")
+  void aCountBelowTheCostAddsThePlaysCost(@TempDir Path folder) throws IOException {
+    // The monster's listener given a cost of 8, which no shipped listener of a modelled card has,
+    // and the card a cost of 5, as the test writes them.
+    GameData.altered(
+        folder,
+        "actions",
+        rows ->
+            ((ObjectNode) rows.get("goblinstein_listen_to_new_deploy").get("fields"))
+                .put("ElixirCost", 8));
+    GameData.alterLoaded(
+        folder,
+        "spells_characters",
+        rows -> GameData.columns(rows, "Goblinstein").put("ManaCost", 5));
+    GameTables tables = GameTables.load(folder);
+    BattleRecords records = new BattleRecords(tables);
+    Standard1v1Battle battle = new Standard1v1Battle(tables);
+    List<String> heard = new ArrayList<>();
+    battle
+        .getWorld()
+        .addObserver(
+            new WorldObserver() {
+              @Override
+              public void cardPlayHeard(
+                  int tick,
+                  WorldEntity owner,
+                  String action,
+                  int side,
+                  String played,
+                  String deployed,
+                  int total,
+                  String scheduled) {
+                if (owner.name().equals("g_0")) {
+                  heard.add(played + " " + total + " " + scheduled);
+                }
+              }
+            });
+    battle.play(OPEN, records.card("Goblinstein"), LEVEL, 0, 3500, 12000, "g");
+    battle.play(OPEN + 40, records.card("Goblinstein"), LEVEL, 1, 3500, 22000, "e");
+    battle.play(OPEN + 60, records.card("Knight"), LEVEL, 0, 14500, 8000, "k");
+    battle.play(OPEN + 80, records.card("Goblinstein"), LEVEL, 0, 14500, 12000, "h");
+    battle.play(OPEN + 100, records.card("Goblinstein"), LEVEL, 0, 14500, 8000, "i");
+    battle.play(OPEN + 120, records.card("Goblinstein"), LEVEL, 0, 3500, 8000, "j");
+    run(battle, OPEN + 120);
+
+    int cost = records.matchCard("Goblinstein").cost();
+    assertThat(cost).isEqualTo(5);
+    assertThat(heard)
+        .containsExactly(
+            "Goblinstein 0 null",
+            "Knight 0 null",
+            "Goblinstein 5 null",
+            "Goblinstein 10 null",
+            "Goblinstein 2 goblinstein_set_custom_tag");
+  }
+
+  @Test
+  @DisplayName(
+      "a variant card's play is tested as the option it was played as, which the shipped group"
+          + " does not list, so the listener does not hear it and the battle runs on")
+  void aVariantPlayIsNotHeardByAGroupWithoutItsOption() {
+    Standard1v1Battle battle = new Standard1v1Battle(GameData.tables());
+    List<String> heard = heardBy(battle, "g_0");
+    battle.startLadderMatch(GOBLINSTEIN_MAIDEN, KNIGHTS, 0, 0);
+    battle.play(OPEN + 21, GameData.card("Goblinstein"), LEVEL, 0, 3500, 10000, "g");
+    battle.playVariant(OPEN + 400, "MergeMaiden", LEVEL, 0, 14500, 10000, "m");
+    run(battle, OPEN + 400);
+
+    assertThat(GameData.records().cardGroup("Goblinstein"))
+        .doesNotContain("MergeMaiden", "MergeMaiden_Mounted");
+    assertThat(heard).containsExactly("MergeMaiden MergeMaiden_Mounted 0 null");
+  }
+
+  @Test
+  @DisplayName(
+      "a listener that tests the card put down hears a variant card's play by the option's row:"
+          + " a group listing the variant card does not hear it, one listing the option does")
+  void aVariantPlayIsTestedAsItsOption(@TempDir Path folder) throws IOException {
+    // The monster's group given the variant card, as the test writes it.
+    GameData.altered(
+        folder,
+        "card_groups",
+        rows ->
+            GameData.columns(rows, "Goblinstein").withArray("PlayableCards").add("MergeMaiden"));
+    assertThat(heardMaidenPlay(GameTables.load(folder)))
+        .containsExactly("MergeMaiden MergeMaiden_Mounted 0 null");
+
+    // Then the option's row in its place.
+    GameData.alterLoaded(
+        folder,
+        "card_groups",
+        rows -> {
+          ArrayNode cards = GameData.columns(rows, "Goblinstein").withArray("PlayableCards");
+          cards.remove(cards.size() - 1);
+          cards.add("MergeMaiden_Mounted");
+        });
+    assertThat(heardMaidenPlay(GameTables.load(folder)))
+        .containsExactly("MergeMaiden MergeMaiden_Mounted 0 goblinstein_set_custom_tag");
+  }
+
+  @Test
+  @DisplayName(
+      "a variant card's play heard by a listener whose count is below its cost, which would add"
+          + " its elixir to the count, is refused")
+  void aVariantPlayCountedIsRefused(@TempDir Path folder) throws IOException {
+    // The monster's group given the option's row and its listener a cost of 8, as the test writes
+    // them.
+    GameData.altered(
+        folder,
+        "card_groups",
+        rows ->
+            GameData.columns(rows, "Goblinstein")
+                .withArray("PlayableCards")
+                .add("MergeMaiden_Mounted"));
+    GameData.alterLoaded(
+        folder,
+        "actions",
+        rows -> GameData.fields(rows, "goblinstein_listen_to_new_deploy").put("ElixirCost", 8));
+
+    assertThatThrownBy(() -> heardMaidenPlay(GameTables.load(folder)))
+        .isInstanceOf(UnsupportedOperationException.class)
+        .hasMessage(
+            "MergeMaiden played as MergeMaiden_Mounted is counted by g_0's"
+                + " goblinstein_listen_to_new_deploy, which listens for its side's card plays:"
+                + " the elixir a variant card's play adds to the count is not modelled");
+  }
+
+  /**
+   * Plays a Goblinstein and then a mounted Merge Maiden of its side in a match on the tables, and
+   * returns what the monster's listener heard of the maiden's play.
+   */
+  private static List<String> heardMaidenPlay(GameTables tables) {
+    Standard1v1Battle battle = new Standard1v1Battle(tables);
+    List<String> heard = heardBy(battle, "g_0");
+    battle.startLadderMatch(GOBLINSTEIN_MAIDEN, KNIGHTS, 0, 0);
+    battle.play(
+        OPEN + 21, new BattleRecords(tables).card("Goblinstein"), LEVEL, 0, 3500, 10000, "g");
+    battle.playVariant(OPEN + 400, "MergeMaiden", LEVEL, 0, 14500, 10000, "m");
+    run(battle, OPEN + 400);
+    return heard;
+  }
+
+  /**
+   * Lists each play the named owner's listener hears: the card played, the card put down, the count
+   * after it and the action it scheduled.
+   */
+  private static List<String> heardBy(Standard1v1Battle battle, String owner) {
+    List<String> heard = new ArrayList<>();
+    battle
+        .getWorld()
+        .addObserver(
+            new WorldObserver() {
+              @Override
+              public void cardPlayHeard(
+                  int tick,
+                  WorldEntity listener,
+                  String action,
+                  int side,
+                  String played,
+                  String deployed,
+                  int total,
+                  String scheduled) {
+                if (listener.name().equals(owner)) {
+                  heard.add(played + " " + deployed + " " + total + " " + scheduled);
+                }
+              }
+            });
+    return heard;
+  }
+
+  @Test
+  @DisplayName(
+      "the tether hits each enemy within its width of the segment from the doctor to the monster"
+          + " for its tether damage at every pass, and spares one farther off")
+  void theTetherHitsTheEnemiesAlongIt() {
+    Standard1v1Battle battle = new Standard1v1Battle(GameData.tables(), LEVEL, false);
+    List<String> passes = new ArrayList<>();
+    List<String> hits = new ArrayList<>();
+    battle
+        .getWorld()
+        .addObserver(
+            new WorldObserver() {
+              @Override
+              public void tetherDamagePass(
+                  int tick,
+                  AreaEffectEntity owner,
+                  int ax,
+                  int ay,
+                  int bx,
+                  int by,
+                  List<WorldEntity> found) {
+                passes.add(tick + " " + found.stream().map(WorldEntity::name).toList());
+              }
+
+              @Override
+              public void tetherHit(
+                  int tick,
+                  AreaEffectEntity owner,
+                  WorldEntity target,
+                  int damage,
+                  int directionX,
+                  int directionY,
+                  DamageResult result) {
+                hits.add(target.name() + " " + damage);
+              }
+            });
+    battle.play(OPEN, GameData.card("Goblinstein"), LEVEL, 0, 3500, 12000, "g");
+    run(battle, OPEN + 30);
+    CharacterEntity monster = battle.getPlays().get(0).units().get(0);
+    CharacterEntity doctor = battle.getPlays().get(0).units().get(1);
+    // Neither end moves or fights, so the segment stays where it is.
+    for (CharacterEntity end : List.of(monster, doctor)) {
+      end.setActive(CharacterEntity.MOVEMENT_SLOT, false);
+    }
+    int ax = doctor.getView().getX();
+    int ay = doctor.getView().getY();
+    int bx = monster.getView().getX();
+    int by = monster.getView().getY();
+    // Two Golems, which walk only for buildings: one on the segment's middle, one off it by the
+    // tether's width, its own radius and 1250 more.
+    String ability = "goblinstein_ability_action";
+    int off =
+        Shipped.number(ability, "TetherWidth")
+            + Shipped.number(Shipped.unitRow("Golem"), "CollisionRadius")
+            + 1250;
+    int tick = battle.getBattle().getTick();
+    CharacterEntity near =
+        battle.deploy(tick, GameData.unit("Golem"), LEVEL, 1, (ax + bx) / 2, (ay + by) / 2, "near");
+    CharacterEntity far =
+        battle.deploy(
+            tick, GameData.unit("Golem"), LEVEL, 1, (ax + bx) / 2 + off, (ay + by) / 2, "far");
+    near.setActive(CharacterEntity.MOVEMENT_SLOT, false);
+    far.setActive(CharacterEntity.MOVEMENT_SLOT, false);
+    run(battle, OPEN + 70);
+    doctor.requestAbility();
+    run(battle, OPEN + 200);
+
+    // A pass every TetherHitInterval from the tether's start for as long as its TetherDuration
+    // lasts, the end excluded. Each hit is the TetherDamage at the doctor's level and rarity.
+    int duration = Shipped.number(ability, "TetherDuration");
+    int interval = Shipped.number(ability, "TetherHitInterval");
+    int count = (duration + interval - 1) / interval;
+    GameRow doctorRow = Shipped.unitRow("goblinstein_doctor");
+    int damage = Shipped.scaled(Shipped.number(ability, "TetherDamage"), doctorRow, LEVEL);
+    assertThat(passes).hasSize(count);
+    assertThat(passes).allMatch(pass -> pass.endsWith(" [near]"));
+    assertThat(hits).hasSize(count).allMatch(hit -> hit.equals("near " + damage));
+    assertThat(far.getHitPoints().getHitPoints()).isEqualTo(far.getHitPoints().getMaximum());
+  }
+
+  @Test
+  @DisplayName(
+      "a monster that leaves before the ability's first step leaves the doctor first in its chain,"
+          + " so the run connects to nothing, and the doctor's death makes no death area")
+  void aDoctorAtTheHeadConnectsToNothing() {
+    Standard1v1Battle battle = new Standard1v1Battle(GameData.tables());
+    List<String> log = new ArrayList<>();
+    battle
+        .getWorld()
+        .addObserver(
+            new WorldObserver() {
+              @Override
+              public void goblinsteinConnected(
+                  int tick, AreaEffectEntity owner, BattleEntity connected) {
+                log.add("connect " + connected);
+              }
+
+              @Override
+              public void goblinsteinDeathAreaMade(
+                  int tick,
+                  AreaEffectEntity owner,
+                  WorldEntity left,
+                  AreaEffectEntity deathArea,
+                  int x,
+                  int y) {
+                log.add("death_area " + left.name());
+              }
+            });
+    battle.play(OPEN, GameData.card("Goblinstein"), LEVEL, 0, 3500, 12000, "g");
+    // The monster is killed in the tick it is placed, after its pre-pass: the kill lands at that
+    // tick's damage drain, and a cleanup removes the monster before the run's first step, in the
+    // tick after.
+    battle
+        .getWorld()
+        .addObserver(
+            new WorldObserver() {
+              @Override
+              public void afterPrePass(int tick, List<WorldEntity> present) {
+                if (tick == OPEN) {
+                  battle.getPlays().get(0).units().get(0).killBy(null);
+                }
+              }
+            });
+    run(battle, OPEN);
+    CharacterEntity doctor = battle.getPlays().get(0).units().get(1);
+    run(battle, OPEN + 1);
+    assertThat(doctor.chainHead()).isSameAs(doctor);
+    assertThat(log).containsExactly("connect null");
+
+    doctor.killBy(null);
+    run(battle, OPEN + 3);
+    assertThat(log).containsExactly("connect null");
+  }
+
+  @Test
+  @DisplayName("the ability's run on an owner other than an area effect that follows is refused")
+  void theAbilityOffAFollowingAreaEffectIsRefused() {
+    Standard1v1Battle battle = new Standard1v1Battle(GameData.tables());
+    ActionOwnerEntity owner = battle.addActionOwner("o", 0, 9000, 10000, LEVEL - 1);
+    BattleAction ability = GameData.actions().build("goblinstein_ability_action", owner.binding());
+    battle.scheduleAction(1, owner, ability);
+
+    assertThatThrownBy(() -> run(battle, OPEN + 1))
+        .isInstanceOf(UnsupportedOperationException.class)
+        .hasMessage(
+            "goblinstein_ability_action on an owner other than an area effect that follows, not"
+                + " modelled");
+  }
+
+  @Test
+  @DisplayName(
+      "a Mirror of Goblinstein while the first lives places a monster and a doctor of its own, one"
+          + " level up, chained to each other: the copy's doctor ties to the copy's monster, the"
+          + " first monster's listener hears the play as Goblinstein, and the champion's slot"
+          + " follows the copy's doctor: a command naming the first doctor is refused, one naming"
+          + " the copy's passes")
+  void aMirrorOfGoblinsteinMakesAPairOfItsOwn() {
+    // The towers stand passive, so the first pair lives on.
+    Standard1v1Battle battle = new Standard1v1Battle(GameData.tables(), LEVEL, false);
+    List<String> heard = heardBy(battle, "g_0");
+    List<String> connected = new ArrayList<>();
+    battle
+        .getWorld()
+        .addObserver(
+            new WorldObserver() {
+              @Override
+              public void goblinsteinConnected(
+                  int tick, AreaEffectEntity owner, BattleEntity unit) {
+                connected.add(
+                    ((WorldEntity) owner.getFollow()).name()
+                        + " "
+                        + (unit == null ? null : ((WorldEntity) unit).name()));
+              }
+            });
+    LadderMatch match = battle.startLadderMatch(GOBLINSTEIN_MIRRORS, KNIGHTS, 0, 0);
+    battle.play(OPEN + 21, GameData.card("Goblinstein"), LEVEL, 0, 3500, 4000, "g");
+    run(battle, OPEN + 21);
+    List<CharacterEntity> first = battle.getPlays().get(0).units();
+    // Kept where they stand, so they take no tower.
+    first.forEach(unit -> unit.setActive(CharacterEntity.MOVEMENT_SLOT, false));
+    // Once the elixir covers the Mirror's item, Goblinstein's cost and the Mirror's own, held to
+    // the most elixir there can be; and no sooner than 22 ticks after the play it repeats.
+    int cost =
+        Math.min(
+            Shipped.cost("Goblinstein") + Shipped.cost("Mirror"),
+            Shipped.number(Shipped.row("globals", "MAX_MANA"), "NumberValue"));
+    int mirror = Math.max(21 + 22, coveredFrom(battle, match, cost));
+    battle.playMirror(mirror, "Mirror", LEVEL, 0, 14500, 4000, "m");
+    run(battle, mirror + 2);
+
+    Standard1v1Battle.Play play = battle.getPlays().get(1);
+    assertThat(play.matchCode()).isZero();
+    assertThat(play.mirror().repeats().name()).isEqualTo("Goblinstein");
+    int level =
+        LEVEL + Shipped.number(Shipped.row("globals", "MIRROR_LEVEL_OFFSET"), "NumberValue");
+    assertThat(play.mirror().level()).isEqualTo(level);
+    List<CharacterEntity> copy = play.units();
+    copy.forEach(unit -> unit.setActive(CharacterEntity.MOVEMENT_SLOT, false));
+    // The same two groups as the first play, one level up.
+    assertThat(copy).hasSize(2);
+    for (int i = 0; i < 2; i++) {
+      GameRow row = Shipped.unitRow(first.get(i).getData().name());
+      assertThat(copy.get(i).getData().name()).isEqualTo(first.get(i).getData().name());
+      assertThat(copy.get(i).getHitPoints().getMaximum())
+          .isEqualTo(Shipped.scaled(Shipped.number(row, "Hitpoints"), row, level));
+    }
+    // Each play's construction chains its own units: the monster first, its doctor after it.
+    assertThat(first.get(1).chainHead()).isSameAs(first.get(0));
+    assertThat(first.get(0).chainNext()).isSameAs(first.get(1));
+    assertThat(copy.get(1).chainHead()).isSameAs(copy.get(0));
+    assertThat(copy.get(0).chainNext()).isSameAs(copy.get(1));
+    assertThat(connected).containsExactly("g_1 g_0", "m_1 m_0");
+    // The first monster's listener tests the card put down, Goblinstein, and schedules its action.
+    assertThat(heard).containsExactly("Mirror Goblinstein 0 goblinstein_set_custom_tag");
+
+    // The slot hears the Mirror's play as a play of Goblinstein and follows the copy's doctor.
+    ChampionController slot = battle.getWorld().kingTower(0).championSlot(1);
+    assertThat(slot.getChampion().name())
+        .isEqualTo(GameData.records().cardChampion("Goblinstein").name());
+    assertThat(slot.getDeployIndex()).isEqualTo(copy.get(1).getDeployIndex());
+    GameRow doctor = Shipped.unitRow(copy.get(1).getData().name());
+    int abilityCost =
+        Shipped.number(
+            Shipped.row("character_abilities", Shipped.text(doctor, "Ability")), "ManaCost");
+    int deployed = battle.getBattle().getTick() + Shipped.number(doctor, "DeployTime") / 50 + 1;
+    while (battle.getBattle().getTick() < deployed || match.side(0).wholeElixir() < abilityCost) {
+      battle.getBattle().step();
+    }
+    int now = battle.getBattle().getTick();
+    battle.useAbility(now, 0, "g_1", "old");
+    battle.useAbility(now + 1, 0, "m_1", "new");
+    run(battle, now + 1);
+    List<Standard1v1Battle.AbilityUse> uses = battle.getAbilityUses();
+    assertThat(uses.get(uses.size() - 2).outcome().code()).isEqualTo(AbilityCommand.NO_CHAMPION);
+    assertThat(uses.get(uses.size() - 1).outcome().code()).isEqualTo(AbilityCommand.OK);
+    assertThat(uses.get(uses.size() - 1).outcome().requested()).containsExactly(copy.get(1));
+  }
+
+  /**
+   * Steps a match until side 0's whole elixir covers a cost, and answers the next tick to run: a
+   * play queued for it finds the elixir, which only grows while the side plays nothing.
+   */
+  private static int coveredFrom(Standard1v1Battle battle, LadderMatch match, int cost) {
+    while (match.side(0).wholeElixir() < cost) {
+      battle.getBattle().step();
+    }
+    return battle.getBattle().getTick();
+  }
+
+  /** Steps the battle until it has run the given tick. */
+  private static void run(Standard1v1Battle battle, int lastTick) {
+    while (battle.getBattle().getTick() <= lastTick) {
+      battle.getBattle().step();
+    }
+  }
+}

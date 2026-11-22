@@ -1,0 +1,47 @@
+{
+  "recipe": "gen9randombattle-starter-v1",
+  "hardware": {
+    "device": "cuda:0",
+    "cpu_threads": 4,
+    "workers": 4,
+    "environments_per_worker": 16,
+    "machine": "SET_TO_ALLOCATED_GPU_MACHINE",
+    "attached_ram_gb": 32,
+    "attached_cpu_count": 8
+  },
+  "allocation_seconds": 3600,
+  "seed": 1729,
+  "training_seed_start": 100000,
+  "iterations": 1000000,
+  "network": {
+    "hidden": 128,
+    "embedding": 16
+  },
+  "learning_rate": 0.0003,
+  "max_decision_phases": 512,
+  "gamma": 0.99,
+  "gae_lambda": 0.95,
+  "ppo_epochs": 4,
+  "minibatch": 2048,
+  "clip": 0.2,
+  "value_coef": 0.5,
+  "entropy_coef": 0.01,
+  "max_grad_norm": 0.5,
+  "faint_reward": 0.0,
+  "opponents": [
+    {
+      "kind": "random",
+      "weight": 0.5
+    },
+    {
+      "kind": "power",
+      "weight": 0.5
+    }
+  ],
+  "history_size": 4,
+  "snapshot_every": 5,
+  "development_evaluation": {
+    "every": 10,
+    "schedule": "practice.json"
+  }
+}

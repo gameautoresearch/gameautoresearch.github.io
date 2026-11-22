@@ -1,0 +1,2 @@
+# Reproducible host/controller environment; no CUDA/JAX packages on the host.
+-r requirements-host.lock.txt

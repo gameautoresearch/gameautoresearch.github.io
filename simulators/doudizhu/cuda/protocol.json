@@ -1,0 +1,15 @@
+{
+  "backend": "douzero-fixed-role-cuda-v1",
+  "rules_authority": "original immutable rules.lock.json and pinned upstream remain unchanged",
+  "shared_cpu_cuda_rules": "rules.h",
+  "actions": "complete canonical sorted/deduplicated multiset set; 4096 scratch entries cover conservative raw generation bound below2496; overflow is an unscored fault, never truncation",
+  "state": "private rank-count hands, public counts/history/last actions/bottom; state, legal candidates, public features, choices and DMC trajectory rings reside on CUDA",
+  "deals": "unchanged pinned Python SHA256/MT19937/Fisher-Yates generator; one upload per wave",
+  "actor_rng": "splitmix-counter-v1: per-game uint64 seed drawn once from saved host PCG64 stream (or independent evaluator per-game streams), turn/domain/nonce counters; unbiased Lemire rejection for bounded choices; exact uint32 Bernoulli threshold for epsilon",
+  "actor_rng_change": "explicit recipe/protocol change from interleaved host PCG64 scalar draws; resume across protocols is refused",
+  "learner_shuffle": "numpy for matched oracle tests; optional torch GPU permutation is a separately declared recipe change whose CUDA RNG state is checkpointed",
+  "boundaries": "completed natural-game waves; no intermediate bootstrap in terminal-return DMC; interrupted/faulted waves produce no targets and their reserved deals remain skipped",
+  "host_control": "four scalar control integers per simulator turn; model inputs/actions/rollouts remain on-device; outcomes and optional bounded replay audit are exported at completed wave boundaries",
+  "neural_precision": "matmul_precision controls IEEE/TF32 heads, deterministic cuDNN keeps its separately recorded default TF32 permission; optional BF16 autocast keeps FP32 master weights, loss and scalar Q head; precision and GPU shuffle changes are explicit recipe choices",
+  "reference": "CPU execution of the same rules header plus independent original DouZero differential tests"
+}

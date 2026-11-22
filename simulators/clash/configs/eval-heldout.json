@@ -1,0 +1,19 @@
+{
+  "visibility": "public held-out seed specification; demo only, not secret grader",
+  "policy_seed": 8128,
+  "engine_seeds": [
+    2000000,
+    2000001,
+    2000002,
+    2000003,
+    2000004,
+    2000005,
+    2000006,
+    2000007
+  ],
+  "opponents": [
+    "scripted",
+    "random",
+    "wait"
+  ]
+}

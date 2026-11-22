@@ -1,0 +1,21 @@
+crforge
+Copyright 2025-2026 voonhous
+
+This product includes software developed by voonhous.
+
+If you port or reimplement crforge's logic, please put a comment at each ported function or module naming the crforge file and the commit you read (see "Porting or reimplementing crforge" in README.md). This is a request, not a condition of the license.
+
+---
+
+Clash Royale is a game created and published by Supercell Oy.
+"Clash Royale", "Supercell", and related names, characters, and imagery
+are trademarks of Supercell Oy. This project is an independent fan-made
+simulator for educational and research purposes and is not affiliated with,
+endorsed by, or associated with Supercell in any way.
+
+crforge ships no game data. Each user builds the game tables on their own machine from the game's own files, fetched from the game's asset CDN or read from a local copy of them.
+
+---
+
+This project uses LibGDX (https://libgdx.com/), licensed under the
+Apache License 2.0.

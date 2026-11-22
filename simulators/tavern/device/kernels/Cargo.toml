@@ -1,0 +1,21 @@
+[package]
+name = "tavern-device-kernels"
+version = "0.1.0"
+edition = "2024"
+license = "MIT"
+[lib]
+crate-type = ["cdylib","rlib"]
+[features]
+ordered_tables = ["tavern-device-core/ordered_tables"]
+frozen_rules = []
+default = ["state_io"]
+state_io = []
+arena = ["tavern-device-core/arena", "cuda_std/external-allocator"]
+[dependencies]
+tavern-device-wire = { path = "../wire" }
+tavern-device-core = { path = "../core", features = ["device"] }
+cuda_std = { git = "https://github.com/Rust-GPU/Rust-CUDA", rev = "3a82c35a7196731fb60eebdac2a40d2b1bf0ba95" }
+# Match this SDK revision's own lock; its broad >=0.22 bound admits incompatible APIs.
+glam = { version = "=0.30.9", default-features = false, features = ["libm","cuda","bytemuck"] }
+serde_json = { version = "=1.0.151", default-features = false, features = ["alloc"] }
+serde = { version = "=1.0.229", default-features = false, features = ["derive","alloc"] }

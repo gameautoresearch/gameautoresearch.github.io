@@ -1,0 +1,4 @@
+# Host orchestration only; game/CUDA dependencies stay in the game's hash lock.
+modal[api-proxy-support]==1.5.2
+grpclib==0.4.9
+numpy==2.4.2

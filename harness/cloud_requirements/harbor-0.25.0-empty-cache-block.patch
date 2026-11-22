@@ -1,0 +1,34 @@
+--- utils.py.orig-harbor	2026-10-31 12:56:17
++++ utils.py	2026-11-18 22:14:11
+@@ -51,6 +51,8 @@
+ 
+         # Handle both dict and Message-like objects
+         if isinstance(msg, dict):
++            if isinstance(msg.get("content"), str) and not msg["content"]:
++                continue
+             if isinstance(msg.get("content"), str):
+                 msg["content"] = [
+                     {
+@@ -66,9 +68,13 @@
+                     if remaining <= 0:
+                         break
+                     if isinstance(content_item, dict) and "type" in content_item:
++                        if content_item.get("type") == "text" and not content_item.get("text"):
++                            continue
+                         content_item["cache_control"] = {"type": "ephemeral"}
+                         remaining -= 1
+         elif hasattr(msg, "content"):
++            if isinstance(msg.content, str) and not msg.content:
++                continue
+             if isinstance(msg.content, str):
+                 msg.content = [  # type: ignore
+                     {
+@@ -83,6 +89,8 @@
+                     if remaining <= 0:
+                         break
+                     if isinstance(content_item, dict) and "type" in content_item:
++                        if content_item.get("type") == "text" and not content_item.get("text"):
++                            continue
+                         content_item["cache_control"] = {"type": "ephemeral"}
+                         remaining -= 1
+ 

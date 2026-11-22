@@ -1,0 +1,109 @@
+{
+  "id": "douzero-fixed-role-v1",
+  "source_commit": "718a5c920bf3361e34178a38f3b80458e176b351",
+  "game": "three-player fixed-role Dou Dizhu",
+  "roles_clockwise": [
+    "landlord",
+    "landlord_down",
+    "landlord_up"
+  ],
+  "teams": [
+    [
+      "landlord"
+    ],
+    [
+      "landlord_down",
+      "landlord_up"
+    ]
+  ],
+  "initial_cards": {
+    "landlord": 20,
+    "landlord_down": 17,
+    "landlord_up": 17
+  },
+  "deck": {
+    "ordinary_ranks": [
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
+      11,
+      12,
+      13,
+      14,
+      17
+    ],
+    "ordinary_copies": 4,
+    "jokers": [
+      20,
+      30
+    ]
+  },
+  "bidding": false,
+  "role_assignment": "fixed before play, landlord starts; evaluation candidate rotates roles on identical deal",
+  "bottom_cards": "shuffle positions 17:20, already included in landlord first20, publicly known",
+  "legal_actions": "unchanged pinned move generator/selector; sorted unique card multisets in lexicographic order; empty tuple pass only when upstream permits",
+  "move_families": [
+    "single",
+    "pair",
+    "triple",
+    "four-card bomb",
+    "rocket",
+    "triple+single",
+    "triple+pair",
+    "straight >=5",
+    "pair straight >=3 pairs",
+    "triple straight >=2 triples",
+    "airplane+single wings",
+    "airplane+pair wings",
+    "four+two singles (pair allowed)",
+    "four+two pairs"
+  ],
+  "rules_authority": "pinned simulator semantics including wing conventions; no claim of universal casino/platform variants",
+  "doubling": "each actually played four-card bomb or joker rocket doubles score",
+  "spring_bonus": false,
+  "bidding_multiplier": false,
+  "termination": "any player empties hand naturally, peasants share winner",
+  "truncations": "guard/infrastructure faults are not wins or losses; budget-aborted waves unscored",
+  "max_decisions_guard": 162,
+  "objective_returns": {
+    "wp": "+1 winning team, -1 losing team per role",
+    "adp": "winning team +2**bombs, losing team -2**bombs per role; upstream DMC convention",
+    "logadp": "winning team +(bombs+1), losing team -(bombs+1)"
+  },
+  "economic_scores": "landlord +/-2*2**bombs; each peasant -/+1*2**bombs; sums to zero",
+  "primary_metric": "win rate separately in all three roles for WP recipes; ADP recipes must report economic average score separately",
+  "observations": {
+    "private_allowed": "own hand only",
+    "public": [
+      "role",
+      "hand counts",
+      "all played cards",
+      "full public action history",
+      "last actions",
+      "last nonpassing role",
+      "bomb count",
+      "public remaining bottom cards",
+      "legal card multisets"
+    ],
+    "opponents_union": "reconstructed from known deck minus own cards minus public played cards, never opponent partitions",
+    "forbidden": [
+      "all_handcards",
+      "opponent hand partitions",
+      "deal seed/index/id",
+      "engine references",
+      "random generator state"
+    ],
+    "network_codec": "unchanged DouZero 54-bit rank multiplicity action encoding; landlord319/peasants430 static features; last15 public moves encoded5x162; networks do not use extra public bottom field"
+  },
+  "history_factorization": "LSTM once per public observation, head once per legal candidate; candidate chunks bounded for GPU transfer",
+  "simulator_device": "CPU Python",
+  "policy_devices": [
+    "CPU",
+    "single CUDA GPU; NVIDIA L4 actually tested"
+  ]
+}

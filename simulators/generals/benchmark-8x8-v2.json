@@ -1,0 +1,104 @@
+{
+  "schema_version": 2,
+  "environment_id": "generals-research-1v1-8x8-v2",
+  "upstream": {
+    "url": "https://github.com/strakam/generals-bots.git",
+    "commit": "954927f508aa47899019d66317cc313af3e9cc19",
+    "license": "MIT; upstream assets retain their individual notices"
+  },
+  "rules_source": "environment.py:RULESET",
+  "seeds": "seeds.json",
+  "action_count": 513,
+  "observation_shape": [
+    8,
+    8,
+    14
+  ],
+  "modes": {
+    "train": "JAX batched PPO; one learner seat per game, alternating at episode reset",
+    "evaluate": "both physical seats for each map/opponent; no shaping; player-visible policy",
+    "profile": "random legal-action simulator separately from current/history inference + PPO"
+  },
+  "training_opponents": [
+    "current",
+    "episode-frozen historical snapshots",
+    "uniform legal random",
+    "visible expansion heuristic"
+  ],
+  "heldout_opponents": [
+    "upstream MIT HunterAgent (never used by train/development eval)",
+    "external source-bound checkpoint"
+  ],
+  "score": {
+    "primary": "(capture_wins + 0.5*cap_draws) / games",
+    "diagnostics": [
+      "capture wins",
+      "capture losses",
+      "cap draws",
+      "illegal actions",
+      "seed-cluster bootstrap CI",
+      "per-seat score",
+      "final public land"
+    ],
+    "faults": "illegal actions, unresolved games, checksum/rules mismatches and simulator exceptions fail validation; never convert to policy loss"
+  },
+  "budgets": {
+    "unit": "allocated worker wall seconds / 3600 on one GPU machine with fixed attached CPU and RAM",
+    "included": [
+      "CPU simulation",
+      "transfers",
+      "compilation",
+      "inference",
+      "updates",
+      "development evaluation",
+      "idle GPU",
+      "checkpoint IO",
+      "setup inside allocation"
+    ],
+    "supervisor": "lease.py persists cumulative elapsed worker seconds and terminates at deadline; external scheduler defines actual hardware reservation",
+    "sample_limit": "optional bounded local smoke only; not a substitute for allocated-worker budget"
+  },
+  "recipes": {
+    "local_smoke": "recipes/8x8-smoke.json"
+  },
+  "caveats": [
+    "Small 8x8 1v1 standard on the pinned classic rules: fog, general trade enabled, no build-castles or deathtouch, 400-tick cap.",
+    "Same generator settings as the archived generals-research-1v1-8x8-v1 task; a new id because source, codec declaration and bindings differ.",
+    "Not live generals.io matchmaking and not the full-size task: full-v2 rates, checkpoints and reference bots do not qualify here.",
+    "Only local CPU validation of this ruleset so far; no GPU throughput or playing-strength measurement."
+  ],
+  "rules": {
+    "id": "generals-research-1v1-8x8-v2",
+    "grid_dims": [
+      8,
+      8
+    ],
+    "pad_to": 8,
+    "mountain_density_range": [
+      0.18,
+      0.24
+    ],
+    "num_castles_range": [
+      2,
+      3
+    ],
+    "castle_val_range": [
+      20,
+      26
+    ],
+    "min_generals_distance": 6,
+    "max_generals_distance": null,
+    "truncation": 400,
+    "num_players": 2,
+    "perfect_info": false,
+    "build_castles": false,
+    "deathtouch_turn": null,
+    "general_trade": true,
+    "timeout_score": "draw; zero terminal reward; bootstrap final visible value in training",
+    "reward": "capture +/-1; optional public potential shaping only in training",
+    "action_codec": "0 pass; 1+(((row*8+col)*4+direction)*2+split)",
+    "range_semantics": "Mountain and castle counts inclusive; castle army upper bound exclusive, as in pinned upstream",
+    "observation_codec": "9 spatial + 5 public scalar broadcast planes, normalized; no memory"
+  },
+  "historical_standard": "benchmark.json (8x8-v1) and benchmark-full-v2.json (full-size, git tag full-size-20261113) and their evidence are immutable records, not current qualification"
+}

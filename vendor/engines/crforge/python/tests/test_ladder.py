@@ -1,0 +1,632 @@
+"""Ladder battles on the game tables (--tables). Nothing here hard-codes game data: the expected
+values are read from the tables, the schema or the battle, or held as relations."""
+
+import json
+from pathlib import Path
+
+import numpy as np
+import pytest
+from gymnasium.utils.env_checker import check_env
+from pettingzoo.test import parallel_api_test
+
+from crforge_env import (
+    ClashGymEnv,
+    ClashParallelEnv,
+    LadderConfig,
+    SideSetup,
+    VectorBattle,
+    _jvm,
+    random_opponent,
+)
+from crforge_env.bench import draw_actions
+from tests.decks import BLUE, RED, arena
+
+pytestmark = pytest.mark.ladder
+
+
+def test_a_ladder_battle_starts_with_the_decks_towers_and_a_closed_hand(install, tables):
+    with VectorBattle(2, 1, install=install, tables=tables) as v:
+        v.reset([1, 2], BLUE, RED)
+        s = v.schema
+        assert v.data_version and v.content_sha and v.vocabulary_hash
+        assert v.vocabulary == sorted(v.vocabulary)
+        for i in range(2):
+            elixir = [s.field(v.observations[i, seat], "elixir") for seat in range(2)]
+            assert elixir[0] == elixir[1] > 0
+            for seat in range(2):
+                o = v.observations[i, seat]
+                assert s.field(o, "elixir_reserved") == 0
+                assert s.field(o, "play_open_in_ticks") > 0
+                rows = s.entities(o)
+                # Every entity at the start is a tower, and each tower the header lists has a row.
+                assert (rows[:, s.entity["kind"]] == s.kinds["tower"]).all()
+                towers = [n for n in s.header if n.endswith("_hp") and not n.endswith("max_hp")]
+                standing = [n for n in towers if s.field(o, n) > 0]
+                assert len(standing) == len(towers) == len(rows)
+                deck = BLUE if seat == 0 else RED
+                assert list(s.field(o, "deck")) == [v.card_id(c) for c in deck]
+                hand = list(s.field(o, "hand_card"))
+                assert set(hand) <= {v.card_id(c) for c in deck}
+                # Before the start cooldown the mask is the wait alone.
+                assert v.masks[i, seat].sum() == 1 and v.masks[i, seat, s.wait] == 1
+                observation_low, observation_high = s.observation_bounds(v.vocabulary_size)
+                assert ((o >= observation_low) & (o <= observation_high)).all()
+
+
+def test_the_mask_is_honoured_and_a_closed_action_is_counted_for_its_seat(install, tables):
+    with VectorBattle(4, 1, install=install, tables=tables) as v:
+        v.reset([1, 2, 3, 4], BLUE, RED)
+        s = v.schema
+        # A play before the start cooldown is closed: taken as a wait, counted for that seat.
+        closed = s.play(0, s.cols // 2, 2)
+        assert v.masks[0, 1, closed] == 0
+        v.step(np.array([[0, closed]] + [[0, 0]] * 3))
+        first, second = v.seat_info(0, 0), v.seat_info(0, 1)
+        assert (first["illegal"], second["illegal"]) == (0, 1)
+        assert second["last_refusal"] == "MASKED" and first["last_refusal"] == "NONE"
+        assert second["illegal_total"] == 1
+        # Random open actions are never refused as illegal, and some are played.
+        rng = np.random.default_rng(0)
+        played = 0
+        for _ in range(300):
+            actions = draw_actions(v.masks, rng, 0.5)
+            played += int((actions != 0).sum())
+            v.step(actions)
+            assert v.infos[:, s.info["illegal_0"]].sum() == 0
+            assert v.infos[:, s.info["illegal_1"]].sum() == 0
+        assert played > 0
+        assert all(v.fault(i) is None for i in range(4))
+
+
+def test_the_same_seeds_and_actions_give_the_same_observations(install, tables):
+    config = LadderConfig(max_ticks=600)
+    with (
+        VectorBattle(4, 1, install=install, tables=tables, config=config) as one,
+        VectorBattle(4, 4, install=install, tables=tables, config=config) as four,
+        VectorBattle(4, 1, install=install, tables=tables, config=config) as again,
+    ):
+        seeds = [1, 2, 3, 4]
+        for v in (one, four, again):
+            v.reset(seeds, BLUE, RED)
+        rng = np.random.default_rng(0)
+        for _ in range(150):
+            actions = draw_actions(one.masks, rng, 0.5)
+            for v in (one, four, again):
+                v.step(actions)
+            np.testing.assert_array_equal(one.observations, four.observations)
+            np.testing.assert_array_equal(one.observations, again.observations)
+            np.testing.assert_array_equal(one.masks, four.masks)
+            np.testing.assert_array_equal(one.infos, four.infos)
+            np.testing.assert_array_equal(one.rewards, again.rewards)
+
+
+def test_the_gym_env_plays_a_whole_battle(install, tables):
+    env = ClashGymEnv(BLUE, RED, install=install, tables=tables, opponent=random_opponent)
+    try:
+        observation, info = env.reset(seed=7)
+        rng = np.random.default_rng(7)
+        done = False
+        steps = 0
+        while not done:
+            mask = env.action_masks()
+            assert (mask == info["action_mask"].astype(bool)).all()
+            open_actions = np.flatnonzero(mask)
+            action = int(rng.choice(open_actions)) if rng.random() < 0.3 else 0
+            observation, reward, terminated, truncated, info = env.step(action)
+            assert env.observation_space.contains(observation)
+            assert info["illegal"] == 0
+            done = terminated or truncated
+            steps += 1
+            assert steps < 10_000
+        assert terminated and not truncated and info["fault"] == "none"
+        s = env.schema
+        result = s.field(observation, "result")
+        if info["winner"] == env.seat:
+            assert reward == 1.0 and result == s.results["won"]
+            assert info["crowns"] >= info["crowns_enemy"]
+        elif info["winner"] == s.winner_draw:
+            assert reward == 0.0 and result == s.results["draw"]
+        else:
+            assert info["winner"] == 1 - env.seat
+            assert reward == -1.0 and result == s.results["lost"]
+            assert info["crowns"] <= info["crowns_enemy"]
+        assert info["tick"] == s.field(observation, "tick") > 0
+    finally:
+        env.close()
+
+
+def test_a_tick_limit_truncates_with_no_result(install, tables):
+    config = LadderConfig(decision_ticks=5, max_ticks=50)
+    env = ClashParallelEnv(BLUE, RED, install=install, tables=tables, config=config)
+    try:
+        env.reset(seed=3)
+        for _ in range(100):
+            _, rewards, terminations, truncations, infos = env.step({})
+            if not env.agents:
+                break
+        assert truncations == {"seat_0": True, "seat_1": True}
+        assert not any(terminations.values())
+        assert rewards == {"seat_0": 0.0, "seat_1": 0.0}
+        assert infos["seat_0"]["winner"] == env.schema.winner_none
+        assert infos["seat_0"]["fault"] == "none"
+        assert infos["seat_0"]["tick"] >= config.max_ticks
+    finally:
+        env.close()
+
+
+def test_the_seats_see_each_other_from_their_own_frames(install, tables):
+    env = ClashParallelEnv(BLUE, RED, install=install, tables=tables)
+    try:
+        observations, infos = env.reset(seed=5)
+        s = env.schema
+        own = s.field(observations["seat_0"], "own_king_hp")
+        assert own == s.field(observations["seat_1"], "enemy_king_hp")
+        assert infos["seat_0"]["crowns"] == infos["seat_1"]["crowns_enemy"] == 0
+    finally:
+        env.close()
+
+
+def test_the_wrappers_pass_the_api_checks_on_a_battle(install, tables):
+    parallel = ClashParallelEnv(BLUE, RED, install=install, tables=tables)
+    try:
+        parallel_api_test(parallel, num_cycles=100)
+    finally:
+        parallel.close()
+    check_env(ClashGymEnv(BLUE, RED, install=install, tables=tables), skip_render_check=True)
+
+
+def test_a_saved_vocabulary_whose_ids_moved_is_refused(install, tables, tmp_path):
+    with VectorBattle(1, 1, install=install, tables=tables) as v:
+        path = tmp_path / "metadata.json"
+        v.write_metadata(path)
+        v.check_metadata(path)
+        saved = json.loads(path.read_text())
+        names = saved["vocabulary"]["names"]
+        moved = names[1]
+        names[0], names[1] = names[1], names[0]
+        with pytest.raises(ValueError, match=moved):
+            v.check_metadata(saved)
+        saved = json.loads(path.read_text())
+        saved["vocabulary"]["names"].append("NoSuchRow")
+        with pytest.raises(ValueError, match="NoSuchRow"):
+            v.check_metadata(saved)
+        saved = json.loads(path.read_text())
+        del saved["vocabulary"]
+        with pytest.raises(ValueError, match="no vocabulary"):
+            v.check_metadata(saved)
+
+
+def test_slot_flags_reach_the_match_and_the_seats_header(install, tables):
+    with VectorBattle(2, 1, install=install, tables=tables) as v:
+        s = v.schema
+        evolution = [s.slot_evolution] + [0] * (s.deck_size - 1)
+        v.reset([1, 2], BLUE, RED, slots0=[evolution, [0] * s.deck_size])
+        assert list(s.field(v.observations[0, 0], "deck_slot")) == evolution
+        assert not s.field(v.observations[1, 0], "deck_slot").any()
+        assert not s.field(v.observations[0, 1], "deck_slot").any()
+        for i in range(2):
+            for seat in range(2):
+                assert not s.field(v.observations[i, seat], "deck_evolution").any()
+        # A reset without flags plays every card plain again.
+        v.reset([1, 2], BLUE, RED)
+        assert not s.field(v.observations[0, 0], "deck_slot").any()
+        with pytest.raises(ValueError, match="slot flags"):
+            v.reset([1, 2], BLUE, RED, slots1=[0] * (s.deck_size - 1))
+        with pytest.raises(ValueError, match="slot flags"):
+            v.reset([1, 2], BLUE, RED, slots1=[4] + [0] * (s.deck_size - 1))
+    env = ClashGymEnv(BLUE, RED, install=install, tables=tables, seat=1, slots=evolution)
+    try:
+        observation, _ = env.reset(seed=3)
+        assert list(env.schema.field(observation, "deck_slot")) == evolution
+    finally:
+        env.close()
+
+
+def _rows(tables, table):
+    return json.loads((Path(tables) / f"{table}.json").read_text(encoding="utf-8"))
+
+
+def _card_rarity(tables, card):
+    """A deck card's rarity row (its columns), read from the deck card tables."""
+    for table in ("spells_characters", "spells_other", "spells_buildings"):
+        rows = _rows(tables, table)["rows"]
+        if card in rows:
+            return _rows(tables, "rarities")["rows"][rows[card]["columns"]["Rarity"]]["columns"]
+    raise AssertionError(f"no deck card {card}")
+
+
+def _tower_rows(v, observation):
+    """The (row name, level) of every tower a seat's observation shows, sorted."""
+    s = v.schema
+    rows = s.entities(observation)
+    towers = rows[rows[:, s.entity["kind"]] == s.kinds["tower"]]
+    return sorted(
+        (v.vocabulary[int(r[s.entity["row"]])], int(r[s.entity["level"]])) for r in towers
+    )
+
+
+def test_a_side_setup_places_its_tower_troop_and_gives_its_levels(install, tables):
+    config = LadderConfig(arena=arena(tables))
+    with VectorBattle(1, 1, install=install, tables=tables, config=config) as v:
+        support = _rows(tables, "support_cards")
+        built = _jvm.java_class("org.crforge.core.battle.replay.ReplayScenario")
+        princess = "King_PrincessTowers"
+        towers = next(
+            str(name)
+            for name in sorted(str(n) for n in built.BUILT_TOWER_SELECTIONS)
+            if name != princess and name in support["rows"]
+        )
+        selection = support["rows"][towers]
+        rarity = _rows(tables, "support_rarities")["rows"][selection["columns"]["Rarity"]]
+        top = rarity["columns"]["RelativeLevel"] + rarity["columns"]["LevelCount"]
+        king = max(
+            row["columns"]["SummonerLevel"] for row in _rows(tables, "exp_levels")["rows"].values()
+        )
+        # The highest level every card rarity holds: a level each card of the deck may stand at.
+        rarities = _rows(tables, "rarities")["rows"].values()
+        level = min(r["columns"]["RelativeLevel"] + r["columns"]["LevelCount"] for r in rarities)
+        setup = SideSetup(towers=towers, king_level=king, tower_level=top, card_levels=[level] * 8)
+
+        v.reset([3], BLUE, RED)
+        plain = _tower_rows(v, v.observations[0, 0])
+        v.reset([3], BLUE, RED, setup1=setup)
+        placed = _tower_rows(v, v.observations[0, 0])
+
+        # Side 0's towers are unchanged; side 1's king stands at its level and its two princess
+        # slots hold the tower troop's rows at the setup's level.
+        changed = [t for t in placed if t not in plain]
+        plain_names = {name for name, _ in plain}
+        troop = [t for t in changed if t[0] not in plain_names]
+        assert [lvl for _, lvl in troop] == [top, top]
+        assert [lvl for name, lvl in changed if name in plain_names] == [king]
+
+        # A written replay names the tower selection and each deck card's level.
+        deck = json.loads(v.replay_json(0))["battle"]["deck1"]
+        expected = int(support["id"]) * 1_000_000 + selection["index"]
+        assert deck["sc"][0]["d"] == expected
+        for card, entry in zip(RED, deck["sp"], strict=True):
+            assert entry["l"] + _card_rarity(tables, card)["RelativeLevel"] + 1 == level
+
+        with pytest.raises(ValueError, match="NoSuchTowers"):
+            v.reset([3], BLUE, RED, setup1=SideSetup(towers="NoSuchTowers"))
+        with pytest.raises(ValueError, match="one per environment"):
+            v.reset([3], BLUE, RED, setup0=[setup, setup])
+    env = ClashGymEnv(BLUE, RED, install=install, tables=tables, opponent_setup=setup)
+    try:
+        env.reset(seed=3)
+        assert _tower_rows(env.vector, env.vector.observations[0, 0]) == placed
+    finally:
+        env.close()
+
+
+def test_an_episode_starts_mid_match_on_a_replay_as_its_seats_saw_it(install, tables):
+    config = LadderConfig(arena=arena(tables))
+    with VectorBattle(2, 1, install=install, tables=tables, config=config) as v:
+        v.set_autoreset(False)
+        v.reset([5, 6], BLUE, RED)
+        rng = np.random.default_rng(2)
+        start = 300
+        seen = None
+        while v.seat_info(0, 0)["tick"] < 2 * start:
+            v.step(draw_actions(v.masks, rng, 0.3))
+            if v.seat_info(0, 0)["tick"] == start:
+                seen = (v.observations[0].copy(), v.masks[0].copy())
+        assert seen is not None
+        replay = v.replay_json(0)
+
+        v.start_from_replay(1, replay, start)
+
+        # Both seats are shown what they were shown at the start tick when they played it.
+        assert v.seat_info(1, 0)["tick"] == start
+        assert (v.observations[1] == seen[0]).all()
+        assert (v.masks[1] == seen[1]).all()
+        assert not v.dones[1]
+        v.step(draw_actions(v.masks, rng, 0.3))
+        assert v.seat_info(1, 0)["tick"] == start + int(v.metadata["config"]["decision_ticks"])
+
+        with pytest.raises(ValueError, match="environment 1"):
+            v.start_from_replay(1, replay, start + 1)
+        with pytest.raises(ValueError, match="end tick"):
+            v.start_from_replay(1, replay, 100 * start)
+    env = ClashGymEnv(BLUE, RED, install=install, tables=tables, config=config, seat=1)
+    try:
+        observation, info = env.reset(options={"replay": replay, "start_tick": start})
+        assert info["tick"] == start
+        assert (observation == seen[0][1]).all()
+    finally:
+        env.close()
+
+
+def test_the_ability_actions_stay_closed_with_no_champion(install, tables):
+    with VectorBattle(2, 1, install=install, tables=tables) as v:
+        v.reset([1, 2], BLUE, RED)
+        s = v.schema
+        rng = np.random.default_rng(1)
+        for _ in range(200):
+            assert not v.masks[:, :, s.first_ability :].any()
+            assert (v.observations[:, :, list(s.header["ability_unit"])] == -1).all()
+            v.step(draw_actions(v.masks, rng, 0.5))
+        # An ability action given anyway is closed: taken as a wait and counted.
+        v.step(np.array([[s.ability(0), 0], [0, s.ability(1)]]))
+        assert v.seat_info(0, 0)["last_refusal"] == "MASKED"
+        assert v.seat_info(1, 1)["last_refusal"] == "MASKED"
+
+
+def test_a_card_not_in_the_tables_is_refused(install, tables):
+    with VectorBattle(1, 1, install=install, tables=tables) as v:
+        with pytest.raises(ValueError, match="Archers"):
+            v.reset([1], [*BLUE[:1], "Archers", *BLUE[2:]], RED)
+
+
+# Three champion cards in one deck: a battle whose setup the battle core refuses.
+THREE_CHAMPIONS = [
+    "ArcherQueen",
+    "GoldenKnight",
+    "SkeletonKing",
+    "Knight",
+    "Archer",
+    "Musketeer",
+    "Giant",
+    "MiniPekka",
+]
+
+
+def test_a_fault_writes_a_bundle_whose_folder_the_fault_info_names(install, tables, tmp_path):
+    folder = tmp_path / "bundles"
+    with VectorBattle(
+        1,
+        1,
+        install=install,
+        tables=tables,
+        config=LadderConfig(fault_bundles=folder, arena=arena(tables)),
+    ) as v:
+        v.reset([3], THREE_CHAMPIONS, RED)
+        fault = v.fault(0)
+        assert fault is not None and fault.kind == "refusal"
+        bundle = Path(fault.bundle)
+        assert bundle.parent == folder.resolve()
+        record = json.loads((bundle / "fault.json").read_text(encoding="utf-8"))
+        assert record["kind"] == "refusal"
+        assert record["signature"] == fault.signature
+        assert record["data_version"] == v.data_version
+        assert record["content_sha"] == v.content_sha
+        assert record["seed"] == 3
+        assert record["decks"] == [THREE_CHAMPIONS, RED]
+        assert record["replay"] == "replay.json"
+        replay = json.loads((bundle / "replay.json").read_text(encoding="utf-8"))
+        assert replay["capture"]["content_sha"] == v.content_sha
+        for seat in range(2):
+            info = v.seat_info(0, seat)
+            assert info["fault"] == "refusal"
+            assert info["fault_bundle"] == fault.bundle
+    # Off by default: the fault is kept, no bundle is written.
+    with VectorBattle(1, 1, install=install, tables=tables) as v:
+        v.reset([3], THREE_CHAMPIONS, RED)
+        assert v.fault(0).bundle is None
+        assert v.seat_info(0, 0)["fault_bundle"] == ""
+
+
+def test_a_written_replay_names_the_configured_arena_and_none_is_refused(install, tables):
+    # Each player's avatar names the arena LadderConfig.arena names, by its row's data id: the
+    # arenas table's id times a million plus the row's index, read from the tables.
+    document = json.loads((Path(tables) / "arenas.json").read_text(encoding="utf-8"))
+    name = arena(tables)
+    expected = int(document["id"]) * 1_000_000 + document["rows"][name]["index"]
+    config = LadderConfig(arena=name)
+    with VectorBattle(1, 1, install=install, tables=tables, config=config) as v:
+        v.reset([3], BLUE, RED)
+        battle = json.loads(v.replay_json(0))["battle"]
+        assert [battle[f"avatar{side}"]["arena"] for side in range(2)] == [expected, expected]
+    # With no arena named, writing a fresh episode is refused, naming the setting.
+    with VectorBattle(1, 1, install=install, tables=tables) as v:
+        v.reset([3], BLUE, RED)
+        with pytest.raises(Exception, match=r"EnvConfig\.arena"):
+            v.replay_json(0)
+
+
+def test_the_landing_mask_closes_tiles_and_the_old_rule_is_kept_apart(install, tables, tmp_path):
+    # The default mask opens only the tiles a card lands on unmoved; the old rule every tile of an
+    # open slot. The rule is kept apart from the schema and the configuration, so an export of one
+    # rule passes the other's check: a model trained under one is read under the other.
+    with (
+        VectorBattle(1, 1, install=install, tables=tables) as landing,
+        VectorBattle(
+            1, 1, install=install, tables=tables, config=LadderConfig(mask_version=1)
+        ) as old,
+    ):
+        assert landing.mask_version == 2 and old.mask_version == 1
+        assert landing.metadata["schema"] == old.metadata["schema"]
+        assert landing.metadata["config"] == old.metadata["config"]
+        path = tmp_path / "old.json"
+        old.write_metadata(path)
+        landing.check_metadata(path)
+        s = landing.schema
+        partial = full = 0
+        for v in (landing, old):
+            v.reset([5], BLUE, RED)
+            for _ in range(60):
+                v.step(np.zeros((1, 2), dtype=np.int32))
+            for seat in range(2):
+                plays = v.masks[0, seat, 1 : s.first_ability].reshape(s.hand_slots, -1)
+                for slot in plays:
+                    if slot.any() and v is landing:
+                        partial += int(not slot.all())
+                    if slot.any() and v is old:
+                        full += int(slot.all())
+                        assert slot.all()
+        assert partial > 0 and full > 0
+    with pytest.raises(Exception, match="mask version"):
+        VectorBattle(1, 1, install=install, tables=tables, config=LadderConfig(mask_version=3))
+
+
+def test_each_seat_numbers_its_entities_in_order_of_first_sight(install, tables):
+    # An episode's first rows are numbered 0, 1, 2, ... in row order in each seat, whatever the
+    # battle's own ids; the rule is exported apart from the schema.
+    with VectorBattle(1, 1, install=install, tables=tables) as v:
+        assert v.id_version == 2
+        assert "id_version" not in v.metadata["schema"]
+        for seed in (3, 4):
+            v.reset([seed], BLUE, RED)
+            for seat in range(2):
+                ids = v.schema.columns(v.observations[0, seat])["id"]
+                assert len(ids) > 0 and list(ids) == list(range(len(ids)))
+
+
+def test_the_new_fields_hold_their_bounds_and_the_buffs_their_own_list(install, tables, tmp_path):
+    with VectorBattle(2, 1, install=install, tables=tables) as v:
+        v.reset([7, 8], BLUE, RED)
+        s = v.schema
+        assert v.buff_names == sorted(v.buff_names) and len(v.buff_names) > 0
+        assert v.max_elixir > 0
+        low, high = s.observation_bounds(v.vocabulary_size, len(v.buff_names))
+        rng = np.random.default_rng(1)
+        buffs = plays = 0
+        for _ in range(400):
+            v.step(draw_actions(v.masks, rng, 0.4))
+            for i in range(2):
+                for seat in range(2):
+                    o = v.observations[i, seat]
+                    assert ((o >= low) & (o <= high)).all()
+                    columns = s.columns(o)
+                    buffs += int((columns["buff_count"] > 0).sum())
+                    plays += int(s.field(o, "enemy_play_count"))
+                    # The enemy's elixir as counted stays within the bar.
+                    assert (
+                        0 <= s.field(o, "enemy_elixir") <= v.max_elixir * s.scales["elixir_scale"]
+                    )
+        assert buffs > 0 and plays > 0
+        # A saved export whose buff list moved is refused, as one whose ids moved.
+        path = tmp_path / "metadata.json"
+        v.write_metadata(path)
+        saved = json.loads(path.read_text())
+        names = saved["vocabulary"]["buff_names"]
+        names[0], names[1] = names[1], names[0]
+        with pytest.raises(ValueError, match="buff"):
+            v.check_metadata(saved)
+
+
+def test_autoreset_battles_start_at_seeds_of_the_range_given(install, tables):
+    # A tick limit ends each episode within ten decisions, so the autoreset runs often.
+    config = LadderConfig(decision_ticks=5, max_ticks=50, arena=arena(tables))
+    low, high = 10_000_000, 2**31 - 1
+    with VectorBattle(3, 2, install=install, tables=tables, config=config) as v:
+        v.set_autoreset_seeds(low, high)
+        v.reset([1, 2, 3], BLUE, RED)
+        restarts = 0
+        for _ in range(40):
+            v.step()
+            for i in np.flatnonzero(v.infos[:, v.schema.info["reset"]]):
+                seed = v.episode_seed(int(i))
+                assert low <= seed <= high
+                # The battle plays the seed the vector reports.
+                assert json.loads(v.replay_json(int(i)))["rndSeed"] == seed
+                restarts += 1
+        assert restarts >= 3
+
+
+def test_a_look_ahead_plays_forks_and_leaves_the_battles_as_they_were(install, tables):
+    with VectorBattle(2, 2, install=install, tables=tables) as v:
+        v.reset([5, 6], BLUE, RED)
+        s = v.schema
+        rng = np.random.default_rng(3)
+        for _ in range(200):
+            v.step(draw_actions(v.masks, rng, 0.3))
+        while not v.masks[0, 0, 1 : s.first_ability].any():
+            v.step(np.zeros((2, 2), dtype=np.int32))
+        play = 1 + int(np.flatnonzero(v.masks[0, 0, 1 : s.first_ability])[0])
+        before = (v.observations.copy(), v.masks.copy(), v.infos.copy())
+        indices = np.array([0, 0, 1])
+        seats = np.array([0, 0, 1])
+        actions = np.array([s.wait, play, s.wait])
+        observations, infos = v.lookahead(indices, seats, actions, 160)
+        assert observations.shape == (3, s.seat_ints) and infos.shape == (3, s.info_ints)
+        assert (infos[:, s.info["fault"]] == 0).all()
+        assert (infos[:, s.info["tick"]] >= v.infos[indices, s.info["tick"]] + 160).all()
+        assert (observations[:, s.header["seat"][0]] == seats).all()
+        assert not np.array_equal(observations[0], observations[1])
+        again, _ = v.lookahead(indices, seats, actions, 160)
+        assert np.array_equal(again, observations)
+        for now, then in zip((v.observations, v.masks, v.infos), before, strict=True):
+            assert np.array_equal(now, then)
+
+
+def test_a_fork_put_into_a_vector_steps_on_as_the_battle(install, tables):
+    with (
+        VectorBattle(1, 1, install=install, tables=tables) as source,
+        VectorBattle(3, 2, install=install, tables=tables) as forks,
+    ):
+        source.reset([7], BLUE, RED)
+        forks.reset([1, 2, 3], BLUE, RED)
+        rng = np.random.default_rng(5)
+        for _ in range(150):
+            source.step(draw_actions(source.masks, rng, 0.3))
+        forks.fork_from(source, 0, -1, [0, 2])
+        for _ in range(60):
+            for target in (0, 2):
+                assert np.array_equal(forks.observations[target], source.observations[0])
+                assert np.array_equal(forks.masks[target], source.masks[0])
+                assert forks.dones[target] == 0
+            actions = draw_actions(source.masks, rng, 0.3)
+            source.step(actions)
+            forks.step(np.concatenate([actions, np.zeros((1, 2), np.int32), actions]))
+            if source.dones[0]:
+                break
+        with pytest.raises(ValueError):
+            forks.fork_from(forks, 1, -1, [1])
+
+
+def test_a_seats_fork_draws_from_the_seeds_it_is_given(install, tables):
+    with (
+        VectorBattle(1, 1, install=install, tables=tables) as source,
+        VectorBattle(3, 2, install=install, tables=tables) as forks,
+    ):
+        source.reset([7], BLUE, RED)
+        forks.reset([1, 2, 3], BLUE, RED)
+        rng = np.random.default_rng(6)
+        for _ in range(150):
+            source.step(draw_actions(source.masks, rng, 0.3))
+        with pytest.raises(ValueError):
+            forks.fork_from(source, 0, 0, [0, 1])
+        with pytest.raises(ValueError):
+            forks.fork_from(source, 0, 0, [0, 1], seeds=[4])
+        forks.fork_from(source, 0, 0, [0, 1, 2], shuffles=[9, 9, 9], seeds=[4, 4, 5])
+        assert (forks.dones == 0).all()
+        for _ in range(40):
+            forks.step(np.repeat(draw_actions(forks.masks[:1], rng, 0.3), 3, axis=0))
+            # The same shuffle and the same seed make the same fork.
+            assert np.array_equal(forks.observations[0], forks.observations[1])
+            if forks.dones[0]:
+                break
+
+
+def test_a_seats_fork_deals_the_unseen_cards_given(install, tables):
+    believed = ["Valkyrie", "HogRider", "Wizard", "Bomber", "Barbarians", "MegaMinion"]
+    believed += ["Minions", "SpearGoblins"]
+    with (
+        VectorBattle(1, 1, install=install, tables=tables) as source,
+        VectorBattle(2, 2, install=install, tables=tables) as forks,
+    ):
+        source.reset([7], BLUE, RED)
+        forks.reset([1, 2], BLUE, RED)
+        rng = np.random.default_rng(6)
+        for _ in range(100):
+            source.step(draw_actions(source.masks, rng, 0.3))
+        seen = source.enemy_seen(0, 0)
+        slots = source.enemy_unseen_slots(0, 0)
+        assert set(seen) <= set(RED)
+        assert len(seen) + len(slots) == len(RED)
+        given = [c for c in believed if c not in RED][: len(slots)]
+        assert len(given) == len(slots)
+        with pytest.raises(ValueError):
+            forks.fork_from(source, 0, 0, [0], [1], [1], unseen_cards=[given[:-1]])
+        forks.fork_from(
+            source, 0, 0, [0, 1], [1, 2], [1, 2], unseen_cards=[given, given], unseen_slots=None
+        )
+        forks.step(np.zeros((2, 2), dtype=np.int32))
+        # The enemy's own view holds only cards seen or given, none of its real unseen ones.
+        hand = list(forks.schema.header["hand_card"])
+        allowed = {forks.vocabulary.index(c) for c in seen + given}
+        for target in (0, 1):
+            ids = forks.observations[target, 1, hand]
+            assert set(ids[ids >= 0].tolist()) <= allowed
+        assert (forks.dones == 0).all()

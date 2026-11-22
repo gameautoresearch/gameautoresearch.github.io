@@ -1,0 +1,7 @@
+{
+  "command": "python experiments/gpu_resident_train.py --config {config} --arch configs/architecture.json --run-root /scratch/runs --run-id {name} --seconds {seconds} --games {trainer[games]} --sets {trainer[sets]} --ring {trainer[ring]}",
+  "output": "/scratch/runs/{name}",
+  "fallback": "ls -d /scratch/runs/{name}/exports/update-* 2>/dev/null | sort -V | tail -n 1",
+  "shape": {"gpu": 1, "cpu": 4, "memory": 16},
+  "reserve_seconds": 180
+}

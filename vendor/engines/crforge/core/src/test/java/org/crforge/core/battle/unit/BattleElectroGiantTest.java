@@ -1,0 +1,833 @@
+/*
+ * crforge - https://github.com/voonhous/crforge
+ * SPDX-License-Identifier: Apache-2.0
+ * Porting this code? Please cite this file and the commit you read: see the README.
+ */
+
+package org.crforge.core.battle.unit;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+
+import com.fasterxml.jackson.databind.node.ObjectNode;
+import java.io.IOException;
+import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.List;
+import org.crforge.core.battle.BattleEntity;
+import org.crforge.core.battle.GameData;
+import org.crforge.core.battle.Shipped;
+import org.crforge.core.battle.action.DamageType;
+import org.crforge.core.battle.data.GameRow;
+import org.crforge.core.battle.data.GameTables;
+import org.crforge.core.battle.projectile.ProjectileEntity;
+import org.crforge.core.pathfinding.GridEntityState;
+import org.crforge.core.pathfinding.combat.DamageResult;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
+
+/**
+ * The Electro Giant's reflect where the reference runs leave it: the reach, strict and counted from
+ * both radii; an area effect never struck back; nothing while the Giant is stunned; the damage once
+ * per attack while every hit of it re-applies the buff; a dying Giant still striking back, but not
+ * at a hit that finds it already down; a building that is no crown tower taking the ordinary
+ * damage; an area hit struck back; nothing for its own side or a shot whose row ignores the
+ * reflect; the reflected damage queued at the end of the damage drain, so a hit queued after the
+ * one struck back meets the attacker's shield first and fells a Giant before a Night Witch it
+ * strikes back dies, whose child then never takes the fallen Giant; a death the reflected damage
+ * causes; a rider's shot struck back at its parent; a damage-taking action's hit struck back at the
+ * character that caused it and never at an area effect; an unkillable attacker held at 1 hit point
+ * by the reflected damage; an evolved Giant's pulse debuff, handed to a Goblin Giant's riders,
+ * lowering them on the Giant's step; and the hits the battle refuses.
+ */
+class BattleElectroGiantTest {
+
+  private static final int LEVEL = Standard1v1Battle.DEFAULT_LEVEL;
+
+  /** The Electro Giant's point, on the bottom side's left, away from every tower. */
+  private static final int X = 3500;
+
+  private static final int Y = 11000;
+
+  /** A point on the top side's left, just past the river, which a bottom-side play can reach. */
+  private static final int TOP_Y = 17500;
+
+  /** The Electro Giant's row, whose reflect columns the expected values read. */
+  private static final GameRow GIANT = Shipped.unitRow("ElectroGiant");
+
+  /** The buff the reflect hands the attacker. */
+  private static final String BUFF = Shipped.text(GIANT, "ReflectedAttackBuff");
+
+  /** The reflect's radius plus the Electro Giant's radius and a Musketeer's. */
+  private static final int MUSKETEER_REACH =
+      Shipped.number(GIANT, "ReflectedAttackRadius")
+          + Shipped.number(GIANT, "CollisionRadius")
+          + Shipped.number(Shipped.unitRow("Musketeer"), "CollisionRadius");
+
+  /** A battle with the towers passive, one Electro Giant that never moves, and every reflect. */
+  private static final class Scene {
+    final Standard1v1Battle match;
+    final List<Reflection> reflections = new ArrayList<>();
+    final CharacterEntity giant;
+    int tick;
+
+    Scene() {
+      this(GameData.tables());
+    }
+
+    Scene(GameTables tables) {
+      match = new Standard1v1Battle(tables, LEVEL, false);
+      match
+          .getWorld()
+          .addObserver(
+              new WorldObserver() {
+                @Override
+                public void reflected(int t, Reflection reflection) {
+                  reflections.add(reflection);
+                }
+              });
+      giant = still(0, 0, "ElectroGiant", X, Y, "giant");
+    }
+
+    /** A unit placed at a tick that never moves, under a name of its own. */
+    CharacterEntity still(int at, int side, String row, int x, int y, String name) {
+      CharacterEntity unit =
+          match.deploy(at, match.getWorld().getRecords().unit(row), LEVEL, side, x, y, name);
+      unit.setActive(CharacterEntity.MOVEMENT_SLOT, false);
+      return unit;
+    }
+
+    void step(int ticks) {
+      for (int i = 0; i < ticks; i++) {
+        match.getBattle().step();
+        tick++;
+      }
+    }
+
+    /** The reflects of hits whose source is the named unit. */
+    List<Reflection> from(String name) {
+      return reflections.stream()
+          .filter(r -> r.source() != null && r.source().name().equals(name))
+          .toList();
+    }
+
+    /** Whether the battle holds an entity of the row. */
+    boolean holds(String row) {
+      for (BattleEntity entity : match.getBattle().getHolder().entities()) {
+        if (entity instanceof WorldEntity unit && unit.getData().name().equals(row)) {
+          return true;
+        }
+      }
+      return false;
+    }
+  }
+
+  @Test
+  @DisplayName(
+      "a shot from strictly inside the reflect radius plus both radii is struck back, one from"
+          + " exactly that far is not")
+  void theReach() {
+    Scene scene = new Scene();
+    scene.still(0, 1, "Musketeer", X, Y + MUSKETEER_REACH - 1, "inside");
+    scene.still(0, 1, "Musketeer", X + MUSKETEER_REACH, Y, "edge");
+    scene.step(60);
+
+    assertThat(scene.from("inside")).isNotEmpty();
+    Reflection first = scene.from("inside").get(0);
+    assertThat(first.buff()).isEqualTo(BUFF);
+    assertThat(first.buffTimeMs()).isEqualTo(Shipped.number(GIANT, "ReflectedAttackBuffDuration"));
+    assertThat(first.damage()).isEqualTo(reflectedDamage());
+    assertThat(first.attacker()).isInstanceOf(ProjectileEntity.class);
+    assertThat(scene.from("edge")).isNotEmpty().allSatisfy(r -> assertThat(r.buff()).isNull());
+  }
+
+  @Test
+  @DisplayName(
+      "a Zap written in the hit-switch form, an area effect, is not struck back, and while its stun"
+          + " holds the Giant strikes back at nothing")
+  void anAreaEffectAndAStun(@TempDir Path folder) throws IOException {
+    // The configured Zap is in the filter form, whose damage is a typed hit (see
+    // aFilterFormZapIsStruckBack); written with its hit switches it deals a plain area hit.
+    GameTables tables =
+        GameData.altered(
+            folder,
+            "area_effect_objects",
+            rows -> {
+              ObjectNode zap = GameData.columns(rows, "Zap");
+              zap.remove("Filter");
+              zap.put("HitsAir", true);
+              zap.put("HitsGround", true);
+              zap.put("OnlyEnemies", true);
+              zap.put("Damage", 75);
+              zap.put("CrownTowerDamagePercent", -70);
+            });
+    Scene scene = new Scene(tables);
+    CharacterEntity knight = scene.still(0, 1, "Knight", X, Y + 1500, "knight");
+    // Hold the Knight back until the Zap has landed.
+    knight.setActive(CharacterEntity.TARGETING_SLOT, false);
+    scene.step(25);
+    scene.match.placeAreaEffect(scene.tick, "Zap", LEVEL, 1, X, Y, "Z");
+    scene.step(1);
+
+    assertThat(scene.reflections).hasSize(1);
+    Reflection zap = scene.reflections.get(0);
+    assertThat(zap.attacker()).isInstanceOf(AreaEffectEntity.class);
+    assertThat(zap.source()).isNull();
+    assertThat(zap.buff()).isNull();
+    assertThat(knight.getHitPoints().getHitPoints()).isEqualTo(knight.getHitPoints().getMaximum());
+
+    scene.step(30);
+    List<Reflection> knights = scene.from("knight");
+    assertThat(knights).isNotEmpty();
+    // The Zap's stun lasts ten visits; a hit while it holds is reflected by nothing.
+    assertThat(knights.stream().filter(r -> r.hitSpeed() < 1))
+        .allSatisfy(r -> assertThat(r.buff()).isNull());
+    assertThat(knights.stream().filter(r -> r.hitSpeed() >= 1))
+        .allSatisfy(r -> assertThat(r.damage()).isEqualTo(reflectedDamage()));
+  }
+
+  @Test
+  @DisplayName(
+      "the configured Zap, of the filter form, whose damage is a typed hit with the area effect as"
+          + " its attacker, is not struck back: nothing in reach takes the buff or the damage")
+  void aFilterFormZapIsNotStruckBack() {
+    Scene scene = new Scene();
+    // A unit of the Zap's side well inside the reflect's reach, which a reflect would strike if
+    // the hit named it.
+    CharacterEntity knight = scene.still(0, 1, "Knight", X, Y + 1500, "knight");
+    knight.setActive(CharacterEntity.TARGETING_SLOT, false);
+    scene.step(25);
+    int giantBefore = scene.giant.getHitPoints().getHitPoints();
+    scene.match.placeAreaEffect(scene.tick, "Zap", LEVEL, 1, X, Y, "Z");
+    scene.step(1);
+
+    // The Zap's typed hit landed on the Giant and reached its reflect.
+    assertThat(scene.giant.getHitPoints().getHitPoints()).isLessThan(giantBefore);
+    assertThat(scene.reflections).hasSize(1);
+    Reflection zap = scene.reflections.get(0);
+    assertThat(zap.attacker()).isInstanceOf(AreaEffectEntity.class);
+    assertThat(zap.source()).isNull();
+    assertThat(zap.struck()).isNull();
+    assertThat(zap.buff()).isNull();
+    assertThat(zap.damage()).isZero();
+    assertThat(knight.getHitPoints().getHitPoints()).isEqualTo(knight.getHitPoints().getMaximum());
+    assertThat(knight.getBuffs().carries(BUFF)).isFalse();
+  }
+
+  @Test
+  @DisplayName(
+      "an Electro Wizard's deploy zap, a typed hit from its area effect, is not struck back at the"
+          + " Electro Wizard standing in reach")
+  void anElectroWizardsZapIsNotStruckBack() {
+    Scene scene = new Scene();
+    // A second Electro Giant, for the top side just past the river, which a bottom-side play can
+    // reach: the Electro Wizard lands inside its reflect's reach and its deploy zap on it.
+    CharacterEntity top = scene.still(0, 1, "ElectroGiant", X, TOP_Y, "top");
+    scene.step(25);
+    int before = top.getHitPoints().getHitPoints();
+    scene.match.play(
+        scene.tick, GameData.card("ElectroWizard"), LEVEL, 0, X, TOP_Y - 2500, "wizard");
+    scene.step(1);
+
+    // The zap's typed hit landed on the Giant and reached its reflect, which struck nothing back.
+    assertThat(top.getHitPoints().getHitPoints()).isLessThan(before);
+    List<Reflection> onTop = scene.reflections.stream().filter(r -> r.target() == top).toList();
+    assertThat(onTop).hasSize(1);
+    assertThat(onTop.get(0).attacker()).isInstanceOf(AreaEffectEntity.class);
+    assertThat(onTop.get(0).source()).isNull();
+    assertThat(onTop.get(0).buff()).isNull();
+    CharacterEntity wizard = scene.match.getPlays().get(0).units().get(0);
+    assertThat(wizard.getHitPoints().getHitPoints()).isEqualTo(wizard.getHitPoints().getMaximum());
+    assertThat(wizard.getBuffs().carries(BUFF)).isFalse();
+  }
+
+  @Test
+  @DisplayName(
+      "a typed hit a character deals to a reflecting unit, whose reflect no reference reaches, is"
+          + " refused")
+  void aTypedHitFromACharacterIsRefused() {
+    Scene scene = new Scene();
+    CharacterEntity knight = scene.still(0, 1, "Knight", X, Y + 1500, "knight");
+    scene.step(25);
+    BattleWorld world = scene.match.getWorld();
+    // The damage type the Electro Wizard's deploy zap deals, dealt here with a character source.
+    String typeName =
+        Shipped.text(Shipped.row("area_effect_objects", "ElectroWizardZap"), "Damage");
+    DamageType type = world.getActions().damageType(typeName, world.binding(knight));
+
+    // The typed hit is queued, and refused as the next step's damage drain deals it.
+    assertThatThrownBy(
+            () -> {
+              world.getHits().queueTypedHit(knight, scene.giant, type, 100);
+              scene.step(1);
+            })
+        .isInstanceOf(UnsupportedOperationException.class)
+        .hasMessageContaining("reflects and takes a typed hit");
+  }
+
+  @Test
+  @DisplayName(
+      "a Three Musketeers bayonet, a damage-taking action's hit the musketeer caused, is struck back"
+          + " at the musketeer as any hit: the buff and the reflected damage")
+  void aBayonetIsStruckBack() {
+    Scene scene = new Scene();
+    scene.giant.setActive(CharacterEntity.TARGETING_SLOT, false);
+    // Inside the bayonet's range of a ground target and inside the reflect's reach.
+    CharacterEntity musketeer =
+        scene.still(0, 1, "ThreeMusketeer_Rework_Character_1", X, Y + 1500, "musketeer");
+    while (scene.from("musketeer").isEmpty() && scene.tick < 120) {
+      scene.step(1);
+    }
+
+    List<Reflection> bayonets = scene.from("musketeer");
+    assertThat(bayonets).hasSize(1);
+    Reflection first = bayonets.get(0);
+    assertThat(first.attacker()).isSameAs(musketeer);
+    assertThat(first.struck()).isSameAs(musketeer);
+    assertThat(first.buff()).isEqualTo(BUFF);
+    assertThat(first.damage()).isEqualTo(reflectedDamage());
+    assertThat(musketeer.getHitPoints().getHitPoints())
+        .isEqualTo(musketeer.getHitPoints().getMaximum() - reflectedDamage());
+    assertThat(musketeer.getBuffs().carries(BUFF)).isTrue();
+  }
+
+  @Test
+  @DisplayName(
+      "an evolved Electro Giant's pulse, a damage-taking action its area effect runs, is not struck"
+          + " back at the evolved Giant standing in reach")
+  void anEvolvedPulseIsNotStruckBack() {
+    Scene scene = new Scene();
+    scene.giant.setActive(CharacterEntity.TARGETING_SLOT, false);
+    CharacterEntity evolved = scene.still(0, 1, "ElectroGiant_EV1", X, Y + 1500, "evolved");
+    evolved.setActive(CharacterEntity.TARGETING_SLOT, false);
+    // The debuff the pulse's hit group puts on what it hits, next to its damage-taking action.
+    String debuff = Shipped.fields("ElectroGiant_EV_Apply_Pulse_Debuff").path("SpawnData").asText();
+    while (!scene.giant.getBuffs().carries(debuff) && scene.tick < 200) {
+      scene.step(1);
+    }
+
+    // The pulse reached the Giant; no reflect struck anything back.
+    assertThat(scene.giant.getBuffs().carries(debuff)).isTrue();
+    assertThat(scene.reflections).allSatisfy(r -> assertThat(r.struck()).isNull());
+    assertThat(evolved.getHitPoints().getHitPoints())
+        .isEqualTo(evolved.getHitPoints().getMaximum());
+    assertThat(evolved.getBuffs().carries(BUFF)).isFalse();
+  }
+
+  @Test
+  @DisplayName(
+      "a damage-taking action's Reflected hit on a reflecting unit, which no reference reaches, is"
+          + " refused")
+  void aReflectedActionHitIsRefused(@TempDir Path folder) throws IOException {
+    GameTables reflected =
+        GameData.altered(
+            folder,
+            "actions",
+            rows ->
+                ((ObjectNode)
+                        GameData.fields(rows, "ThreeMusketeer_Rework_Bayonet_Attack_Deal_Damage")
+                            .get("Damage"))
+                    .put("Flags", "Reflected"));
+    Scene scene = new Scene(reflected);
+    scene.still(0, 1, "ThreeMusketeer_Rework_Character_1", X, Y + 1500, "musketeer");
+
+    assertThatThrownBy(() -> scene.step(120))
+        .isInstanceOf(UnsupportedOperationException.class)
+        .hasMessageContaining("reflects and takes a damage-taking action's Reflected hit");
+  }
+
+  @Test
+  @DisplayName(
+      "every pellet of one Hunter attack re-applies the buff, and only the first deals the damage")
+  void oncePerAttack() {
+    Scene scene = new Scene();
+    scene.still(0, 1, "Hunter", X, Y + 2000, "hunter");
+    scene.step(60);
+
+    List<Reflection> pellets = scene.from("hunter");
+    assertThat(pellets.size()).isGreaterThan(1);
+    assertThat(pellets).allSatisfy(r -> assertThat(r.buff()).isEqualTo(BUFF));
+    assertThat(pellets.stream().filter(r -> r.damage() > 0)).hasSize(1);
+  }
+
+  @Test
+  @DisplayName(
+      "the hit that kills the Giant is still struck back, before its own death; a building that is"
+          + " no crown tower takes the ordinary damage")
+  void aDyingGiantAndABuilding() {
+    Scene scene = new Scene();
+    CharacterEntity cannon = scene.still(0, 1, "Cannon", X + 1500, Y + 1000, "cannon");
+    scene.step(30);
+    int before = cannon.getHitPoints().getHitPoints();
+    scene.giant.getHitPoints().setHitPoints(1);
+    while (scene.from("cannon").isEmpty() && scene.tick < 200) {
+      scene.step(1);
+    }
+
+    Reflection last = scene.from("cannon").get(0);
+    assertThat(last.damage()).isEqualTo(reflectedDamage());
+    assertThat(last.hitPointsBefore()).isLessThanOrEqualTo(before);
+    assertThat(scene.giant.getHitPoints().getHitPoints()).isZero();
+  }
+
+  @Test
+  @DisplayName("a Valkyrie's area hit, which no shot carries, is struck back at the Valkyrie")
+  void anAreaHit() {
+    Scene scene = new Scene();
+    CharacterEntity valkyrie = scene.still(0, 1, "Valkyrie", X, Y + 1500, "valkyrie");
+    scene.step(60);
+
+    List<Reflection> hits = scene.from("valkyrie");
+    assertThat(hits).isNotEmpty();
+    assertThat(hits.get(0).attacker()).isSameAs(valkyrie);
+    assertThat(hits.get(0).buff()).isEqualTo(BUFF);
+    assertThat(hits.get(0).damage()).isEqualTo(reflectedDamage());
+  }
+
+  @Test
+  @DisplayName(
+      "the reflected damage waits behind the hits queued before it: a Night Witch it kills on the"
+          + " step another hit fells the Giant leaves a child that never takes the fallen Giant")
+  void theReflectedDamageWaitsItsTurn() {
+    Scene scene = new Scene();
+    CharacterEntity witch = scene.still(0, 1, "DarkWitch", X, Y + 1500, "witch");
+    CharacterEntity knight = scene.still(0, 1, "Knight", X + 6000, Y + 6000, "knight");
+    knight.setActive(CharacterEntity.TARGETING_SLOT, false);
+    List<Integer> giantHitPointsAtTheReflectedHit = new ArrayList<>();
+    scene
+        .match
+        .getWorld()
+        .addObserver(
+            new WorldObserver() {
+              @Override
+              public void reflectedHit(
+                  int t, WorldEntity reflector, WorldEntity struck, int damage, DamageResult r) {
+                giantHitPointsAtTheReflectedHit.add(reflector.getHitPoints().getHitPoints());
+              }
+            });
+    // Deployed, and no hit of its own yet: the witch's first hit waits for its load time.
+    scene.step(Shipped.number(Shipped.unitRow("DarkWitch"), "DeployTime") / 50 + 1);
+    witch.getHitPoints().setHitPoints(1);
+    scene.giant.getHitPoints().setHitPoints(10);
+    BattleWorld world = scene.match.getWorld();
+    // Both hits wait for the next drain, in this order: the witch's is struck back, the Knight's
+    // fells the Giant.
+    world.getHits().dealDirectHit(witch, scene.giant.getTargetView(), 1, 0, 0);
+    world.getHits().dealDirectHit(knight, scene.giant.getTargetView(), 100, 0, 0);
+    scene.step(1);
+
+    // The witch's reflected damage was dealt after the Knight's hit: the Giant was down.
+    assertThat(giantHitPointsAtTheReflectedHit).containsExactly(0);
+    assertThat(witch.getHitPoints().getHitPoints()).isZero();
+    String child = Shipped.text(Shipped.unitRow("DarkWitch"), "DeathSpawnCharacter");
+    CharacterEntity made = null;
+    for (BattleEntity entity : scene.match.getBattle().getHolder().entities()) {
+      if (entity instanceof CharacterEntity unit && unit.getData().name().equals(child)) {
+        made = unit;
+      }
+    }
+    assertThat(made).isNotNull();
+    // So the child the witch left, made after both hits, walked on rather than starting an attack
+    // on a Giant that was already down.
+    assertThat(made.getUnit().entity().getState()).isEqualTo(GridEntityState.MOVING);
+    assertThat(made.getUnit().targeting().getReference())
+        .isNotNull()
+        .isNotSameAs(scene.giant.getTargetView());
+  }
+
+  @Test
+  @DisplayName(
+      "a second hit on the tick the Giant falls, which finds it with no hit points, is not struck"
+          + " back")
+  void aGiantAlreadyDown() {
+    Scene scene = new Scene();
+    CharacterEntity first = scene.still(0, 1, "Knight", X - 1300, Y, "first");
+    CharacterEntity second = scene.still(0, 1, "Knight", X + 1300, Y, "second");
+    scene.step(25);
+    scene.giant.getHitPoints().setHitPoints(1);
+    BattleWorld world = scene.match.getWorld();
+    world.getHits().dealDamage(first, scene.giant.getTargetView(), 100, 0, 0);
+    world.getHits().dealDamage(second, scene.giant.getTargetView(), 100, 0, 0);
+
+    assertThat(scene.giant.getHitPoints().getHitPoints()).isZero();
+    // The first hit's reflected damage waits in the damage queue for the next drain.
+    scene.step(1);
+    assertThat(scene.from("first")).hasSize(1);
+    assertThat(scene.from("second")).isEmpty();
+  }
+
+  @Test
+  @DisplayName("a hit from the Giant's own side is not struck back")
+  void aHitFromItsOwnSide() {
+    Scene scene = new Scene();
+    CharacterEntity friend = scene.still(0, 0, "Knight", X, Y + 1500, "friend");
+    scene.step(25);
+    scene.match.getWorld().getHits().dealDamage(friend, scene.giant.getTargetView(), 100, 0, 0);
+
+    assertThat(scene.from("friend")).hasSize(1);
+    assertThat(scene.from("friend").get(0).buff()).isNull();
+    assertThat(friend.getBuffs().carries(BUFF)).isFalse();
+  }
+
+  @Test
+  @DisplayName("a Giant Skeleton killed by the reflected damage dies and drops its bomb")
+  void aKillingReflect() {
+    Scene scene = new Scene();
+    CharacterEntity skeleton = scene.still(0, 1, "GiantSkeleton", X, Y + 1500, "skeleton");
+    scene.step(25);
+    skeleton.getHitPoints().setHitPoints(1);
+    while (scene.from("skeleton").isEmpty() && scene.tick < 200) {
+      scene.step(1);
+    }
+
+    assertThat(scene.from("skeleton").get(0).hitPointsAfter()).isZero();
+    assertThat(scene.holds("GiantSkeletonBomb")).isTrue();
+  }
+
+  @Test
+  @DisplayName(
+      "the reflected damage joins the end of the damage drain and lands there in the same step:"
+          + " a hit queued after the struck back one meets the attacker's shield first")
+  void theReflectedDamageLandsAfterTheHitsQueuedBeforeIt() {
+    Scene scene = new Scene();
+    // A shielded attacker inside the reflect's reach but out of its own attack range, so it never
+    // hits the Giant by itself: the only hit it deals is the one queued below.
+    int reach =
+        Shipped.number(GIANT, "ReflectedAttackRadius")
+            + Shipped.number(GIANT, "CollisionRadius")
+            + Shipped.number(Shipped.unitRow("DarkPrince"), "CollisionRadius");
+    CharacterEntity prince = scene.still(0, 1, "DarkPrince", X, Y + reach - 300, "prince");
+    scene.step(25);
+    int shield = prince.getHitPoints().getShield();
+    int full = prince.getHitPoints().getHitPoints();
+    assertThat(shield).isPositive().isNotEqualTo(reflectedDamage());
+    assertThat(scene.from("prince")).isEmpty();
+
+    // The Dark Prince's hit on the Giant, then a hit of exactly its shield on the Dark Prince
+    // queued after it, both for the next step's drain.
+    BattleWorld world = scene.match.getWorld();
+    world.getHits().dealDirectHit(prince, scene.giant.getTargetView(), 100, 0, 0);
+    world.getHits().dealQueuedDamage(prince.getTargetView(), shield, 0, 0, 0);
+    scene.step(1);
+
+    // The later hit takes the whole shield; the reflected damage, dealt after it, comes off the
+    // hit points. Dealt at once inside the Giant's hit, the reflect would meet the shield first,
+    // and the later hit would lose to the shield whatever the reflect left of it.
+    assertThat(scene.from("prince")).hasSize(1);
+    Reflection struck = scene.from("prince").get(0);
+    assertThat(struck.damage()).isEqualTo(reflectedDamage());
+    assertThat(struck.hitPointsBefore()).isEqualTo(full);
+    assertThat(struck.hitPointsAfter()).isEqualTo(full - reflectedDamage());
+    assertThat(prince.getHitPoints().getShield()).isZero();
+    assertThat(prince.getHitPoints().getHitPoints()).isEqualTo(full - reflectedDamage());
+  }
+
+  @Test
+  @DisplayName(
+      "an unkillable attacker the reflected damage would kill is held at 1 hit point and lives: the"
+          + " reflected hit does not pierce its immunity")
+  void anUnkillableAttackerIsHeldAtOne() {
+    Scene scene = new Scene();
+    CharacterEntity knight = scene.still(0, 1, "Knight", X, Y + 1500, "knight");
+    // A buff that sets only the UNKILLABLE tag, as the Berserker hero's ability buff sets it.
+    knight
+        .getBuffs()
+        .apply(
+            BuffData.builder()
+                .name("unkillable")
+                .rarity(GameData.records().buff("Rage").rarity())
+                .gameTagsToSet(knight.getView().getFlagBits().unkillable())
+                .build(),
+            1000000,
+            knight.getPackedLevel(),
+            null,
+            1);
+    scene.step(25);
+    assertThat(knight.unkillable()).isTrue();
+    // Every hit point but one off, so the next reflected damage would kill a killable Knight.
+    knight.getHitPoints().setHitPoints(1);
+    int guard = scene.tick + 200;
+    while (scene.from("knight").stream().noneMatch(r -> r.damage() > 0) && scene.tick < guard) {
+      scene.step(1);
+    }
+
+    Reflection struck =
+        scene.from("knight").stream().filter(r -> r.damage() > 0).findFirst().orElseThrow();
+    assertThat(struck.damage()).isEqualTo(reflectedDamage());
+    assertThat(struck.hitPointsBefore()).isEqualTo(1);
+    assertThat(struck.hitPointsAfter()).isEqualTo(1);
+    scene.step(1);
+    assertThat(knight.getHitPoints().getHitPoints()).isEqualTo(1);
+    assertThat(knight.isRemovable()).isFalse();
+  }
+
+  @Test
+  @DisplayName(
+      "an attacker whose tags forbid damage takes the reflect's buff but none of the reflected"
+          + " damage, as an evolved Skeleton Army's spectral soldier takes none")
+  void anAttackerThatTakesNoDamage() {
+    Scene scene = new Scene();
+    CharacterEntity knight = scene.still(0, 1, "Knight", X, Y + 1500, "knight");
+    // A buff that sets only the NO_DAMAGE tag, as the evolved Minion Horde's ghost buff sets it.
+    knight
+        .getBuffs()
+        .apply(
+            BuffData.builder()
+                .name("spectral")
+                .rarity(GameData.records().buff("Rage").rarity())
+                .gameTagsToSet(knight.getView().getFlagBits().noDamage())
+                .build(),
+            1000000,
+            knight.getPackedLevel(),
+            null,
+            1);
+    scene.step(1);
+    int full = knight.getHitPoints().getHitPoints();
+    int guard = scene.tick + 200;
+    while (scene.from("knight").stream().noneMatch(r -> r.damage() > 0) && scene.tick < guard) {
+      scene.step(1);
+    }
+
+    Reflection struck =
+        scene.from("knight").stream().filter(r -> r.damage() > 0).findFirst().orElseThrow();
+    assertThat(struck.buff()).isEqualTo(BUFF);
+    assertThat(knight.getBuffs().carries(BUFF)).isTrue();
+    assertThat(struck.hitPointsBefore()).isEqualTo(full);
+    assertThat(struck.hitPointsAfter()).isEqualTo(full);
+    assertThat(knight.getHitPoints().getHitPoints()).isEqualTo(full);
+  }
+
+  @Test
+  @DisplayName(
+      "a reflect from a unit whose buffs scale its damage, which no Ladder card gives an Electro"
+          + " Giant, is refused")
+  void aReflectWithADamagePercentIsRefused() {
+    Scene scene = new Scene();
+    scene
+        .giant
+        .getBuffs()
+        .apply(
+            BuffData.builder()
+                .name("double")
+                .rarity(GameData.records().buff("Rage").rarity())
+                .damageMultiplier(200)
+                .build(),
+            1000000,
+            scene.giant.getPackedLevel(),
+            null,
+            0);
+    scene.still(0, 1, "Knight", X, Y + 1500, "knight");
+
+    assertThatThrownBy(() -> scene.step(60))
+        .isInstanceOf(UnsupportedOperationException.class)
+        .hasMessageContaining("whose buffs scale its damage");
+  }
+
+  @Test
+  @DisplayName(
+      "a Spear Goblin's shot is struck back at the Goblin Giant it rides on, not at the rider, and"
+          + " the Giant hands the buff to each of its riders")
+  void aRidersShot() {
+    Scene scene = new Scene();
+    // Played for the top side, it walks down onto the Giant; its riders shoot from farther out.
+    scene.match.play(0, GameData.card("GoblinGiant"), LEVEL, 1, X, Y + 2500, "goblin");
+
+    // Until a shot is struck back with the buff: the first ones may be out of the reflect's reach.
+    // The loop guard is a battle's whole length, which the scene's walk and first shots never near.
+    int guard = Shipped.battleTicks();
+    while (scene.reflections.stream()
+            .noneMatch(r -> r.attacker() instanceof ProjectileEntity && r.buff() != null)
+        && scene.tick < guard) {
+      scene.step(1);
+    }
+    Reflection buffed =
+        scene.reflections.stream()
+            .filter(r -> r.attacker() instanceof ProjectileEntity && r.buff() != null)
+            .findFirst()
+            .orElseThrow();
+    // The Giant struck back for its rider's shot, one of the play's units.
+    assertThat(scene.match.getPlays().get(0).units()).contains((CharacterEntity) buffed.struck());
+    CharacterEntity giant = (CharacterEntity) buffed.struck();
+    assertThat(giant.getBuffs().carries(BUFF)).isTrue();
+    // Every rider it carries, its row's SpawnNumber.
+    assertThat(giant.riders())
+        .hasSize(Shipped.number(Shipped.unitRow("GoblinGiant"), "SpawnNumber"))
+        .allSatisfy(rider -> assertThat(rider.getBuffs().carries(BUFF)).isTrue());
+    List<Reflection> shots =
+        scene.reflections.stream().filter(r -> r.attacker() instanceof ProjectileEntity).toList();
+    assertThat(shots)
+        .isNotEmpty()
+        .allSatisfy(
+            r -> {
+              assertThat(r.source().getData().name()).isEqualTo("SpearGoblinGiant");
+              assertThat(r.struck().getData().name()).isEqualTo("GoblinGiant");
+            });
+  }
+
+  @Test
+  @DisplayName(
+      "the riders' shots are keyed by the Goblin Giant they ride on: until the Giant attacks"
+          + " itself, only the first of them deals the reflected damage, every one hands the buff")
+  void ridersShareTheParentsKey() {
+    Scene scene = new Scene();
+    scene.match.play(0, GameData.card("GoblinGiant"), LEVEL, 1, X, Y + 2500, "goblin");
+
+    // Until a shot of each rider is struck back with the buff. The loop guard is a battle's whole
+    // length, which the scene's walk and first shots never near.
+    int guard = Shipped.battleTicks();
+    while (struckRiders(scene) < 2 && scene.tick < guard) {
+      scene.step(1);
+    }
+    List<Reflection> shots = riderShots(scene);
+    CharacterEntity giant = (CharacterEntity) shots.get(0).struck();
+    // The Giant takes buildings only: it has made no attack of its own, so its key never changed.
+    assertThat(giant.getAttackCount()).isZero();
+    assertThat(shots).allSatisfy(r -> assertThat(r.buff()).isEqualTo(BUFF));
+    assertThat(shots.stream().filter(r -> r.damage() > 0)).hasSize(1);
+  }
+
+  @Test
+  @DisplayName(
+      "an evolved Electro Giant's pulse debuff handed by a Goblin Giant to its riders lowers each"
+          + " rider's level on the step it lowers the Giant's, the riders listed before it")
+  void aHandedPulseDebuffLowersTheRidersOnTheSameStep() {
+    Standard1v1Battle match = new Standard1v1Battle(GameData.tables(), LEVEL, false);
+    CharacterEntity evolved =
+        match.deploy(
+            0, match.getWorld().getRecords().unit("ElectroGiant_EV1"), LEVEL, 0, X, Y, "evolved");
+    evolved.setActive(CharacterEntity.MOVEMENT_SLOT, false);
+    evolved.setActive(CharacterEntity.TARGETING_SLOT, false);
+    // Played for the top side, it walks down into the pulse's reach.
+    match.play(0, GameData.card("GoblinGiant"), LEVEL, 1, X, TOP_Y, "goblin");
+    // The debuff the pulse's hit group puts on what it hits; its start action lowers the level.
+    String debuff = Shipped.fields("ElectroGiant_EV_Apply_Pulse_Debuff").path("SpawnData").asText();
+
+    // Step until the Goblin Giant's maximum hit points first drop: the debuff's start action ran on
+    // it. The loop guard is a battle's whole length, which the walk and the pulse never near.
+    int guard = Shipped.battleTicks();
+    CharacterEntity giant = null;
+    List<Integer> riderMaxima = List.of();
+    int giantMaximum = 0;
+    for (int tick = 0; tick < guard; tick++) {
+      if (giant == null && !match.getPlays().isEmpty()) {
+        giant =
+            match.getPlays().get(0).units().stream()
+                .filter(unit -> unit.getData().name().equals("GoblinGiant"))
+                .findFirst()
+                .orElse(null);
+      }
+      if (giant != null) {
+        giantMaximum = giant.getHitPoints().getMaximum();
+        riderMaxima = giant.riders().stream().map(r -> r.getHitPoints().getMaximum()).toList();
+      }
+      match.getBattle().step();
+      if (giant != null && giant.getHitPoints().getMaximum() < giantMaximum) {
+        break;
+      }
+    }
+
+    assertThat(giant).isNotNull();
+    CharacterEntity carrier = giant;
+    assertThat(carrier.getBuffs().carries(debuff)).isTrue();
+    assertThat(carrier.getHitPoints().getMaximum()).isLessThan(giantMaximum);
+    // Each rider, listed before the Giant, was handed the debuff and lowered on the same step.
+    List<CharacterEntity> riders = carrier.riders();
+    assertThat(riders)
+        .hasSize(Shipped.number(Shipped.unitRow("GoblinGiant"), "SpawnNumber"))
+        .allSatisfy(rider -> assertThat(rider.getId()).isLessThan(carrier.getId()));
+    for (int i = 0; i < riders.size(); i++) {
+      assertThat(riders.get(i).getBuffs().carries(debuff)).isTrue();
+      assertThat(riders.get(i).getHitPoints().getMaximum())
+          .as("rider %d's maximum", i)
+          .isLessThan(riderMaxima.get(i));
+    }
+  }
+
+  /** The reflects of a rider's shot that handed the buff. */
+  private static List<Reflection> riderShots(Scene scene) {
+    return scene.reflections.stream()
+        .filter(r -> r.attacker() instanceof ProjectileEntity && r.buff() != null)
+        .toList();
+  }
+
+  /** How many riders have had a shot struck back with the buff. */
+  private static long struckRiders(Scene scene) {
+    return riderShots(scene).stream().map(Reflection::source).distinct().count();
+  }
+
+  @Test
+  @DisplayName("a shot whose row ignores the reflect is not struck back")
+  void aShotIgnoringTheReflect(@TempDir Path folder) throws IOException {
+    Scene scene =
+        new Scene(
+            GameData.altered(
+                folder,
+                "projectiles",
+                rows ->
+                    GameData.columns(rows, "MusketeerProjectile")
+                        .put("IgnoreReflectedAttack", true)));
+    scene.still(0, 1, "Musketeer", X, Y + 2000, "musketeer");
+    scene.step(60);
+
+    assertThat(scene.from("musketeer")).isNotEmpty().allSatisfy(r -> assertThat(r.buff()).isNull());
+  }
+
+  @Test
+  @DisplayName(
+      "a fallen king's circle kills a reflecting unit and nothing is struck back: the kill has no"
+          + " attacker")
+  void theCircleKillsIt() {
+    Scene scene = new Scene();
+    CharacterEntity knight = scene.still(0, 1, "Knight", X, Y + 1500, "knight");
+    scene.step(25);
+    int knightHitPoints = knight.getHitPoints().getHitPoints();
+
+    scene.match.getWorld().getHits().circleKill(scene.giant, 1000);
+    // The kill lands at the damage drain of the next step.
+    scene.step(1);
+
+    assertThat(scene.giant.getHitPoints().getHitPoints()).isZero();
+    assertThat(scene.giant.isRemovable()).isTrue();
+    assertThat(scene.reflections).isEmpty();
+    assertThat(knight.getHitPoints().getHitPoints()).isEqualTo(knightHitPoints);
+    assertThat(knight.getBuffs().carries(BUFF)).isFalse();
+  }
+
+  @Test
+  @DisplayName("a kill with no killer on a reflecting unit kills it, striking nothing back")
+  void aKillWithoutAKiller() {
+    Scene scene = new Scene();
+    scene.step(25);
+
+    scene.match.getWorld().getHits().kill(scene.giant, null);
+    // The kill lands at the damage drain of the next step.
+    scene.step(1);
+
+    assertThat(scene.giant.getHitPoints().getHitPoints()).isZero();
+    assertThat(scene.reflections).isEmpty();
+  }
+
+  @Test
+  @DisplayName(
+      "a kill a killer deals to a reflecting unit, whose reflect no reference reaches, is refused")
+  void aKillByAKillerIsRefused() {
+    Scene scene = new Scene();
+    CharacterEntity knight = scene.still(0, 1, "Knight", X, Y + 1500, "knight");
+    scene.step(25);
+
+    // The kill is queued, and refused as the next step's damage drain deals it.
+    assertThatThrownBy(
+            () -> {
+              scene.match.getWorld().getHits().kill(scene.giant, knight);
+              scene.step(1);
+            })
+        .isInstanceOf(UnsupportedOperationException.class)
+        .hasMessageContaining("reflects and takes a kill");
+  }
+
+  /** The reflect's damage at the Giant's level: the row's ReflectedAttackDamage. */
+  private static int reflectedDamage() {
+    return Shipped.scaled(Shipped.number(GIANT, "ReflectedAttackDamage"), GIANT, LEVEL);
+  }
+}

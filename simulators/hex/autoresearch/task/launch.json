@@ -1,0 +1,6 @@
+{
+  "command": "mkdir -p /scratch/runs/{name} && python training/train.py --config {config} --out /scratch/runs/{name} --seed {seed} --seconds {seconds}",
+  "output": "/scratch/runs/{name}",
+  "shape": {"gpu": 1, "cpu": 4, "memory": 16},
+  "reserve_seconds": 90
+}

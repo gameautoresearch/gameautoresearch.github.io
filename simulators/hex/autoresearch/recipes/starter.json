@@ -1,0 +1,1 @@
+{"architecture": {"hidden": 256, "depth": 2}, "games_per_wave": 2048, "learning_rate": 0.0003, "minibatch": 8192, "epochs": 1, "value_coef": 0.5, "entropy_coef": 0.01, "max_grad_norm": 1.0}

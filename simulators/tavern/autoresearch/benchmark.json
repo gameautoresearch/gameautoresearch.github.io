@@ -1,0 +1,93 @@
+{
+  "schema_version": 1,
+  "game": "tavern",
+  "benchmark_id": "tavern-four-small-v1",
+  "task": {
+    "players": 4,
+    "content": "Implemented",
+    "start_turn": 1,
+    "lobby_types": 3,
+    "hero_choices": 2,
+    "max_regular_tier": 4,
+    "board_slots": 7,
+    "hand_slots": 10,
+    "actions_per_recruit_turn": 30,
+    "safety_max_turns": 100,
+    "observation_numeric": 3227,
+    "observation_cards": 124,
+    "actions": 245,
+    "training_opponents": "three scripted",
+    "learning_seats": [
+      0
+    ],
+    "gamma": 1.0,
+    "backend": "Rust CPU AutoTavern 37.0.2; CUDA learner",
+    "full_size_form": "tavern-eight-implemented-v1 (8 players, tiers 1-6, 5 types) at git tag full-size-20261113"
+  },
+  "resources": {
+    "gpu": "L40S",
+    "cpu_cores": 4,
+    "memory_gib": 16
+  },
+  "budget": {
+    "research_worker_seconds": 7200,
+    "smoke_worker_seconds": 600,
+    "accounting": "allocated_worker_wall_time",
+    "model_smoke_usd": 2,
+    "default_mode": "seconds",
+    "seconds_mode": {
+      "research_seconds": 7200,
+      "smoke_research_seconds": 600,
+      "concurrency": "one job at a time"
+    },
+    "usd_mode": {
+      "research_usd": 5.81,
+      "smoke_research_usd": 0.48,
+      "wall_seconds": 18000,
+      "smoke_wall_seconds": 4800,
+      "concurrency": "parallel: up to 4 jobs, 2 GPUs, 64 CPU cores"
+    }
+  },
+  "starter": {
+    "recipe": "recipes/starter.json",
+    "editable_files": [
+      "starter/policy.py",
+      "starter/learner.py",
+      "starter/train.py",
+      "recipes/starter.json"
+    ],
+    "initialization": "random"
+  },
+  "agent": {
+    "brief": "task/brief.md"
+  },
+  "evaluation": {
+    "primary_metric": "mean_normalized_placement_points",
+    "score_scale": [
+      0,
+      100
+    ],
+    "formula": "100*(4-placement)/3",
+    "seat_weighting": "equal four seats",
+    "opponent_weighting": "equal frozen panels",
+    "secondary": "top_half_rate (placement 1-2)",
+    "smoke_seed_groups": 2,
+    "full_seed_groups": 16,
+    "full_games_per_seat": 4,
+    "normalization": "null until independent three-seed full-budget reference calibration",
+    "faults": "invalidate schedule; no placement score",
+    "interval": "bootstrap whole seed groups",
+    "full_opponents": 3,
+    "full_episodes": 768,
+    "smoke_opponents": 1,
+    "opponent_strength": "weak development PPO; no expert qualification",
+    "full_private_schedule": "private/panel-full.json",
+    "smoke_private_schedule": "private/panel.json",
+    "opponent_inventory": "private/opponents.json"
+  },
+  "commands": {
+    "prepare": ".venv-tavern-ar/bin/python -m harness prepare tavern --out RELEASE",
+    "smoke": ".venv-tavern-ar/bin/python -m harness run tavern network --release RELEASE --out SESSION --smoke --model MODEL --execute",
+    "grade": ".venv-tavern-ar/bin/python -m harness grade --session SESSION"
+  }
+}

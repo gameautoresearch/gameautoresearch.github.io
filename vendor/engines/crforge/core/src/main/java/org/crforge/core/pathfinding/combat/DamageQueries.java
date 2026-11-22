@@ -1,0 +1,152 @@
+/*
+ * crforge - https://github.com/voonhous/crforge
+ * SPDX-License-Identifier: Apache-2.0
+ * Porting this code? Please cite this file and the commit you read: see the README.
+ */
+
+package org.crforge.core.pathfinding.combat;
+
+/**
+ * What the damage chain needs to know about the target it is lowering, the attacker behind the
+ * damage and the battle they are in.
+ *
+ * <p>Every method has a default that gives the answer a plain tower or troop gives in a running
+ * standard battle, so an implementation only overrides what it changes. These are the answers of a
+ * plain unit and a plain tower: nothing is untouchable, nothing blocks damage, and neither side
+ * carries a buff that changes the amount.
+ */
+public interface DamageQueries {
+
+  /** The answers of a plain target in a running battle. */
+  DamageQueries STANDARD = new DamageQueries() {};
+
+  /** True when the target takes no damage at all, whatever the source. */
+  default boolean damageForbidden() {
+    return false;
+  }
+
+  /**
+   * The target's own answer to "am I immune to this hit", asked before anything else is read. An
+   * ordinary entity answers no; what sets it is not documented.
+   */
+  default boolean immune() {
+    return false;
+  }
+
+  /**
+   * True while the target is hidden from this hit, which the entry refuses, and a buff's damage
+   * over time with it. A hit that passes hidden targets answers no.
+   */
+  default boolean hidden() {
+    return false;
+  }
+
+  /** True while the target cannot be touched at all, which also stops the bookkeeping. */
+  default boolean untouchable() {
+    return false;
+  }
+
+  /**
+   * True while the battle holds every damage event, which the bookkeeping refuses to run under:
+   * from the first step of a Ladder match's tiebreaker on. A kill and the tiebreaker's drain pass
+   * it.
+   */
+  default boolean damageHeld() {
+    return false;
+  }
+
+  /**
+   * True once the battle is over, which the subtraction refuses to run under: from a match's end
+   * on. A kill and the tiebreaker's drain pass it.
+   */
+  default boolean battleEnded() {
+    return false;
+  }
+
+  /** True when the target carries the buff component that may change the damage it takes. */
+  default boolean targetHasBuffComponent() {
+    return true;
+  }
+
+  /**
+   * The damage after the target's own buffs have changed it. The chain floors the answer at one
+   * afterwards.
+   */
+  default int modifyDamage(int damage) {
+    return damage;
+  }
+
+  /** Damage the target's buffs add on top, ignored when it is not positive. */
+  default int extraDamage() {
+    return 0;
+  }
+
+  /** True when the attacker carries the buff component whose percentages scale the damage. */
+  default boolean attackerHasBuffComponent() {
+    return true;
+  }
+
+  /** Percentage the attacker's buffs scale every hit by; 100 leaves the damage alone. */
+  default int attackerDamagePercent() {
+    return 100;
+  }
+
+  /**
+   * Percentage the attacker's buffs scale a hit on a crown tower by, applied after {@link
+   * #attackerDamagePercent()}; 100 leaves the damage alone.
+   */
+  default int attackerCrownTowerPercent() {
+    return 100;
+  }
+
+  /** True when the target is a crown tower, which is what makes the second percentage apply. */
+  default boolean crownTowerTarget() {
+    return false;
+  }
+
+  /**
+   * Told of the amount the entry settled on, after the two sides' percentages and before the
+   * bookkeeping: the target's running actions hear of the hit, and a counter among them may change
+   * the amount. Answers the amount to go on with; 0 deals nothing. Supplied as the amount
+   * unchanged, for a target whose runs hear nothing.
+   */
+  default int heard(int amount) {
+    return amount;
+  }
+
+  /**
+   * Told once the bookkeeping lets a hit through - past the battle's hold, the untouchable test and
+   * the dedupe list - before the subtraction: the character that dealt the hit counts it. Supplied
+   * as doing nothing, for a hit no character dealt.
+   */
+  default void hitCounted() {}
+
+  /**
+   * Told in the subtraction, past the battle's hold and with hit points left, before anything is
+   * taken off: the listening runs of what dealt the hit hear of it. Supplied as doing nothing, for
+   * a hit nothing that listens dealt.
+   */
+  default void beforeSubtraction() {}
+
+  /**
+   * Told at the end of the subtraction when the hit took hit points off the target, with the amount
+   * before the overkill of a killing hit is removed: a hit the shield takes tells nothing, a
+   * killing hit tells it, and so does a hit on a target already at no hit points, whose whole
+   * amount counts. The target's on-damage action is scheduled. Supplied as doing nothing, for a
+   * target without one.
+   */
+  default void hitPointsTaken(int amount) {}
+
+  /**
+   * True when the target's tag word holds UNKILLABLE: a hit that does not pierce immunity leaves it
+   * at 1 hit point at least. Supplied as false, for a target that never carries the tag.
+   */
+  default boolean unkillable() {
+    return false;
+  }
+
+  /** The battle tick a dedupe id is listed with. */
+  default int battleTick() {
+    return 0;
+  }
+}

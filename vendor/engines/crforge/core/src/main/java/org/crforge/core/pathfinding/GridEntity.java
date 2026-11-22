@@ -1,0 +1,271 @@
+/*
+ * crforge - https://github.com/voonhous/crforge
+ * SPDX-License-Identifier: Apache-2.0
+ * Porting this code? Please cite this file and the commit you read: see the README.
+ */
+
+package org.crforge.core.pathfinding;
+
+import java.util.function.BooleanSupplier;
+import lombok.Getter;
+import lombok.Setter;
+
+/**
+ * The entity-level state that the grid routing, movement, targeting, spatial index and overlay code
+ * reads and writes about one thing on the arena.
+ *
+ * <p>This holds only what belongs to the entity itself: its identity, where it is, which way it
+ * faces, what state it is in and the handful of per-entity flags the other passes ask about. The
+ * working state of a component - the route it is following, its push accumulators, its attack
+ * timers - lives in that component's own class, not here.
+ *
+ * <p>Units: positions, radii and offsets are integer game units, 1000 per arena tile and 500 per
+ * routing cell. Countdowns are milliseconds and advance 50 per tick at 20 ticks per second. The
+ * facing pair is a vector scaled to length 256.
+ *
+ * <p>The class is a plain mutable holder with no behaviour, and is not thread safe.
+ */
+@Getter
+@Setter
+public class GridEntity {
+
+  /** Identity of the entity within the match. The overlay's per-side hash folds this value in. */
+  private int id;
+
+  /** Readable name, used by fixtures and diagnostics rather than by any rule. */
+  private String name;
+
+  /** Which player the entity belongs to, 0 or 1. */
+  private int side;
+
+  /**
+   * Virtual type of the entity. Characters and crown towers are type 5; the overlay builder and the
+   * spatial index's type mask both filter on this value.
+   */
+  private int type = 5;
+
+  /**
+   * Road id (lane) the entity was assigned when it was created, 0 for none. It is written once at
+   * creation and never recomputed; the cell cost and the default target selection read it.
+   */
+  private int lane;
+
+  /** Position along the arena's width, in game units. */
+  private int x;
+
+  /** Position along the arena's length, in game units. */
+  private int y;
+
+  /** Height above the ground, in game units, non-zero while jumping or flying. */
+  private int z;
+
+  /**
+   * What the height changes pushed to the entity add to {@link #z}, folded in at its pre-hook: the
+   * live height is the two together. Only an action that holds the entity on the ground pushes any.
+   */
+  private int heightOffset;
+
+  /** Facing vector, x component, scaled so the pair has length 256. */
+  private int dirX;
+
+  /** Facing vector, y component, scaled so the pair has length 256. */
+  private int dirY;
+
+  /** Copy of {@link #x} taken when the position was first written. */
+  private int prevX;
+
+  /** Copy of {@link #y} taken when the position was first written. */
+  private int prevY;
+
+  /** Copy of {@link #z} taken when the position was first written. */
+  private int prevZ;
+
+  /** Current state, one of the constants in {@link GridEntityState} (0 to 16). */
+  private int state;
+
+  /**
+   * Behaviour flags, a 64-bit word, one bit per game tag as {@link #flagBits} numbers them. The
+   * tags table has more than 32 rows, so this must stay a {@code long}: the high bits carry the
+   * movement and targeting restrictions such as "may not be pushed by an ally" and "may not move".
+   */
+  private long flags;
+
+  /**
+   * Flags requested during this tick's visits and applied afterwards, a 64-bit word like {@link
+   * #flags}.
+   */
+  private long pendingFlags;
+
+  /**
+   * Which bit of {@link #flags} and {@link #pendingFlags} each flag is, as the battle's game tags
+   * table numbers the tags; every entity of a battle shares the battle's. An entity made outside a
+   * battle has {@link EntityFlags#NONE}, under which no flag has a bit.
+   */
+  private EntityFlags flagBits = EntityFlags.NONE;
+
+  /** Radius, in game units, of the circle the entity occupies for collision and for the overlay. */
+  private int collisionRadius;
+
+  /** Mass, which decides how far a push moves this entity relative to the one pushing it. */
+  private int mass;
+
+  /**
+   * True for a crown tower: the king tower and the princess towers alike. Query results order crown
+   * towers last, a unit notices them from farther away, and a hit on one deals the crown-tower
+   * damage.
+   */
+  private boolean crownTower;
+
+  /** True for a building, which stands still and occludes cells. */
+  private boolean building;
+
+  /**
+   * Whether another building stands within 500 of the entity edge to edge, as a building whose row
+   * is in the characters table asks it of the battle each time its contact is asked; null for every
+   * other entity, which never asks. See {@link #besideAnotherBuilding()}.
+   */
+  private BooleanSupplier besideBuildingQuery;
+
+  /** True for an air unit, which ignores water and ground obstacles when routing. */
+  private boolean air;
+
+  /**
+   * True when the entity stamps its footprint into the routing cost overlay. Buildings occlude;
+   * ordinary troops do not.
+   */
+  private boolean occludes;
+
+  /**
+   * True for a character whose row sets IsOccluder: it stamps its footprint into the routing cost
+   * overlay like a building, but only while it has no movement component or has not moved since its
+   * position copy, as {@link #isMovedSinceCopy()} records it.
+   */
+  private boolean occluder;
+
+  /**
+   * The movement component's record, written as each movement pass reaches it, of whether the
+   * position differs from the copy taken at the head of the tick; false until the first pass. The
+   * overlay build of the next tick reads it, so an occluder stops stamping on the tick after it
+   * moved and stamps again on the tick after it stood still.
+   */
+  private boolean movedSinceCopy;
+
+  /**
+   * Whether the overlay build stamps the entity's footprint now, as the entity's occlusion query
+   * answers it: a building always does; an occluder does while it has no movement component, or
+   * while its movement component records no move since the position copy.
+   */
+  public boolean occludesCells() {
+    return occludes || (occluder && (!movementComponent || !movedSinceCopy));
+  }
+
+  /**
+   * True while the entity still has hit points. This is the alive answer the target validator asks
+   * about a candidate, refreshed once per tick before the component passes run.
+   */
+  private boolean alive = true;
+
+  /**
+   * Remaining deploy time in milliseconds. While it is positive the entity is in {@link
+   * GridEntityState#DEPLOYING} and its component visits are skipped.
+   */
+  private int deployCountdown;
+
+  /**
+   * General-purpose elapsed-time accumulator in milliseconds. The state visit adds 50 per tick,
+   * except in the states selected by {@link GridEntityState#DELAY_SKIP_MASK}, where the deployment
+   * delay accumulator is advanced instead.
+   */
+  private int delay;
+
+  /**
+   * True when the entity has an active movement component. The spatial index widens a moving
+   * entity's bucket footprint by half a cell so a query still finds it after it has stepped, and
+   * the avoidance handler treats a neighbour without one as a static obstacle. A unit waiting its
+   * turn to deploy has its component switched off until it starts deploying.
+   */
+  private boolean movementActive;
+
+  /**
+   * True when the entity has a movement component at all, switched on or not. The push pass and the
+   * aligned static neighbours check count a neighbour without one as static; a tower or a building
+   * has none.
+   */
+  private boolean movementComponent;
+
+  /**
+   * True while the entity rides on another, placed around it every movement visit: it takes no part
+   * in collision, so no push pass or avoidance meets it.
+   */
+  private boolean attached;
+
+  /**
+   * True for a clone: one still deploying takes no part in collision, so no push pass or avoidance
+   * meets it.
+   */
+  private boolean clone;
+
+  /**
+   * Countdown in milliseconds that blocks movement while it is positive, for example the delay
+   * after a dash lands. The speed budget and all three movement gates return zero while it runs.
+   *
+   * <p>The movement component carries its own countdown at the same position in its record; the two
+   * must not be conflated. This one is the entity's.
+   */
+  private int blockCountdownMs;
+
+  /**
+   * The tower slot: set for the king tower alone, the entity that fills its side's tower slot. The
+   * validator's tower filters read it, apart from the crown-tower flag, which every tower answers.
+   */
+  private int kingCandidate;
+
+  /**
+   * Candidacy gate the target selector and the avoidance handler read, enabled for every entity
+   * when its view is built. Its writers are not established.
+   */
+  private int targetable;
+
+  /**
+   * Amount by which the target selector lowers this candidate's squared distance before it ranks
+   * the candidate, in squared game units. Ordinary entities answer zero. The battle sets it only
+   * where a projectile's impact fixes its children's priority, as the Goblin Barrel's does: the
+   * k-th child it makes answers (20k)^2; and where a death spawn fixes them, as the Skeleton
+   * Barrel's container does: the i-th answers (80i)^2. An action spawn's fixed priority is refused.
+   */
+  private int squaredDistanceReduction;
+
+  /**
+   * Damage on its way to this entity and not yet landed, in hit points: the sum of what every
+   * homing projectile fired at it will deal, put here as the projectile starts its flight and taken
+   * off again as it arrives. The validator refuses a projectile attacker a target this damage will
+   * kill. Zero for an entity nothing is shooting at.
+   */
+  private int pendingDamageAmount;
+
+  /**
+   * How long the longest of those shots still has to fly, in milliseconds, at most 1000: raised by
+   * each shot as it starts, left alone as one arrives, and counted down by 50 in every state visit.
+   * The validator ignores pending damage that lands later than a global limit.
+   */
+  private int pendingDamageDurationMs;
+
+  /**
+   * True when the entity is a building of the characters table with another building within 500 of
+   * it edge to edge, which takes it out of contact; false for every other entity.
+   */
+  public boolean besideAnotherBuilding() {
+    return besideBuildingQuery != null && besideBuildingQuery.getAsBoolean();
+  }
+
+  /**
+   * Height used by the push and avoidance passes when they decide whether two entities occupy the
+   * same layer: the live height, the entity's own height and its height offset together, read as
+   * the passes ask for it. So a height the entity's own movement writes counts at once: a dash cut
+   * short in the air, as a tiebreaker's clearing resumes a dasher before it lands, leaves the unit
+   * on the air layer, where it neither pushes nor is pushed by a unit on the ground.
+   */
+  public int getZTotal() {
+    return z + heightOffset;
+  }
+}

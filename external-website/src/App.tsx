@@ -1,0 +1,27 @@
+import { PAGE } from "./meta";
+import AutoresearchPost from "./posts/autoresearch/Post";
+import Toc from "./Toc";
+
+function displayDate(date: string) {
+  return new Date(`${date}T00:00:00`).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+}
+
+// The whole site is this one post: no site nav, no index, no footer; a contents list sits in the left margin.
+export default function App() {
+  return (
+    <div className="page-shell">
+      <Toc rootId="post-body" />
+      <div className="site-layout">
+        <main className="profile">
+          <article className="blog-post" aria-labelledby="post-title">
+            <h2 id="post-title">{PAGE.title}</h2>
+            <p className="post-byline">
+              {PAGE.authors.join(" and ")} · <time dateTime={PAGE.date}>{displayDate(PAGE.date)}</time>
+            </p>
+            <div className="post-content" id="post-body"><AutoresearchPost /></div>
+          </article>
+        </main>
+      </div>
+    </div>
+  );
+}

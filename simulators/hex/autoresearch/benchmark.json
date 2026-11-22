@@ -1,0 +1,127 @@
+{
+  "schema_version": 1,
+  "game": "hex",
+  "benchmark_id": "hex13-no-swap-research-v1",
+  "task": {
+    "rules_id": "hex13-no-swap-v1",
+    "source": "method of Jones, Scaling Scaling Laws with Board Games (arXiv:2104.03113), on a 13x13 board (the paper stops at 9x9, which research sessions saturated)",
+    "players": 2,
+    "board": "13x13 rhombus of hexagonal cells, cell = 13*row + col",
+    "first_player": "black, joins top and bottom edges",
+    "second_player": "white, joins left and right edges",
+    "swap_rule": false,
+    "termination": "natural connection; no draws; at most 169 moves",
+    "observation": "full board int8[169], side to move, legal mask bool[169]",
+    "legal_actions": "every empty cell",
+    "engine": "frozen batched PyTorch engine (GPU and CPU), checked against an independent BFS reference"
+  },
+  "resources": {
+    "gpu": "L40S",
+    "cpu_cores": 4,
+    "memory_gib": 16,
+    "practice_worker": "8 CPU cores, 16 GiB, no GPU; charged to the research budget at its shape's rate",
+    "leases": "0 or 1 L40S, 1-32 CPU cores, 2-64 GiB, researcher commands, shared /scratch Volume",
+    "concurrency": "seconds mode: one active job (a run, a practice or a lease); usd mode: 4 active jobs, at most 2 with a GPU and 64 CPU cores in total",
+    "charging": "seconds mode: training-worker seconds = worker seconds x cost(shape) / cost(training worker); usd mode: US dollars = worker seconds x cost(shape); cost at the frozen Modal sandbox list prices in contract.py PRICE"
+  },
+  "budget": {
+    "default_mode": "seconds",
+    "research_worker_seconds": 7200,
+    "smoke_worker_seconds": 600,
+    "research_wall_seconds": 18000,
+    "usd_mode": {
+      "research_usd": 10.0,
+      "smoke_research_usd": 0.5,
+      "research_wall_seconds": 18000,
+      "smoke_research_wall_seconds": 4800,
+      "wall_seconds": 18000,
+      "smoke_wall_seconds": 4800,
+      "concurrency": "parallel: up to 4 jobs, 2 GPUs, 64 CPU cores"
+    },
+    "fresh_final_train_seconds": 3600,
+    "accounting": "allocated_worker_wall_time",
+    "smoke_teardown_reserve_seconds": 20,
+    "seconds_mode": {
+      "research_seconds": 7200,
+      "smoke_research_seconds": 600,
+      "concurrency": "one job at a time"
+    }
+  },
+  "starter": {
+    "recipe": "recipes/starter.json",
+    "editable_files": [
+      "starter/policy.py",
+      "starter/learner.py",
+      "starter/train.py"
+    ],
+    "initialization": "random",
+    "algorithm": "REINFORCE with a learned value baseline and entropy bonus; Adam; pure self-play; greedy at evaluation",
+    "architecture": {
+      "hidden": 256,
+      "depth": 2,
+      "input": "canonical 2x13x13 planes from the side to move"
+    }
+  },
+  "agent": {
+    "brief": "task/brief.md"
+  },
+  "evaluation": {
+    "primary_metric": "panel_win_rate_times_100",
+    "score_scale": [
+      0,
+      100
+    ],
+    "openings": "2-ply (black cell, white cell), drawn without replacement from all 28392",
+    "seats": "every opening played twice, candidate as black and as white",
+    "panel": [
+      "random",
+      "heuristic-e90",
+      "heuristic-e80",
+      "heuristic-e60",
+      "heuristic",
+      "mohex-100-e15",
+      "mohex-100",
+      "mohex-2k",
+      "mohex-anchor"
+    ],
+    "panel_elo_vs_anchor": [
+      -2580,
+      -2164,
+      -1852,
+      -1486,
+      -1155,
+      -917,
+      -498,
+      -177,
+      0
+    ],
+    "panel_calibration": "reports/hex/panel-calibration-13x13-2026-11-14.json; epsilon = chance of a uniformly random move",
+    "opponents_equal_weight": true,
+    "anchor": "MoHex 2.0 (benzene-vanilla-cmake), parallel DFPN solver, knowledge threshold 0, 50000 games per move; a strong reference on 13x13, not perfect play",
+    "secondary": "candidate Elo fitted against the calibrated panel; Elo against the anchor alone; per-seat and per-opponent win rates; the campaign head-to-head tournament",
+    "practice_openings": 16,
+    "private_openings": 64,
+    "smoke_practice_openings": 2,
+    "smoke_private_openings": 4,
+    "uncertainty": "2000 opening-cluster bootstrap replicates",
+    "reference_normalized": "null: the raw score is anchored on MoHex and needs no calibration run",
+    "inference_batch": 64,
+    "position_seconds": 0.01,
+    "call_seconds": 0.1,
+    "move_clock": "a policy call covering n positions (n <= inference_batch) must answer within call_seconds + n * position_seconds of wall time on one CPU thread",
+    "policy_startup_seconds": 60,
+    "late_moves": "a policy call answered after its move clock is replaced by uniformly random legal moves for every game in it",
+    "milestones": [
+      0.3333333333333333,
+      0.6666666666666666,
+      1
+    ],
+    "faults": "no ordinary score for an illegal or malformed policy answer, a policy that does not load, a MoHex fault or an incomplete schedule",
+    "tournament": "every campaign ends with a round robin of its final networks plus the five strongest panel opponents (tools/hex_tournament.py), under the same move clock"
+  },
+  "commands": {
+    "prepare": ".venv-hex/bin/python -m harness prepare hex --out RELEASE",
+    "smoke": ".venv-hex/bin/python -m harness run hex network --release RELEASE --out SESSION --smoke --model MODEL --execute",
+    "grade": ".venv-hex/bin/python -m harness grade --session SESSION"
+  }
+}

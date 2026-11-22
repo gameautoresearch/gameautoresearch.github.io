@@ -1,0 +1,12 @@
+[package]
+name = "tavern-native-abi"
+version = "0.1.0"
+edition = "2024"
+license = "MIT"
+[lib]
+crate-type = ["cdylib"]
+[features]
+arena = ["tavern-device-core/arena", "cuda_std/external-allocator"]
+[dependencies]
+tavern-device-core = { path = "../core" }
+cuda_std = { path = "../runtime" }

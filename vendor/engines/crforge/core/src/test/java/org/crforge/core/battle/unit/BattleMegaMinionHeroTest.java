@@ -1,0 +1,260 @@
+/*
+ * crforge - https://github.com/voonhous/crforge
+ * SPDX-License-Identifier: Apache-2.0
+ * Porting this code? Please cite this file and the commit you read: see the README.
+ */
+
+package org.crforge.core.battle.unit;
+
+import static org.assertj.core.api.Assertions.assertThat;
+
+import java.util.Arrays;
+import java.util.List;
+import org.crforge.core.battle.GameData;
+import org.crforge.core.battle.Shipped;
+import org.crforge.core.battle.action.ActionInstance;
+import org.crforge.core.battle.action.SetIndicatorOnTarget;
+import org.crforge.core.battle.expression.ExpressionCompiler;
+import org.crforge.core.battle.expression.ExpressionEvaluator;
+import org.crforge.core.battle.match.LadderMatch;
+import org.crforge.core.battle.match.MatchCard;
+import org.crforge.core.battle.match.MatchSide;
+import org.crforge.core.pathfinding.EntityFlags;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+
+/**
+ * The Mega Minion's hero form played from the hero slot: its mark, which its starting group starts
+ * 1500 ms in, searches the battle for a target and, with none, disables the ability. With an enemy
+ * troop in the battle it marks the one with the lowest maximum hit points, the furthest from the
+ * hero among equals, and gives it the hero's bot buff.
+ */
+class BattleMegaMinionHeroTest {
+
+  /** Which bit of a tag word each flag is, as the configured tables number the game tags. */
+  private static final EntityFlags BITS = EntityFlags.of(GameData.tables());
+
+  private static final int LEVEL = Standard1v1Battle.DEFAULT_LEVEL;
+
+  private static final String HERO = "MegaMinionHero";
+
+  private static final String MARK = "MegaMinion_hero_mark_target";
+
+  private static final String BOT_BUFF = "MegaMinionHeroBuffForBots";
+
+  /** The Mega Minion first, in the hero slot, and seven other cards. */
+  private static final List<String> DECK =
+      List.of(
+          "MegaMinion", "Archer", "Knight", "Giant", "Minions", "Musketeer", "Fireball", "Arrows");
+
+  /** The other side's deck, which holds the Knight and the Archers it plays. */
+  private static final List<String> OTHER =
+      List.of(
+          "Knight", "Archer", "Giant", "Minions", "Musketeer", "Fireball", "Arrows", "MegaMinion");
+
+  @Test
+  @DisplayName(
+      "the mark takes the enemy troop it finds and keeps it: the hero loses ABILITY_DISABLED, the"
+          + " troop carries the hero's bot buff with the hero as its source and parent, and the"
+          + " hand-over takes the same target")
+  void anEnemyTroopIsMarked() {
+    Standard1v1Battle battle = heroPlayed();
+    CharacterEntity hero = named(battle, HERO).get(0);
+    int tick = battle.getBattle().getTick();
+    battle.play(tick, GameData.card("Knight"), LEVEL, 1, 14500, 25500, "k");
+    int limit = tick + 60;
+    while (markTarget(hero) == null) {
+      assertThat(battle.getBattle().getTick()).isLessThan(limit);
+      // The mark, once started, raises ABILITY_DISABLED while it has no target.
+      if (runs(hero).contains(MARK)) {
+        assertThat(hero.getView().getFlags() & BITS.abilityDisabled()).isNotZero();
+      }
+      step(battle);
+    }
+    CharacterEntity knight = named(battle, "Knight").get(0);
+    assertThat(mark(hero).target().id()).isEqualTo(knight.getId());
+    // The pick's action runs on the hero in its next pending pass, the Knight its cause, and puts
+    // the bot buff on the Knight.
+    step(battle);
+    assertThat(hero.getView().getFlags() & BITS.abilityDisabled()).isZero();
+    List<BuffInstance> buffs =
+        knight.getBuffs().items().stream()
+            .filter(buff -> buff.getBuff().name().equals(BOT_BUFF))
+            .toList();
+    assertThat(buffs).hasSize(1);
+    assertThat(buffs.get(0).getSource()).isSameAs(hero);
+    assertThat(buffs.get(0).getParent()).isSameAs(hero);
+    for (int i = 0; i < 40; i++) {
+      step(battle);
+      assertThat(mark(hero).target().id()).isEqualTo(knight.getId());
+      assertThat(hero.getView().getFlags() & BITS.abilityDisabled()).isZero();
+      // A stacking buff from the same parent is not listed twice.
+      assertThat(
+              knight.getBuffs().items().stream().filter(b -> b.getBuff().name().equals(BOT_BUFF)))
+          .hasSize(1);
+    }
+  }
+
+  @Test
+  @DisplayName(
+      "the mark picks the lowest maximum hit points, and of those the one furthest from the hero:"
+          + " of a Knight and the Archers, the Archer furthest away")
+  void theLowestMaximumThenTheFurthestIsMarked() {
+    // Both plays on one tick as the hero appears: the other side holds the elixir for both before
+    // the hero is played, so all have deployed by the time the mark starts.
+    int both =
+        GameData.records().matchCard("Knight").cost()
+            + GameData.records().matchCard("Archer").cost();
+    Standard1v1Battle battle = heroPlayed(both);
+    CharacterEntity hero = named(battle, HERO).get(0);
+    int tick = battle.getBattle().getTick();
+    battle.play(tick, GameData.card("Knight"), LEVEL, 1, 3500, 25500, "k");
+    battle.play(tick, GameData.card("Archer"), LEVEL, 1, 14500, 25500, "a");
+    int limit = tick + 60;
+    while (markTarget(hero) == null) {
+      assertThat(battle.getBattle().getTick()).isLessThan(limit);
+      step(battle);
+    }
+    List<CharacterEntity> archers = named(battle, "Archer");
+    assertThat(archers)
+        .hasSize(Shipped.number(Shipped.row("spells_characters", "Archer"), "SummonNumber"));
+    assertThat(named(battle, "Knight")).hasSize(1);
+    CharacterEntity further = archers.get(0);
+    for (CharacterEntity archer : archers) {
+      if (distanceSquared(hero, archer) > distanceSquared(hero, further)) {
+        further = archer;
+      }
+    }
+    for (CharacterEntity archer : archers) {
+      if (archer != further) {
+        assertThat(distanceSquared(hero, archer)).isLessThan(distanceSquared(hero, further));
+      }
+    }
+    assertThat(mark(hero).target().id()).isEqualTo(further.getId());
+  }
+
+  private static long distanceSquared(CharacterEntity a, CharacterEntity b) {
+    long dx = a.getView().getX() - b.getView().getX();
+    long dy = a.getView().getY() - b.getView().getY();
+    return dx * dx + dy * dy;
+  }
+
+  /** The hero's mark run. */
+  private static SetIndicatorOnTarget.Run mark(CharacterEntity hero) {
+    return hero.actionHolder().running().stream()
+        .filter(SetIndicatorOnTarget.Run.class::isInstance)
+        .map(SetIndicatorOnTarget.Run.class::cast)
+        .findFirst()
+        .orElseThrow();
+  }
+
+  /**
+   * The target of the hero's mark, or null while it has none or the mark has not started yet: the
+   * hero's starting group starts it 1500 ms in.
+   */
+  private static SetIndicatorOnTarget.Candidate markTarget(CharacterEntity hero) {
+    return hero.actionHolder().running().stream()
+        .filter(SetIndicatorOnTarget.Run.class::isInstance)
+        .map(SetIndicatorOnTarget.Run.class::cast)
+        .findFirst()
+        .map(SetIndicatorOnTarget.Run::target)
+        .orElse(null);
+  }
+
+  @Test
+  @DisplayName(
+      "ability_charges_left answers the charges the slot that follows the hero has left, and -1"
+          + " for a unit whose row has no ability with charges or for a tower")
+  void abilityChargesLeft() {
+    Standard1v1Battle battle = heroPlayed();
+    CharacterEntity hero = named(battle, HERO).get(0);
+    CharacterEntity knight =
+        battle.deploy(battle.getBattle().getTick(), GameData.unit("Knight"), LEVEL, 1, 3500, 25000);
+    step(battle);
+
+    // The slot has the charges of the hero's ability row, none spent.
+    int charges =
+        Shipped.number(
+            Shipped.row("character_abilities", Shipped.text(Shipped.unitRow(HERO), "Ability")),
+            "MaxCharges");
+    assertThat(battle.getWorld().kingTower(0).championSlot(1).getCharges()).isEqualTo(charges);
+    assertThat(chargesLeft(battle, hero)).isEqualTo(charges);
+    assertThat(chargesLeft(battle, knight)).isEqualTo(-1);
+    assertThat(chargesLeft(battle, battle.getWorld().kingTower(0))).isEqualTo(-1);
+  }
+
+  /** What ability_charges_left answers for a context. */
+  private static int chargesLeft(Standard1v1Battle battle, WorldEntity context) {
+    BattleExpressionEnvironment environment =
+        new BattleExpressionEnvironment(context, battle.getWorld());
+    return ExpressionEvaluator.evaluate(
+        ExpressionCompiler.compile("ability_charges_left", environment), environment);
+  }
+
+  /** A battle with the hero Mega Minion played at (3500, 14000), one step after it appears. */
+  private static Standard1v1Battle heroPlayed() {
+    return heroPlayed(0);
+  }
+
+  /**
+   * A battle with the hero Mega Minion played at (3500, 14000), one step after it appears, played
+   * once the other side holds the given elixir as well.
+   */
+  private static Standard1v1Battle heroPlayed(int otherElixir) {
+    Standard1v1Battle battle = null;
+    LadderMatch match = null;
+    for (int word = 0; match == null || !inHand(match, "MegaMinion"); word++) {
+      battle = new Standard1v1Battle(GameData.tables());
+      match = battle.startLadderMatch(DECK, OTHER, word, 0, heroFirst(), new int[8]);
+    }
+    int cost = GameData.records().matchCard("MegaMinion").cost();
+    while (battle.getBattle().getTick() < match.getStartCooldownTicks()
+        || match.side(0).wholeElixir() < cost
+        || match.side(1).wholeElixir() < otherElixir) {
+      step(battle);
+    }
+    battle.play(
+        battle.getBattle().getTick(), GameData.card("MegaMinion"), LEVEL, 0, 3500, 14000, "m");
+    int limit = battle.getBattle().getTick() + 200;
+    while (named(battle, HERO).isEmpty()) {
+      assertThat(battle.getBattle().getTick()).isLessThan(limit);
+      step(battle);
+    }
+    step(battle);
+    return battle;
+  }
+
+  /** The names of the rows a unit's holder runs. */
+  private static List<String> runs(CharacterEntity unit) {
+    return unit.actionHolder().running().stream()
+        .map(ActionInstance::getAction)
+        .map(action -> action.name())
+        .toList();
+  }
+
+  /** Slot flags with the first card in the hero slot. */
+  private static int[] heroFirst() {
+    int[] slots = new int[8];
+    slots[0] = MatchSide.HERO_SLOT;
+    return slots;
+  }
+
+  private static boolean inHand(LadderMatch match, String card) {
+    List<MatchCard> deck = match.side(0).deck();
+    return Arrays.stream(match.side(0).getHand().slots())
+        .anyMatch(index -> index >= 0 && deck.get(index).name().equals(card));
+  }
+
+  /** The characters of a row the holder lists, in its order. */
+  private static List<CharacterEntity> named(Standard1v1Battle battle, String row) {
+    return battle.getWorld().getHolder().entities().stream()
+        .filter(CharacterEntity.class::isInstance)
+        .map(CharacterEntity.class::cast)
+        .filter(unit -> unit.getData().name().equals(row))
+        .toList();
+  }
+
+  private static void step(Standard1v1Battle battle) {
+    battle.getBattle().step();
+  }
+}

@@ -1,0 +1,776 @@
+/*
+ * crforge - https://github.com/voonhous/crforge
+ * SPDX-License-Identifier: Apache-2.0
+ * Porting this code? Please cite this file and the commit you read: see the README.
+ */
+
+package org.crforge.core.pathfinding;
+
+import static org.crforge.core.util.ValidationUtils.checkArgument;
+
+import java.util.function.BooleanSupplier;
+import java.util.function.IntSupplier;
+import java.util.function.Supplier;
+import lombok.Setter;
+import org.crforge.core.fidelity.Fidelity;
+import org.crforge.core.fidelity.FidelityStatus;
+import org.crforge.core.pathfinding.move.MovementChain;
+import org.crforge.core.pathfinding.move.MovementConfig;
+import org.crforge.core.pathfinding.move.MovementState;
+import org.crforge.core.pathfinding.state.StateSetter;
+import org.crforge.core.pathfinding.state.StateTimers;
+import org.crforge.core.pathfinding.target.TargetingState;
+
+/**
+ * The state setter of one grid-driven unit: the interrupt guard, and the actions a state change
+ * runs on the unit's movement and targeting components.
+ *
+ * <p>A state change is more than a store. Leaving the attacking state clears the targeting
+ * component's target-lost timer, while that component is switched on, and starts a row's
+ * not-attacking countdown; leaving the deploying or either pathfinding state clears the deploy
+ * countdown, unless the unit is leaving for clone setup. Entering the standing, attacking,
+ * clone-setup or casting state empties the route and clears the route-leads-away bit, so a unit
+ * that stops holds no route; entering clone setup also switches the movement component on, and
+ * leaving it empties the route and clears the movement component's destination. Entering the moving
+ * state prepares a route at once, over whatever reference the targeting component holds at that
+ * moment, rather than waiting for the next movement visit. The actions run in that order: exit
+ * actions, the store, entry actions.
+ *
+ * <p>The guard comes first: while the deploy countdown is running, only clone setup and the two
+ * removed-and-following states may be set, so nothing pulls a unit that is still being placed into
+ * attacking or moving. A request for the state the unit is already in does nothing at all.
+ *
+ * <p>The route preparation needs the movement pass's answers over the unit's <b>current</b>
+ * reference, which is why the setter is given a supplier of chains rather than a chain: each
+ * preparation builds a fresh one.
+ *
+ * <p>A unit without a movement component skips every route action, and one without a targeting
+ * component skips the target-lost clear; either may be null. The standard game reaches the
+ * targeting component through the unit's switch, so a component switched off, as a stun or a hold
+ * leaves it, is not there either: a unit stunned in the attacking state and moved out of it, as a
+ * Clone sets it up, keeps its target-lost timer.
+ *
+ * <p>A setter given the unit's deploy time seeds the deploy countdown on entering the deploying
+ * state with the larger of the countdown and the deploy time, which is how a unit that waited its
+ * turn starts deploying.
+ *
+ * <p>Entering the dashing state raises the dashing flag and, for a unit with a movement component,
+ * resets its charge - to 0 for a row with a charge range, to none without, with the targeting
+ * component's strike-now byte cleared - loads its dash timer with the row's constant dash time and
+ * clears its landing hold.
+ *
+ * <p>Entering either pathfinding state drops the damage pending on the unit, as the unit's own
+ * entry hook does; the pending duration is kept.
+ *
+ * <p>Entering the casting state, for a unit given its casting, raises the casting flag and seeds
+ * the ability's two countdowns in whole ticks, and empties the route; a cast whose countdowns are
+ * both 0 then runs the ability's effect at once and, still casting with no cast time left, goes
+ * back to the state it came from. Back to walking that is a bare store of the state, with no exit,
+ * no entry and no combat gate, so the route stays empty until the next movement visit prepares one;
+ * back to any other state it is a change of its own, running its own exit, entry and combat gate in
+ * place of the casting change's gate. Entering the ability's follow-up state seeds the cast's
+ * countdown with the follow-up's duration in whole ticks. Leaving it before the effect fired leaves
+ * the ability pending again, and a unit with a movement component has its charge reset.
+ *
+ * <p>Every change that stores a new state ends with the unit's combat gate, wherever it is asked
+ * for: a change into or out of the casting state with the casting's gate, one into or out of a
+ * hook's states with the hook's, an arrival out of the in-game pathfinding state with that
+ * arrival's, and any other with the setter's tail gate. So a gate that drops the reference and
+ * resumes the unit does so inside the change, at the point of the tick the change was asked at: a
+ * unit held standing under NO_MOVE whose targeting visit resumes it as a stun lands has its
+ * reference dropped and is resumed there, before its movement visit puts it back to standing, and
+ * is not left moving by the state visit's gate after that visit.
+ *
+ * <p><b>Not carried here.</b> The standard game also switches components on and off as states
+ * change, seeds the morph countdown on entering the morphing state, chains a further dash on
+ * leaving the dashing state and runs the row's closing action, resets the charge on leaving the
+ * follow-up states, relocates a unit leaving a following state to a free cell, makes a building
+ * asked to follow stand instead, and ends every change with a notification after its combat gate.
+ * None of that is reachable from a plain ground unit, which is all the grid drives.
+ */
+@Fidelity(
+    status = FidelityStatus.PARTIAL,
+    note =
+        "Settled: the interrupt guard; the route emptied on entering the standing, attacking,"
+            + " clone-setup and casting states; the route prepared on entering the moving state;"
+            + " the target-lost timer cleared, and the not-attacking countdown started, on"
+            + " leaving the attacking state, the first only while the targeting component is"
+            + " switched on, held by the recorded Clones of a Knight a Zap stunned just after it"
+            + " lost its target (stun_clone_lost_*), the second held by the reference battles"
+            + " card_Ghost,"
+            + " evo_ghost_vs_musketeer and knight_evolved_third_play; the deploy countdown"
+            + " cleared on leaving the deploying and pathfinding states and raised to the unit's"
+            + " deploy time on entering the deploying state; the dashing state's entry, held by"
+            + " card_Assassin and grid_clone_over_bandit_dash; the casting state's entry and exit"
+            + " with the combat gate after them, held by cg_giantbuffer_buffs_friends; the"
+            + " pending damage dropped, and every projectile aimed at the unit losing it, on"
+            + " entering either pathfinding state, held by ability_mighty_miner; the combat gate"
+            + " on leaving the"
+            + " in-game pathfinding state, held by ability_mighty_miner,"
+            + " filter_freeze_over_mightyminer_lane_switch and"
+            + " grid_rage_over_miner_tunnel_and_lane_switch; the combat gate at the end of every"
+            + " other change, held by recorded battles of an evolved Mega Knight held by its"
+            + " uppercut and stunned by Mini Sparkys; the follow-up state's countdown"
+            + " seeded on its entry, held by ability_monk and random_battle16_s0048; the clone"
+            + " setup's entry and exit, held by card_Clone and spell_clone_into_push; a pulled"
+            + " unit's exit into the clone setup without the standing test, held by"
+            + " clone-refusals-v1/pull_clone_pulled_troop and"
+            + " clone-refusals-v1/drag_clone_dragged_fisherman. Held by the"
+            + " walks of the reference battles, whose route empties at the lock, and the staggered"
+            + " placements of the reference battles, golden-gaps-v1/place_barbarians_edge and"
+            + " place_skeleton_army_edge among them. Not modelled: switching components, the"
+            + " countdown seeded on entering the morphing state, the chained dash and closing"
+            + " action on leaving the dashing state, whose columns are refused, the"
+            + " following-state rewrites and the notification every change ends with. A cast"
+            + " with no countdowns at all fires in the casting state's entry and goes back to the"
+            + " state it came from, held by ability_hero_giant_slap; back to walking by a bare"
+            + " store of the state, held by random_battle16_s0012, whose Ice Golemite hero casts"
+            + " as it walks past its princess tower and is routed on its next movement visit;"
+            + " refused for a casting given no effect to run there.")
+public final class GridStateSetter implements StateSetter {
+
+  /** Milliseconds per tick, which the casting countdowns are counted in. */
+  private static final int TICK_MS = 50;
+
+  private final GridEntity owner;
+  private final MovementState movement;
+  private final TargetingState targeting;
+  private final Supplier<MovementChain> chains;
+
+  /** The deploy countdown entering the deploying state seeds; -1 for a setter that seeds none. */
+  private final int deployTimeMs;
+
+  /** The unit's movement columns, which the dashing state's entry reads; null for none. */
+  private MovementConfig movementConfig;
+
+  /**
+   * What entering and leaving the casting state needs: the unit's countdowns, its ability's cast
+   * time and trigger delay, whether it is a champion's clone, the combat gate the change ends with,
+   * and how long the ability's follow-up state lasts.
+   *
+   * @param timers the unit's state-visit countdowns, which the entry seeds
+   * @param castTimeMs the ability's cast time
+   * @param triggerDelayMs the ability's trigger delay
+   * @param championClone true for a clone of a champion, whose cast is never left pending
+   * @param combatGate the combat gate, run at the end of a change into or out of the casting state
+   * @param abilityStateDurationMs how long the follow-up state lasts, which its entry seeds the
+   *     cast's countdown with in whole ticks; 0 for an ability without one
+   * @param effect the ability's effect, which a cast with neither a cast time nor a trigger delay
+   *     runs in the casting state's entry itself; null for a casting that never needs it there,
+   *     whose cast with no countdowns is refused
+   */
+  public record Casting(
+      StateTimers timers,
+      int castTimeMs,
+      int triggerDelayMs,
+      boolean championClone,
+      Runnable combatGate,
+      int abilityStateDurationMs,
+      Runnable effect) {
+
+    /** A casting whose ability has no follow-up state. */
+    public Casting(
+        StateTimers timers,
+        int castTimeMs,
+        int triggerDelayMs,
+        boolean championClone,
+        Runnable combatGate) {
+      this(timers, castTimeMs, triggerDelayMs, championClone, combatGate, 0, null);
+    }
+
+    /** A casting whose ability's effect is never run by the casting state's entry. */
+    public Casting(
+        StateTimers timers,
+        int castTimeMs,
+        int triggerDelayMs,
+        boolean championClone,
+        Runnable combatGate,
+        int abilityStateDurationMs) {
+      this(
+          timers,
+          castTimeMs,
+          triggerDelayMs,
+          championClone,
+          combatGate,
+          abilityStateDurationMs,
+          null);
+    }
+  }
+
+  /**
+   * What the hook's states do beyond the setter's own fields: the unit's component switches, the
+   * reference check, the standing test with its relocation, and the combat gate every change into
+   * or out of one of them ends with.
+   */
+  public interface Following {
+
+    /**
+     * Switches both components, the targeting and the movement one, on or off.
+     *
+     * @param on true to switch them on
+     */
+    void components(boolean on);
+
+    /** Switches the movement component back on, as leaving the held state to attack does. */
+    void movementOn();
+
+    /**
+     * Whether the targeting component is switched on now: the reference check of an entry to or an
+     * exit from a pulled state runs only on a component that was on as the change was asked.
+     *
+     * @return true when the targeting component is on
+     */
+    boolean targetingOn();
+
+    /** Drops the targeting reference when it no longer passes the attack range test. */
+    void dropReferenceOutOfRange();
+
+    /** Moves the unit off a cell the standing test refuses, as leaving a pulled state does. */
+    void standOrRelocate();
+
+    /** The combat gate a change into or out of the hook's states ends with. */
+    void tailGate();
+  }
+
+  /**
+   * Whether the unit's targeting component is switched on now, or null for a setter that treats it
+   * as on (a tower's, and the bare setters of the unit tests). The standard game reaches the
+   * component through the unit's switch: a component switched off, as a stun or a hold leaves it,
+   * is not there for the setter, so a change out of the attacking state keeps its target-lost
+   * timer.
+   */
+  @Setter private BooleanSupplier targetingSwitchedOn;
+
+  /** The unit's hook states, or null for a unit the setter refuses to move into them. */
+  @Setter private Following following;
+
+  /** The unit's casting, or null for a unit without an ability, which never casts. */
+  @Setter private Casting casting;
+
+  /**
+   * The charge range the unit's buffs give it, which the charge reset reads for a row without one,
+   * or null for a unit whose buffs give none.
+   */
+  @Setter private IntSupplier chargeRangeFromModifiers;
+
+  /**
+   * What entering the deploying state makes besides its countdown - a row's riders and its push -
+   * or null for nothing.
+   */
+  @Setter private Runnable deployingEntry;
+
+  /**
+   * What leaving the attacking state does besides clearing the target-lost timer - a row with a
+   * buff while it is not attacking starts that countdown - or null for nothing.
+   */
+  @Setter private Runnable attackingExit;
+
+  /**
+   * What entering either pathfinding state does besides dropping the pending damage - the
+   * projectiles aimed at the unit lose it as their target - or null for nothing.
+   */
+  @Setter private Runnable pathfindEntry;
+
+  /**
+   * The combat gate a change out of the in-game pathfinding state ends with, on the targeting
+   * component's own switch, or null for a unit that never enters that state.
+   */
+  @Setter private Runnable ingamePathfindExitGate;
+
+  /**
+   * The combat gate every change ends with that none of the gates above ends, on the targeting
+   * component's own switch, or null for a setter that runs none.
+   */
+  @Setter private Runnable tailGate;
+
+  /**
+   * Creates the setter of one unit.
+   *
+   * @param owner the unit whose state this sets
+   * @param movement the unit's movement component, or null when it has none
+   * @param targeting the unit's targeting component, or null when it has none
+   * @param chains builds a movement chain over the unit's current reference, for the route
+   *     preparation that entering the moving state runs
+   */
+  public GridStateSetter(
+      GridEntity owner,
+      MovementState movement,
+      TargetingState targeting,
+      Supplier<MovementChain> chains) {
+    this(owner, movement, targeting, chains, -1);
+  }
+
+  /**
+   * Creates the setter of one unit that seeds its deploy countdown on entering the deploying state.
+   *
+   * @param owner the unit whose state this sets
+   * @param movement the unit's movement component, or null when it has none
+   * @param targeting the unit's targeting component, or null when it has none
+   * @param chains builds a movement chain over the unit's current reference
+   * @param deployTimeMs the unit's deploy time, which entering the deploying state seeds the
+   *     countdown with; -1 to seed nothing
+   */
+  public GridStateSetter(
+      GridEntity owner,
+      MovementState movement,
+      TargetingState targeting,
+      Supplier<MovementChain> chains,
+      int deployTimeMs) {
+    this(owner, movement, targeting, chains, deployTimeMs, null);
+  }
+
+  /**
+   * Creates the setter of one unit that seeds its deploy countdown and can enter the dashing state.
+   *
+   * @param owner the unit whose state this sets
+   * @param movement the unit's movement component, or null when it has none
+   * @param targeting the unit's targeting component, or null when it has none
+   * @param chains builds a movement chain over the unit's current reference
+   * @param deployTimeMs the unit's deploy time, or -1 to seed nothing
+   * @param movementConfig the unit's movement columns, whose charge range and constant dash time
+   *     the dashing state's entry reads; null for a unit that never dashes
+   */
+  public GridStateSetter(
+      GridEntity owner,
+      MovementState movement,
+      TargetingState targeting,
+      Supplier<MovementChain> chains,
+      int deployTimeMs,
+      MovementConfig movementConfig) {
+    this.owner = owner;
+    this.movement = movement;
+    this.targeting = targeting;
+    this.chains = chains;
+    this.deployTimeMs = deployTimeMs;
+    this.movementConfig = movementConfig;
+  }
+
+  /**
+   * The unit's movement columns from now on, as a swap of its row makes them: the charge reset and
+   * the dashing state's entry read the row the unit has.
+   *
+   * @param movementConfig the unit's movement columns
+   */
+  public void setMovementConfig(MovementConfig movementConfig) {
+    this.movementConfig = movementConfig;
+  }
+
+  /**
+   * What leaving the dashing state does for a unit whose dashes chain: the chain's next dash, which
+   * keeps the unit dashing, or the dash's end.
+   */
+  public interface DashExit {
+
+    /**
+     * Starts the chain's next dash as the unit is asked to leave for a state, when it may.
+     *
+     * @param newState the state asked for
+     * @return true when a next dash started: the unit stays dashing, and nothing else is done
+     */
+    boolean chain(int newState);
+
+    /** The dash's end, as the unit leaves the dashing state with no next dash. */
+    void end();
+  }
+
+  /** What leaving the dashing state does, for a unit whose dashes chain; null for any other. */
+  private DashExit dashExit;
+
+  /**
+   * Gives the setter what leaving the dashing state does for a unit whose dashes chain.
+   *
+   * @param dashExit the chain and the dash's end
+   */
+  public void setDashExit(DashExit dashExit) {
+    this.dashExit = dashExit;
+  }
+
+  @Override
+  public void setState(GridEntity entity, int newState) {
+    checkArgument(
+        entity == owner,
+        () -> "the setter of " + owner.getName() + " was asked about " + entity.getName());
+    int oldState = owner.getState();
+    if (oldState == newState) {
+      return;
+    }
+    if (owner.getDeployCountdown() >= 1 && !interruptsDeployment(newState)) {
+      return;
+    }
+    boolean hook = hookState(oldState) || hookState(newState);
+    if (hook && following == null) {
+      throw new UnsupportedOperationException(
+          owner.getName() + " is asked into or out of a hook's state, not modelled for it");
+    }
+    // Leaving the dashing state, a chain's next dash keeps the unit dashing: nothing is stored.
+    if (oldState == GridEntityState.DASHING && dashExit != null && dashExit.chain(newState)) {
+      return;
+    }
+    exit(oldState, newState);
+    owner.setState(newState);
+    if (enter(oldState, newState)) {
+      // A cast with no countdowns fired in the entry and went back to the state it came from,
+      // whose own change ran the combat gate: this change ends without its own.
+      return;
+    }
+    // Every change ends with one combat gate: the casting's for a change into or out of the casting
+    // state, the hook's for one into or out of the hook's states, the arrival's for one out of the
+    // in-game pathfinding state, and the tail gate for any other.
+    boolean gated = false;
+    if ((oldState == GridEntityState.CASTING || newState == GridEntityState.CASTING)
+        && casting != null) {
+      casting.combatGate().run();
+      gated = true;
+    }
+    if (hook) {
+      following.tailGate();
+      gated = true;
+    }
+    // An arrival out of the in-game pathfinding state ends with the combat gate too: a unit that
+    // deploys again there drops its reference.
+    if (oldState == GridEntityState.INGAME_PATHFIND && ingamePathfindExitGate != null) {
+      ingamePathfindExitGate.run();
+      gated = true;
+    }
+    // Any other change ends with the tail gate, as the change is made, not at the state visit's
+    // tail: a stun found there drops the reference and resumes the unit before the rest of the
+    // tick, its movement visit included, runs.
+    if (!gated && tailGate != null) {
+      tailGate.run();
+    }
+  }
+
+  /** The two pulled states and the held state a hook sets. */
+  private static boolean hookState(int state) {
+    return state == GridEntityState.FOLLOWING_REMOVED
+        || state == GridEntityState.FOLLOWING_REMOVED_BUILDING
+        || state == GridEntityState.COMPONENTS_DISABLED;
+  }
+
+  /** The three states that may be set while the deploy countdown is still running. */
+  private static boolean interruptsDeployment(int state) {
+    return state == GridEntityState.CLONE_SETUP
+        || state == GridEntityState.FOLLOWING_REMOVED
+        || state == GridEntityState.FOLLOWING_REMOVED_BUILDING;
+  }
+
+  /** The actions keyed by the state being left. */
+  private void exit(int oldState, int newState) {
+    switch (oldState) {
+      case GridEntityState.ATTACKING -> {
+        if (targeting != null
+            && (targetingSwitchedOn == null || targetingSwitchedOn.getAsBoolean())) {
+          targeting.setTargetLostTimerMs(0);
+        }
+        if (attackingExit != null) {
+          attackingExit.run();
+        }
+      }
+      case GridEntityState.DEPLOYING,
+          GridEntityState.SPAWN_PATHFIND,
+          GridEntityState.INGAME_PATHFIND -> {
+        if (newState != GridEntityState.CLONE_SETUP) {
+          owner.setDeployCountdown(0);
+        }
+      }
+      case GridEntityState.CASTING -> exitCasting();
+      case GridEntityState.DASHING -> {
+        if (dashExit != null) {
+          dashExit.end();
+        }
+      }
+      case GridEntityState.FOLLOWING_REMOVED, GridEntityState.FOLLOWING_REMOVED_BUILDING ->
+          exitPulled(newState);
+      // Leaving a clone's setup empties the route and forgets the point the move aimed at.
+      case GridEntityState.CLONE_SETUP -> {
+        if (movement != null) {
+          resetRoute();
+          movement.setExplicitX(-1);
+          movement.setExplicitY(-1);
+        }
+      }
+      default -> {
+        // No ported action.
+      }
+    }
+  }
+
+  /**
+   * Leaving a pulled state: both components switched on and, with a movement component, the point
+   * the unit aimed at, the move time and its copy, the charge and the pushback's bytes reset and a
+   * reference out of range dropped; then the standing test on the unit's cell, which moves it off a
+   * cell it may not stand on. The route the standard game empties here too is emptied, or prepared
+   * afresh, by the entry of the state asked for: standing, moving or the clone's setup.
+   *
+   * <p>A unit a Clone reaches while pulled (a troop the hook pulls, or a Fisherman his hook drags
+   * to a building) leaves for the clone's setup the same way but skips the standing test: it stays
+   * where the hook had it, on the river too, and its move apart starts from there. The hook no
+   * longer pulls a troop set up so, and flies on to its aim; a dragged Fisherman's targeting goes
+   * off in the setup's combat gate, so the hook's next step finds its owner lost and ends it where
+   * it stands.
+   *
+   * <p>The move time starting again from 0 gives a unit that walks and waits by turns (a row with a
+   * stop-movement-after time) a whole stretch of walking after the release: it walks on the first
+   * step it is moving again, wherever in its stretch the hook caught it, and its next wait falls a
+   * whole stretch later.
+   *
+   * <p>The reference check reads the targeting component as it was when the change was asked,
+   * before the switch: a pulled troop's is off, so the troop keeps its reference however far the
+   * pull took it, and an attack it was part way through goes on from where the hook stopped it. A
+   * Fisherman dragged to a building has his on, and drops a reference out of range.
+   */
+  private void exitPulled(int newState) {
+    boolean targetingWasOn = following.targetingOn();
+    following.components(true);
+    if (movement != null) {
+      movement.setExplicitX(-1);
+      movement.setExplicitY(-1);
+      movement.setMoveTimeMs(0);
+      movement.setMoveTimeMsCopy(0);
+      resetCharge();
+      movement.stopPushback();
+      if (targetingWasOn) {
+        following.dropReferenceOutOfRange();
+      }
+    }
+    // Set up as a clone, the unit is not tested on its cell: it stays where the hook had it.
+    if (newState == GridEntityState.CLONE_SETUP) {
+      return;
+    }
+    following.standOrRelocate();
+  }
+
+  /**
+   * Leaving the casting state: a cast left before its effect fired is pending again, unless the
+   * unit is a champion's clone, and a unit with a movement component has its charge reset.
+   */
+  private void exitCasting() {
+    if (casting != null
+        && casting.timers().getAbilityWarningCountdown() >= 1
+        && !casting.championClone()) {
+      owner.setPendingFlags(owner.getPendingFlags() | owner.getFlagBits().abilityCooldownPaused());
+      casting.timers().setAbilityReady(true);
+    }
+    if (movement != null) {
+      resetCharge();
+    }
+  }
+
+  /**
+   * Entering the casting state: the casting flag raised and the countdowns seeded in whole ticks,
+   * the cast time's and the trigger delay's. A cast with neither, whose effect fires in the entry
+   * itself, needs the casting's effect; without one it is refused.
+   */
+  private void enterCasting() {
+    if (casting == null) {
+      throw new UnsupportedOperationException(
+          owner.getName() + " enters the casting state without an ability");
+    }
+    owner.setPendingFlags(owner.getPendingFlags() | owner.getFlagBits().castingAbility());
+    int cast = casting.castTimeMs() / TICK_MS;
+    int trigger = casting.triggerDelayMs() / TICK_MS;
+    if ((cast | trigger) == 0 && casting.effect() == null) {
+      throw new UnsupportedOperationException(
+          owner.getName() + " casts with no cast time and no trigger delay, not modelled");
+    }
+    casting.timers().setAbilityCountdown(cast);
+    casting.timers().setAbilityWarningCountdown(trigger);
+  }
+
+  /**
+   * The end of the casting state's entry, after the route is emptied: a cast whose two countdowns
+   * are both 0 runs the ability's effect at once, as the state visit would on the step its trigger
+   * delay ran out; then, when the unit is still casting with no cast time left (the effect did not
+   * send it into the follow-up state), it goes back to the state it came from.
+   *
+   * <p>A unit that came from walking is walking again by a store of the state alone: the casting
+   * state is not left (its charge is kept), the walking state is not entered (no route is prepared
+   * here, during the command that asked for the cast, over an overlay the tick has not built yet)
+   * and no combat gate runs. Its next movement visit finds the route empty and prepares one from
+   * where it stands, over that tick's overlay. A unit that came from any other state goes back
+   * through a change of its own, which runs its own exit, entry and combat gate. (The game of data
+   * version 14.593.1 changes back in full from walking too; none of its reference battles tells the
+   * two apart.)
+   *
+   * @param oldState the state the unit was in before it entered the casting state
+   * @return true when the unit went back, so the change into the casting state ends without its own
+   *     combat gate
+   */
+  private boolean castAtOnce(int oldState) {
+    StateTimers timers = casting.timers();
+    if ((timers.getAbilityCountdown() | timers.getAbilityWarningCountdown()) != 0) {
+      return false;
+    }
+    casting.effect().run();
+    if (timers.getAbilityCountdown() > 0 || owner.getState() != GridEntityState.CASTING) {
+      return false;
+    }
+    if (oldState == GridEntityState.MOVING) {
+      // The state is stored and the change ends there: the casting state is not left, the walking
+      // state not entered, and no combat gate runs. The route the entry emptied stays empty until
+      // the unit's next movement visit prepares one.
+      owner.setState(GridEntityState.MOVING);
+      return true;
+    }
+    setState(owner, oldState);
+    return true;
+  }
+
+  /**
+   * The charge reset: to 0 for a row with a charge range or a unit whose buffs give one, to none
+   * otherwise, with the targeting component's strike-now byte cleared.
+   */
+  private void resetCharge() {
+    checkArgument(
+        movementConfig != null,
+        () -> "the setter of " + owner.getName() + " has no movement columns to reset a charge by");
+    boolean charges =
+        movementConfig.chargeRange() != 0
+            || (chargeRangeFromModifiers != null && chargeRangeFromModifiers.getAsInt() != 0);
+    movement.setChargeProgress(charges ? 0 : MovementState.CHARGE_INACTIVE);
+    if (targeting != null) {
+      targeting.setChargeStrike(false);
+    }
+  }
+
+  /**
+   * The actions keyed by the state being entered, run after it is stored.
+   *
+   * @return true when a cast with no countdowns fired in the casting state's entry and the unit
+   *     went back to the state it came from, which ends the change without its own combat gate
+   */
+  private boolean enter(int oldState, int newState) {
+    switch (newState) {
+      case GridEntityState.STANDING -> resetRoute();
+      case GridEntityState.ATTACKING -> {
+        if (oldState == GridEntityState.COMPONENTS_DISABLED) {
+          following.movementOn();
+        }
+        resetRoute();
+      }
+      // Pulled: a reference out of range is dropped, when the targeting component is on as the
+      // change is asked, and both components are switched off; held:
+      // both are switched off. The combat gate after it switches the targeting one back on in all
+      // but the troop's pulled state.
+      // A building, which the standard game makes stand instead, is never asked: a hook on one
+      // drags its owner.
+      case GridEntityState.FOLLOWING_REMOVED, GridEntityState.FOLLOWING_REMOVED_BUILDING -> {
+        if (following.targetingOn()) {
+          following.dropReferenceOutOfRange();
+        }
+        following.components(false);
+      }
+      case GridEntityState.COMPONENTS_DISABLED -> following.components(false);
+      // A clone's setup switches the movement component on and empties the route; the charge is
+      // kept, the standard game not resetting it there.
+      case GridEntityState.CLONE_SETUP -> {
+        if (movement != null && owner.isMovementComponent()) {
+          owner.setMovementActive(true);
+        }
+        resetRoute();
+      }
+      case GridEntityState.CASTING -> {
+        enterCasting();
+        resetRoute();
+        return castAtOnce(oldState);
+      }
+      case GridEntityState.MOVING -> {
+        // The entry to moving switches the movement component on. Only the held state has it off
+        // here in a battle: a Fisherman whose hook ended while he waited for the pull walks again.
+        // Elsewhere it is on already, and the scenes that hold a unit still by switching it off
+        // keep it off.
+        if (oldState == GridEntityState.COMPONENTS_DISABLED) {
+          following.movementOn();
+        }
+        prepareRoute();
+      }
+      case GridEntityState.DASHING -> enterDash();
+      // The ability's follow-up state counts its duration down on the cast's countdown, in whole
+      // ticks; the state visit takes it from there.
+      case GridEntityState.ABILITY_FOLLOW_UP -> enterFollowUp();
+      // The entity's own entry hook: a unit that goes underground or pathfinds in the battle drops
+      // the damage pending on it, whose duration it keeps, and the projectiles aimed at it lose it.
+      // Then, with its movement component on, its pushback in flight is stopped: a unit pushed as
+      // its ability switches lanes routes across from where the push has left it.
+      case GridEntityState.SPAWN_PATHFIND, GridEntityState.INGAME_PATHFIND -> {
+        owner.setPendingDamageAmount(0);
+        if (pathfindEntry != null) {
+          pathfindEntry.run();
+        }
+        if (movement != null && owner.isMovementActive()) {
+          movement.stopPushback();
+        }
+      }
+      case GridEntityState.DEPLOYING -> {
+        // Entering the deploying state switches the movement component on, which a unit that
+        // waited its turn had off; a building has none to switch.
+        if (movement != null && owner.isMovementComponent()) {
+          owner.setMovementActive(true);
+        }
+        if (deployTimeMs >= 0) {
+          // The entry keeps the larger of the running countdown and the deploy time. The guard
+          // refuses this state while the countdown is 1 or more, so here it is the deploy time.
+          owner.setDeployCountdown(Math.max(owner.getDeployCountdown(), deployTimeMs));
+        }
+        if (deployingEntry != null) {
+          deployingEntry.run();
+        }
+      }
+      default -> {
+        // No ported action.
+      }
+    }
+    return false;
+  }
+
+  /**
+   * The follow-up state's entry: the cast's countdown seeded with the ability's follow-up duration
+   * in whole ticks.
+   */
+  private void enterFollowUp() {
+    if (casting == null) {
+      throw new UnsupportedOperationException(
+          owner.getName() + " enters the ability's follow-up state without an ability");
+    }
+    casting.timers().setAbilityCountdown(casting.abilityStateDurationMs() / TICK_MS);
+  }
+
+  /**
+   * The dashing state's entry: the dashing flag raised and, with a movement component, the charge
+   * reset, the dash timer loaded and the landing hold cleared.
+   */
+  private void enterDash() {
+    owner.setPendingFlags(owner.getPendingFlags() | owner.getFlagBits().dashing());
+    if (movement == null) {
+      return;
+    }
+    resetCharge();
+    // The dash timer: the constant dash time, when the row has one; a fixed dash distance, which
+    // times the dash by its length instead, is refused with its row.
+    if (movementConfig.dashConstantTime() >= 1) {
+      movement.setDashTimeMs(movementConfig.dashConstantTime());
+    }
+    owner.setBlockCountdownMs(0);
+  }
+
+  /** Empties the route and clears the route-leads-away bit. */
+  private void resetRoute() {
+    if (movement == null) {
+      return;
+    }
+    movement.getRoute().clear();
+    movement.setRouteLeadsAway(0);
+  }
+
+  /**
+   * Prepares a route over the unit's current reference, as entering the moving state does. Storing
+   * a reference asks for the same preparation, so a targeting component's owner points its route
+   * request here.
+   */
+  public void prepareRoute() {
+    if (movement == null) {
+      return;
+    }
+    chains.get().prepareRoute();
+  }
+}

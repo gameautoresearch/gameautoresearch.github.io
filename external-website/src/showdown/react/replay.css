@@ -1,0 +1,50 @@
+/* <BattleReplay>: Showdown's field, one slim control bar, and a collapsed battle log. */
+.psr { --psr-ink: #000; --psr-muted: #6b6b6b; --psr-rule: #eaeaea; --psr-rail: #e2e2de; --psr-p1: #0081ad; --psr-p2: #e0218a;
+  outline: none; }
+
+/* Field: Showdown's 640 × 360 battle, scaled to the container's width. Clicking it plays or pauses. */
+.psr-stage { position: relative; width: 100%; overflow: hidden; border-radius: 6px; background: #cfd5da; cursor: pointer; }
+.psr-scale { position: absolute; top: 0; left: 0; width: 640px; height: 360px; transform-origin: 0 0; }
+.psr .battle { position: absolute; top: 0; left: 0; width: 640px; height: 360px; margin: 0; border: 0; }
+/* Showdown's own overlay buttons (one can turn sound on) are replaced by the bar. */
+.psr .battle .playbutton, .psr .battle .replayDownloadButton { display: none !important; }
+.psr-note { position: absolute; inset: 0; display: grid; place-items: center; color: #555; font-size: 13px; }
+
+/* Bar: every control is 32px tall and centred on one line. */
+.psr-bar { display: flex; align-items: center; gap: 2px; height: 36px; margin-top: 4px; }
+.psr-bar button { flex: none; display: grid; place-items: center; height: 32px; padding: 0; border: 0; background: none;
+  color: var(--psr-muted); font: inherit; cursor: pointer; -webkit-tap-highlight-color: transparent; transition: color 120ms ease; }
+.psr-bar button:hover:not(:disabled) { color: var(--psr-ink); }
+.psr-bar button:disabled { opacity: 0.4; cursor: default; }
+.psr-bar button:focus-visible, .psr-scrub:focus-visible, .psr-log summary:focus-visible { outline: 2px solid var(--psr-p1); outline-offset: 1px; border-radius: 4px; }
+.psr-ic { width: 32px; }
+.psr-ic svg { width: 16px; height: 16px; display: block; }
+.psr-bar .psr-play { color: var(--psr-ink); margin-left: -8px; }
+.psr-bar button[aria-pressed="true"] { color: var(--psr-ink); }
+.psr-txt { min-width: 32px; font-size: 12.5px !important; font-variant-numeric: tabular-nums; }
+.psr-turn { flex: none; min-width: 40px; padding: 0 6px 0 8px; color: var(--psr-muted); font-size: 12.5px; line-height: 32px;
+  text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+/* Scrubber: rail, fill, knockout dots and thumb share one centre line and one x coordinate. */
+.psr-scrub { position: relative; flex: 1; min-width: 60px; height: 32px; cursor: pointer; touch-action: none; }
+.psr-scrub-inner { position: absolute; top: 0; bottom: 0; left: 7px; right: 7px; }
+.psr-rail, .psr-fill { position: absolute; top: 50%; left: 0; height: 3px; margin-top: -1.5px; border-radius: 2px; }
+.psr-rail { right: 0; background: var(--psr-rail); }
+.psr-fill { background: var(--psr-ink); }
+.psr-dot { position: absolute; top: 50%; width: 6px; height: 6px; margin: -3px 0 0 -3px; border-radius: 50%; background: var(--psr-p1);
+  box-shadow: 0 0 0 1.5px #fff; }
+.psr-dot.p2 { background: var(--psr-p2); }
+.psr-thumb { position: absolute; top: 50%; width: 12px; height: 12px; margin: -6px 0 0 -6px; border-radius: 50%;
+  background: var(--psr-ink); box-shadow: 0 0 0 2px #fff; transition: transform 120ms ease; pointer-events: none; }
+.psr-scrub:hover .psr-thumb { transform: scale(1.15); }
+
+/* Battle log: collapsed under a summary line, opens in place. */
+.psr-log { margin-top: 2px; border-top: 1px solid var(--psr-rule); }
+.psr-log summary { display: flex; align-items: center; gap: 6px; padding: 8px 0; color: var(--psr-muted); font-size: 12.5px;
+  cursor: pointer; list-style: none; user-select: none; }
+.psr-log summary::-webkit-details-marker { display: none; }
+.psr-log summary::before { content: ""; width: 0; height: 0; border-left: 5px solid currentColor; border-top: 4px solid transparent;
+  border-bottom: 4px solid transparent; transition: transform 120ms ease; }
+.psr-log[open] summary::before { transform: rotate(90deg); }
+.psr-log summary:hover { color: var(--psr-ink); }
+.psr .battle-log { position: static; width: auto; height: 220px; border: 0; background: #fff; font-size: 13px; overflow-y: auto; }

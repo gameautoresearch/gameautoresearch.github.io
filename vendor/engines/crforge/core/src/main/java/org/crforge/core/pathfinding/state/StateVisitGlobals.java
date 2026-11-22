@@ -1,0 +1,30 @@
+/*
+ * crforge - https://github.com/voonhous/crforge
+ * SPDX-License-Identifier: Apache-2.0
+ * Porting this code? Please cite this file and the commit you read: see the README.
+ */
+
+package org.crforge.core.pathfinding.state;
+
+import org.crforge.core.pathfinding.grid.PathfindingGlobals;
+
+/**
+ * The match-wide settings the entity state visit reads.
+ *
+ * @param attackFinishTimeMs the attack-finish time, which is also how long a spawned unit's
+ *     first-tick immunity lasts
+ */
+public record StateVisitGlobals(int attackFinishTimeMs) {
+
+  /** The standard settings, made once: the record is immutable, so every visit can share it. */
+  private static final StateVisitGlobals STANDARD =
+      new StateVisitGlobals(PathfindingGlobals.ATTACK_FINISH_TIME_MS);
+
+  /**
+   * The standard game's value: {@link PathfindingGlobals#ATTACK_FINISH_TIME_MS}, so a spawned
+   * unit's first-tick immunity survives five visits and clears on the sixth.
+   */
+  public static StateVisitGlobals standard() {
+    return STANDARD;
+  }
+}

@@ -1,0 +1,7 @@
+[package]
+name = "tavern-build-ptx"
+version = "0.1.0"
+edition = "2024"
+license = "MIT"
+[dependencies]
+cuda_builder = { git = "https://github.com/Rust-GPU/Rust-CUDA", rev = "3a82c35a7196731fb60eebdac2a40d2b1bf0ba95", features = ["rustc_codegen_nvvm","llvm21"] }

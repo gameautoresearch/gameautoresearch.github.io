@@ -1,0 +1,444 @@
+/*
+ * crforge - https://github.com/voonhous/crforge
+ * SPDX-License-Identifier: Apache-2.0
+ * Porting this code? Please cite this file and the commit you read: see the README.
+ */
+
+package org.crforge.core.battle.replay;
+
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
+import org.crforge.core.battle.data.GameVersions;
+
+/**
+ * The replay fields that differ between data versions, and how {@link ReplayScenario} reads each in
+ * a version's replays. Every version's replays share the fields that version 14.593.1's write; a
+ * later version's replays write more fields, and pin some shared ones to other values.
+ *
+ * <p>A version is listed here only once its replays' fields have been decided, each one consumed,
+ * pinned or carried as {@link ReplayScenario} describes. A replay of any other version is read by
+ * the 14.593.1 fields, so a field only a later version writes is refused as one with no mapping.
+ *
+ * <p>A case generated for the tests ({@link ScenarioShape#GENERATED}) is written in 14.593.1's
+ * replay shape whatever its version, and is read by a version's generated cases' fields ({@link
+ * #generated}), listed once recorded battles of such cases have established them, for every data
+ * version of the game client they were recorded on.
+ *
+ * @param dataVersion the data version, as the game tables name it
+ * @param rootPins the replay's own fields pinned to one value, by field
+ * @param events whether the replay's events ({@code evt}) are carried, each of an event type in
+ *     {@link #EVENT_TYPES}; else they are pinned to none
+ * @param battlePins the battle header's fields pinned to one value beyond those every version pins,
+ *     by field
+ * @param battleCarried the battle header's fields carried, by field, with what each is; a field
+ *     listed may be left out
+ * @param avatarPins each avatar's fields pinned to one value, by field
+ * @param avatarCarried each avatar's fields carried, by field, with what each is
+ * @param accountHighOptional whether an avatar may leave out the high word of its account id, read
+ *     as 0
+ * @param deckCarried each deck's fields carried beyond its cards and its tower selection
+ * @param cardCarried each deck card's fields carried beyond its row, level and slot flags
+ * @param selectionPins the tower selection's fields pinned to one value, by field
+ * @param selectionCarried the tower selection's fields carried
+ * @param playerData how each player's data ({@code hbd}) is read: {@code null} for the 14.593.1
+ *     rule, only data with no emotes listed; else the fields an entry may hold, its king level
+ *     {@code kt} among them
+ * @param cosmeticCarried whether a play's packed cosmetic field (bits 17..18) is carried; else it
+ *     must be 0
+ * @param excludedEvolutions whether a player data entry may hold the evolutions excluded from the
+ *     battle ({@value #EXCLUDED_EVOLUTIONS_FIELD}), read as {@link ReplayScenario} describes
+ * @param ladderEvents whether a Ladder battle under an event is read: the battle header's event
+ *     block ({@value #EVENT_FIELD}) with game mode type {@value #EVENT_GAME_MODE_TYPE}, the event's
+ *     trail and id ({@code te}), and the card level minimum ({@value #CARD_LEVEL_MIN_FIELD}) of any
+ *     battle, read as {@link ReplayScenario} describes; else the event block has no mapping and the
+ *     card level minimum, where the version writes it, is pinned
+ */
+public record ReplayFormat(
+    String dataVersion,
+    Map<String, String> rootPins,
+    boolean events,
+    Map<String, String> battlePins,
+    Map<String, String> battleCarried,
+    Map<String, String> avatarPins,
+    Map<String, String> avatarCarried,
+    boolean accountHighOptional,
+    List<String> deckCarried,
+    List<String> cardCarried,
+    Map<String, String> selectionPins,
+    List<String> selectionCarried,
+    List<String> playerData,
+    boolean cosmeticCarried,
+    boolean excludedEvolutions,
+    boolean ladderEvents) {
+
+  /**
+   * The event types of a version whose events are carried, each what a player's client showed. The
+   * battle reads no event: once an event's tick is reached, the step hands it to the listener the
+   * screen sets, after the step's own work. Type 10 is a sticker a player sent (its parameters: the
+   * sticker's kind, the sender's side and the sticker's id), which the screen shows in a bubble.
+   * Any other type is refused until what it is has been established.
+   */
+  public static final Set<Integer> EVENT_TYPES = Set.of(1, 3, 5, 10);
+
+  /** The fields of one event. */
+  public static final Set<String> EVENT_FIELDS =
+      Set.of("type", "id_hi", "id_lo", "ticks", "params", "coords");
+
+  /** The player data field that gives the side's king level, counted from 1. */
+  public static final String KING_LEVEL_FIELD = "kt";
+
+  /**
+   * The player data field that lists the evolutions excluded from the battle, each by its data id
+   * (its table's id times a million plus its row's index): a play of a card whose evolution is
+   * listed is not built evolved.
+   */
+  public static final String EXCLUDED_EVOLUTIONS_FIELD = "es";
+
+  /** The battle header field that holds the event a battle is played under. */
+  public static final String EVENT_FIELD = "event";
+
+  /** The game mode type ({@code gmt}) of a Ladder battle played under an event. */
+  public static final String EVENT_GAME_MODE_TYPE = "16";
+
+  /** The battle header field that holds the card level minimum, 0 for none. */
+  public static final String CARD_LEVEL_MIN_FIELD = "cardlvlmin";
+
+  /** A battle header switch of client 16.635.1's replays, true in a challenge's. */
+  public static final String SEB_FIELD = "seb";
+
+  /**
+   * The player data field that holds the player's progress on the trail the battle counts for: its
+   * trophy road, arena and theme, presentation and matchmaking.
+   */
+  public static final String TRAIL_PROGRESS_FIELD = "trl";
+
+  /** The fields of version 14.593.1's replays, which every version's replays share. */
+  public static final ReplayFormat V14_593_1 =
+      new ReplayFormat(
+          GameVersions.DATA_14_593_1,
+          Map.of(),
+          false,
+          Map.of(),
+          Map.of(),
+          ordered("expLevel", "1", "npc", "false"),
+          Map.of(),
+          false,
+          List.of(),
+          List.of(),
+          ordered("t", "0", "c", "1"),
+          List.of(),
+          null,
+          false,
+          false,
+          false);
+
+  /**
+   * The fields of version 16.402.18's replays: the request lists ({@code srq}, {@code srs}) and
+   * three header switches pinned to the one value they are established on; the replay's events, the
+   * players' profiles, the deck cards' cosmetics, the tower card's counts and flags and the
+   * players' data other than the king level carried, with no battle input; each side's king level
+   * read from its player data.
+   */
+  public static final ReplayFormat V16_402_18 =
+      new ReplayFormat(
+          GameVersions.DATA_16_402_18,
+          ordered("srq", "[]", "srs", "[]"),
+          true,
+          ordered("cardlvlmin", "0", "rrb", "false", "seb", "false"),
+          ordered(
+              "rkd",
+              "the Path of Legends header of a Ranked1v1_NewArena replay, matchmaking and"
+                  + " presentation: the battle plays the same with it as a Ladder battle"),
+          ordered("npc", "false"),
+          ordered(
+              "expLevel",
+              "the player's experience level, no battle input: the king's level is its player"
+                  + " data's kt",
+              "expPoints",
+              "presentation",
+              "totalExpPoints",
+              "presentation",
+              "clan_name",
+              "presentation",
+              "clan_id_hi",
+              "presentation",
+              "clan_id_lo",
+              "presentation",
+              "badge",
+              "presentation",
+              "welo",
+              "presentation",
+              "scr",
+              "presentation",
+              "spi",
+              "presentation",
+              "spt",
+              "presentation",
+              "lti",
+              "presentation",
+              "birth_date",
+              "presentation",
+              "rnk_sc",
+              "the player's Path of Legends score, presentation: the battle plays the same with"
+                  + " it as a Ladder battle"),
+          true,
+          List.of("hdr"),
+          List.of("pr", "sc", "hsc"),
+          ordered("t", "0"),
+          List.of("c", "newu", "newf"),
+          List.of(
+              KING_LEVEL_FIELD,
+              "em",
+              "sk",
+              "bn",
+              "br",
+              "brp",
+              "egr",
+              "npc",
+              "hcl",
+              "dts",
+              "dbi",
+              "ptix",
+              "rrsmr",
+              "ts",
+              "sa"),
+          true,
+          false,
+          false);
+
+  /**
+   * The fields of client 16.635.1's replays: 16.402.18's, and a player data entry may list the
+   * evolutions excluded from the battle ({@value #EXCLUDED_EVOLUTIONS_FIELD}). Client 16.402.17
+   * reads that field too and builds a play's item without it; client 16.635.1 builds a play of a
+   * card whose evolution is listed unevolved.
+   *
+   * <p>A Ladder battle under an event is read too ({@link #ladderEvents}): its event block, game
+   * mode type {@value #EVENT_GAME_MODE_TYPE}, the event's trail and id, and the card level minimum,
+   * which is no longer pinned to 0; each player data entry may hold the player's trail progress
+   * ({@value #TRAIL_PROGRESS_FIELD}), carried. Traced on client 16.635.1 only.
+   *
+   * <p>The header switch {@value #SEB_FIELD}, true in a challenge's replays, is carried, no longer
+   * pinned to false: the game stores it with the header and reads it only to write the header out
+   * again, never in a battle.
+   */
+  public static final ReplayFormat V16_635_1 =
+      V16_402_18
+          .withExcludedEvolutions(GameVersions.DATA_16_635_3)
+          .withLadderEvents()
+          .withSebCarried();
+
+  /**
+   * The format of each data version whose replays' fields have been decided. The fields are the
+   * game client's: client 16.402.17's replays of data version 16.402.18 decided them for every data
+   * version that client runs ({@link GameVersions#CLIENT_16_402_17_DATA}); its replays of 16.402.19
+   * write the same fields. Client 16.635.1's replays of data version 16.635.3 decided {@link
+   * #V16_635_1} for every data version that client runs ({@link
+   * GameVersions#CLIENT_16_635_1_DATA}).
+   */
+  private static final Map<String, ReplayFormat> BY_VERSION = byVersion();
+
+  /**
+   * The fields of each data version's generated cases, once recorded battles of such cases on its
+   * game client have established them. A 14.593.1 case is in its own version's replay shape.
+   *
+   * <p>A case generated for a data version of client 16.402.17 ({@link
+   * GameVersions#CLIENT_16_402_17_DATA}) is read by version 14.593.1's fields, with the version's
+   * command types. Such a case leaves out the request lists ({@code srq}, {@code srs}), the header
+   * switches {@code cardlvlmin}, {@code rrb} and {@code seb}, and the players' king levels ({@code
+   * kt}), and keeps 14.593.1's arena. The recorded battles of such cases on data version 16.402.18
+   * play the same with the request lists empty, the switches at the values this client's replays
+   * pin, the arena of this client's replays and a king level of 1 for each side added, so each king
+   * stands at level 1, as the 14.593.1 fields give it; without a king level, the avatar's exp level
+   * does not change it. The fields are the client's, as its replays' are ({@link #BY_VERSION}), so
+   * they hold on every data version the client runs.
+   *
+   * <p>Client 16.635.1 reads such a case by the same fields, for every data version it runs ({@link
+   * GameVersions#CLIENT_16_635_1_DATA}). Its recorded battles of generated cases on data version
+   * 16.635.3 play the same with the request lists empty, the switches {@code cardlvlmin} 0, {@code
+   * rrb} and {@code seb} false and a king level of 1 for each side added, all together, and on one
+   * case also the request lists, the switches and the king levels each added alone; a king level of
+   * 2 raises that side's king to that level's hit points, so the absent king level is 1; without a
+   * king level, the avatar's exp level does not change the battle.
+   */
+  private static final Map<String, ReplayFormat> GENERATED_BY_VERSION = generatedByVersion();
+
+  /** The table of {@link #BY_VERSION}. */
+  private static Map<String, ReplayFormat> byVersion() {
+    Map<String, ReplayFormat> byVersion = new HashMap<>();
+    byVersion.put(V14_593_1.dataVersion(), V14_593_1);
+    for (String version : GameVersions.CLIENT_16_402_17_DATA) {
+      byVersion.put(version, V16_402_18.forDataVersion(version));
+    }
+    for (String version : GameVersions.CLIENT_16_635_1_DATA) {
+      byVersion.put(version, V16_635_1.forDataVersion(version));
+    }
+    return Map.copyOf(byVersion);
+  }
+
+  /** The table of {@link #GENERATED_BY_VERSION}. */
+  private static Map<String, ReplayFormat> generatedByVersion() {
+    Map<String, ReplayFormat> byVersion = new HashMap<>();
+    byVersion.put(V14_593_1.dataVersion(), V14_593_1);
+    for (String version : GameVersions.CLIENT_16_402_17_DATA) {
+      byVersion.put(version, V14_593_1.forDataVersion(version));
+    }
+    for (String version : GameVersions.CLIENT_16_635_1_DATA) {
+      byVersion.put(version, V14_593_1.forDataVersion(version));
+    }
+    return Map.copyOf(byVersion);
+  }
+
+  /**
+   * The format of a data version's replays.
+   *
+   * @param dataVersion the data version, or null
+   * @return its format, or empty when its fields have not been decided
+   */
+  public static Optional<ReplayFormat> of(String dataVersion) {
+    return dataVersion == null
+        ? Optional.empty()
+        : Optional.ofNullable(BY_VERSION.get(dataVersion));
+  }
+
+  /**
+   * The format a replay read against tables of a data version is read by: the version's own, else
+   * 14.593.1's.
+   */
+  public static ReplayFormat orShared(String dataVersion) {
+    return of(dataVersion).orElse(V14_593_1);
+  }
+
+  /**
+   * The format a data version's generated cases are read by ({@link ScenarioShape#GENERATED}).
+   * Unlike a replay's, it does not fall back to 14.593.1's: a version's generated cases are read
+   * only once recorded battles on its game client have established their fields.
+   *
+   * @param dataVersion the data version, or null
+   * @return its generated cases' format, or empty when it is not established
+   */
+  public static Optional<ReplayFormat> generated(String dataVersion) {
+    return dataVersion == null
+        ? Optional.empty()
+        : Optional.ofNullable(GENERATED_BY_VERSION.get(dataVersion));
+  }
+
+  /** The same fields, as another data version's. */
+  private ReplayFormat forDataVersion(String version) {
+    return new ReplayFormat(
+        version,
+        rootPins,
+        events,
+        battlePins,
+        battleCarried,
+        avatarPins,
+        avatarCarried,
+        accountHighOptional,
+        deckCarried,
+        cardCarried,
+        selectionPins,
+        selectionCarried,
+        playerData,
+        cosmeticCarried,
+        excludedEvolutions,
+        ladderEvents);
+  }
+
+  /** The same fields as another data version's, with the excluded evolutions read. */
+  private ReplayFormat withExcludedEvolutions(String version) {
+    return new ReplayFormat(
+        version,
+        rootPins,
+        events,
+        battlePins,
+        battleCarried,
+        avatarPins,
+        avatarCarried,
+        accountHighOptional,
+        deckCarried,
+        cardCarried,
+        selectionPins,
+        selectionCarried,
+        playerData,
+        cosmeticCarried,
+        true,
+        ladderEvents);
+  }
+
+  /**
+   * The same fields with a Ladder battle under an event read: the card level minimum leaves the
+   * pinned header fields, and a player data entry may hold the trail progress.
+   */
+  private ReplayFormat withLadderEvents() {
+    Map<String, String> pins = new LinkedHashMap<>(battlePins);
+    pins.remove(CARD_LEVEL_MIN_FIELD);
+    List<String> data = new ArrayList<>(playerData);
+    data.add(TRAIL_PROGRESS_FIELD);
+    return new ReplayFormat(
+        dataVersion,
+        rootPins,
+        events,
+        Collections.unmodifiableMap(pins),
+        battleCarried,
+        avatarPins,
+        avatarCarried,
+        accountHighOptional,
+        deckCarried,
+        cardCarried,
+        selectionPins,
+        selectionCarried,
+        List.copyOf(data),
+        cosmeticCarried,
+        excludedEvolutions,
+        true);
+  }
+
+  /**
+   * The same fields with the header switch {@value #SEB_FIELD} carried rather than pinned to false.
+   */
+  private ReplayFormat withSebCarried() {
+    Map<String, String> pins = new LinkedHashMap<>(battlePins);
+    pins.remove(SEB_FIELD);
+    Map<String, String> carried = new LinkedHashMap<>(battleCarried);
+    carried.put(
+        SEB_FIELD,
+        "a header switch the game stores and writes back with the header, never read in a battle;"
+            + " true in a challenge's replays");
+    return new ReplayFormat(
+        dataVersion,
+        rootPins,
+        events,
+        Collections.unmodifiableMap(pins),
+        Collections.unmodifiableMap(carried),
+        avatarPins,
+        avatarCarried,
+        accountHighOptional,
+        deckCarried,
+        cardCarried,
+        selectionPins,
+        selectionCarried,
+        playerData,
+        cosmeticCarried,
+        excludedEvolutions,
+        ladderEvents);
+  }
+
+  /** Whether the player data entries are read field by field, the king level among them. */
+  public boolean kingLevelFromPlayerData() {
+    return playerData != null;
+  }
+
+  /** Pairs in the order given, as a map that keeps that order. */
+  private static Map<String, String> ordered(String... pairs) {
+    Map<String, String> map = new LinkedHashMap<>();
+    for (int i = 0; i < pairs.length; i += 2) {
+      map.put(pairs[i], pairs[i + 1]);
+    }
+    return Collections.unmodifiableMap(map);
+  }
+}

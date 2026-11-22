@@ -1,0 +1,302 @@
+/*
+ * crforge - https://github.com/voonhous/crforge
+ * SPDX-License-Identifier: Apache-2.0
+ * Porting this code? Please cite this file and the commit you read: see the README.
+ */
+
+package org.crforge.core.battle.unit;
+
+import org.crforge.core.battle.action.ActionHolder;
+import org.crforge.core.battle.action.ActionInstance;
+import org.crforge.core.battle.action.BattleAction;
+import org.crforge.core.battle.action.MegaKnightUppercut;
+import org.crforge.core.fidelity.Fidelity;
+import org.crforge.core.fidelity.FidelityStatus;
+import org.crforge.core.pathfinding.EntityFlags;
+import org.crforge.core.pathfinding.GridEntity;
+import org.crforge.core.pathfinding.GridEntityState;
+import org.crforge.core.pathfinding.math.FixedMath;
+import org.crforge.core.pathfinding.target.RangeTest;
+
+/**
+ * One run of the evolved Mega Knight's uppercut on the unit.
+ *
+ * <p>The run raises no tags as it starts: while it is listed the unit carries its row's
+ * GameTagsToSet, which the runtime sets on every run, and so stands, holds its attack or can be
+ * pulled as the row says. As it starts the run keeps the object the unit's targeting component has
+ * as its target; an object without a movement component ends the run at once. Its first update
+ * pushes that target: the point it is pushed away from stands just behind it on the line from the
+ * nearest tower of its own side - the side's princess towers, then the king facing the unit's side
+ * - so the push drives it toward that tower, through the pushback entry past every gate of the
+ * request; then the row's action is scheduled on it with the unit as the cause, a push the entry
+ * took clears the target's avoidance blend unless the row turns that off, the unit carries
+ * LOCK_TARGET for one step while the row's LockTargetAfterUppercut is on, and the run waits out the
+ * follow-up delay. A target with no movement component switched on, or one already switching lanes
+ * (the in-game pathfinding state of a lane switch ability), is not pushed, nothing is scheduled on
+ * it, and the run ends; that state is the only one the push point tests, so a target following a
+ * removed building is pushed like any other. The run ends too for a target whose tag word holds
+ * NO_PUSHBACK, which the uppercut's push entry refuses (no other push asks the entry that): nothing
+ * is scheduled on it unless the row's OnlyRunActionOnPushback is off, and the run does not wait.
+ * Each later update ends the run when the unit has no target or attacks another one in range; with
+ * another target out of range it marks the uppercut's target in its targeting queue, at a priority
+ * the queue's flush never takes; then the delay runs down by 50 ms, and the run ends when none is
+ * left. A target that leaves the battle is forgotten, and the next update ends the run.
+ */
+@Fidelity(
+    status = FidelityStatus.TRACED,
+    note =
+        "Settled line for line: the start's target, the push point, the push through the entry,"
+            + " the action on the target, the wait for the delay, the ends, the mark and the leave"
+            + " notice; held by the reference battles cg_megaknight_evo_uppercut_giant and"
+            + " evo_megaknight_vs_musketeer. The blend cleared after a push the entry took, on"
+            + " ResetAvoidanceAtPushback; held by UppercutAvoidanceTest. The entry's refusal of a"
+            + " NO_PUSHBACK target, the run ended without the wait and no action on the target"
+            + " while OnlyRunActionOnPushback is set; held by BattleUppercutWindTest. A target"
+            + " switching lanes not pushed, nothing scheduled on it and the run ended; held by"
+            + " BattleUppercutWindTest. Traced on client 16.635.1, held by no reference yet: no"
+            + " tags raised at the start or through the wait, the row's own on the unit while the"
+            + " run is listed, and LOCK_TARGET for one step after the push only while"
+            + " LockTargetAfterUppercut is on (16.402.17 raised NO_ATTACK and NO_MOVE at the start,"
+            + " after the push and on each step of the wait); held by BattleUppercutAttractTest."
+            + " Refused: the start without a current target, which reads the targeting component's"
+            + " previous reference, a push point with no tower or king found, which turns to the"
+            + " facing, and a target other than a character with a movement component.")
+final class UppercutRun extends ActionInstance {
+
+  /** Milliseconds one update takes off the delay. */
+  private static final int STEP_MS = 50;
+
+  /** The squared distance before any tower is found, compared unsigned. */
+  private static final long UNSET = 0xffffffffL;
+
+  private final MegaKnightUppercut row;
+  private final CharacterEntity unit;
+
+  /** The object the run pushes, or null once it has left. */
+  private WorldEntity target;
+
+  private boolean pushed;
+
+  /** What is left of the follow-up delay, in milliseconds. */
+  private int delay;
+
+  /** The squared distance to the nearest tower found, compared unsigned, and the vector to it. */
+  private long best = UNSET;
+
+  private int vx;
+  private int vy;
+
+  /** The point this update pushed away from and the vector from the tower, or null for none. */
+  private int[] pushPoint;
+
+  /**
+   * The start: the target kept, the run finished for a target without a movement component.
+   *
+   * @param row the uppercut
+   * @param unit the unit it runs on
+   * @param phase the phase of the pending pass that ran it
+   * @param instigator what caused it, the target of the hit, or null
+   */
+  UppercutRun(MegaKnightUppercut row, CharacterEntity unit, int phase, WorldEntity instigator) {
+    super(row);
+    this.row = row;
+    this.unit = unit;
+    // The run raises no tags of its own as it starts: the row's own, which the runtime sets on the
+    // run, hold the unit while it is listed. From here on each pre-hook tells the observers how the
+    // hold part of the unit's word changes.
+    unit.watchTags();
+    target = unit.currentTarget();
+    if (target == null) {
+      throw new UnsupportedOperationException(
+          row.name()
+              + " starts on "
+              + unit.name()
+              + " without a current target, which reads its previous reference, not modelled");
+    }
+    if (!target.hasMovementComponent()) {
+      finish();
+    }
+    unit.world()
+        .getEvents()
+        .uppercutStarted(unit, row.name(), phase, instigator, target, isFinished());
+  }
+
+  @Override
+  protected void update(ActionHolder holder) {
+    int before = delay;
+    pushPoint = null;
+    String outcome;
+    if (target == null) {
+      outcome = "no target";
+      finish();
+    } else if (!pushed) {
+      pushed = true;
+      if (!pushTarget()) {
+        outcome = "push refused";
+        finish();
+      } else {
+        // The one tag the run raises itself, for one step, and only as the row asks.
+        if (row.isLockTargetAfterUppercut()) {
+          unit.raiseWatched(bits().lockTarget());
+        }
+        delay = row.getDashFollowUpDelayMs();
+        if (delay != 0) {
+          outcome = "pushed";
+        } else {
+          outcome = "pushed, no delay";
+          finish();
+        }
+      }
+    } else {
+      outcome = hold();
+    }
+    if (before != delay || pushPoint != null || isFinished()) {
+      unit.world().getEvents().uppercutStepped(unit, delay, isFinished(), outcome, pushPoint);
+    }
+  }
+
+  /** A later update: the ends, the mark, and the delay run down. */
+  private String hold() {
+    WorldEntity current = unit.currentTarget();
+    if (current == null) {
+      finish();
+      return "owner without a target";
+    }
+    if (unit.isActive(CharacterEntity.TARGETING_SLOT) && current.getId() != target.getId()) {
+      if (RangeTest.referenceInRange(unit.getUnit().targeting(), current.getTargetView(), 0)) {
+        finish();
+        return "other target in range";
+      }
+      unit.markTarget(target, 0);
+    }
+    delay -= STEP_MS;
+    if (delay > 0) {
+      return "waiting";
+    }
+    // Without the follow-up dash, which the row refuses, the run ends with the delay.
+    finish();
+    return "delay over";
+  }
+
+  /** The push point and the push: answers whether the push ran on a target not switching lanes. */
+  private boolean pushTarget() {
+    if (!target.hasMovementComponent()) {
+      return false;
+    }
+    // The push point reads the target's state once and tests it for the lane switch alone: a
+    // target switching lanes is neither pushed nor given the row's action, and the run ends.
+    if (target.getView().getState() == GridEntityState.INGAME_PATHFIND) {
+      return false;
+    }
+    int tx = target.getView().getX();
+    int ty = target.getView().getY();
+    for (TowerEntity tower : unit.world().princessTowers(target.side())) {
+      nearer(tx, ty, tower);
+    }
+    TowerEntity king = unit.world().kingTower(WorldEntity.opposing(unit.side()));
+    if (king == null) {
+      throw new UnsupportedOperationException(
+          row.name() + " pushes with no king facing " + unit.name() + ", not modelled");
+    }
+    nearer(tx, ty, king);
+    if (best == UNSET) {
+      throw new UnsupportedOperationException(
+          row.name() + " finds no tower to push toward, which turns to the facing, not modelled");
+    }
+    int px = tx;
+    int py = ty;
+    if ((int) best >= 1) {
+      int root = FixedMath.isqrt((int) best);
+      int offset = row.getPushRadiusDirectionalOffset();
+      px = offset * vx / root + tx;
+      py = vy * offset / root + ty;
+    }
+    pushPoint = new int[] {px, py, vx, vy};
+    boolean ran = push(px, py);
+    vx = 0;
+    vy = 0;
+    best = UNSET;
+    return ran;
+  }
+
+  /**
+   * Keeps a tower as the nearest when its squared distance is below the best, compared unsigned.
+   */
+  private void nearer(int tx, int ty, WorldEntity tower) {
+    int dx = tx - tower.getView().getX();
+    int dy = ty - tower.getView().getY();
+    long squared = Integer.toUnsignedLong(dx * dx + dy * dy);
+    if (best > squared) {
+      best = squared;
+      vx = dx;
+      vy = dy;
+    }
+  }
+
+  /**
+   * The push through the entry, past the request's gates, then the row's action on the target with
+   * the unit as the cause: answers whether the entry took the push. A target whose movement
+   * component is off is not pushed and nothing is scheduled on it; a push the entry refuses
+   * schedules the action only when the row's OnlyRunActionOnPushback is off.
+   */
+  private boolean push(int x, int y) {
+    if (!(target instanceof CharacterEntity pushedUnit)) {
+      throw new UnsupportedOperationException(
+          row.name() + " pushes " + target.name() + ", which is not a character, not modelled");
+    }
+    if (!pushedUnit.isActive(CharacterEntity.MOVEMENT_SLOT)) {
+      return false;
+    }
+    // A clone pushed by the uppercut, and knocked by its action on the targets, is held by no
+    // recording; the knock is held on a clone only from the hero Giant's slap.
+    if (pushedUnit.isClone()) {
+      throw new UnsupportedOperationException(
+          row.name() + " pushes the clone " + pushedUnit.name() + ", which is not modelled");
+    }
+    // The uppercut asks the entry to refuse a target whose tag word holds NO_PUSHBACK, as a
+    // counter's parry of the hit leaves it for the next step; no other push asks that. The entry
+    // tests it after its pushback-in-flight refusal, and both refuse with nothing changed, so the
+    // order does not show.
+    GridEntity view = pushedUnit.getView();
+    int entered =
+        (view.getFlags() & view.getFlagBits().noPushback()) != 0
+            ? 0
+            : pushedUnit.pushEntry(
+                x,
+                y,
+                row.getPushBackStrength(),
+                true,
+                row.isDistanceProportionalPush(),
+                row.isResetPushbackIfStronger());
+    if (entered == 0 && row.isOnlyRunActionOnPushback()) {
+      return false;
+    }
+    BattleAction onTargets = row.getActionOnTargets();
+    if (onTargets != null) {
+      BattleAction built =
+          unit.world().getActions().build(onTargets.name(), unit.world().binding(pushedUnit));
+      pushedUnit.actionHolder().schedule(built, ActionHolder.OWN_DELAY, false, unit.actionHolder());
+    }
+    // A push the entry took clears the target's avoidance blend, as the row's
+    // ResetAvoidanceAtPushback says (true unless the row turns it off), so no push step is turned
+    // by the way it was steering: it flies straight toward its tower.
+    if (entered == 1 && row.isResetAvoidanceAtPushback()) {
+      pushedUnit.getUnit().movement().setAvoidanceBlend(0);
+    }
+    return entered == 1;
+  }
+
+  /** The target leaving the battle is forgotten. */
+  @Override
+  protected void objectLeft(int leftId) {
+    if (target != null && target.getId() == leftId) {
+      unit.world().getEvents().uppercutTargetLeft(unit, target);
+      target = null;
+    }
+  }
+
+  /** Which bit of the unit's tag word each flag is. */
+  private EntityFlags bits() {
+    return unit.getView().getFlagBits();
+  }
+}

@@ -1,0 +1,7 @@
+**/target/
+/tavern.ptx
+/tavern.cubin
+/rustc-ice-*.txt
+
+/tavern-state.ptx
+/tavern-state.cubin

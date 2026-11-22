@@ -1,0 +1,19 @@
+[package]
+name = "tavern-device-kernels"
+version = "0.1.0"
+edition = "2024"
+license = "MIT"
+[lib]
+path = "../../kernels/src/lib.rs"
+crate-type = ["cdylib"]
+[features]
+ordered_tables = ["tavern-device-core/ordered_tables"]
+frozen_rules = []
+default = []
+state_io = []
+arena = ["tavern-device-core/arena", "cuda_std/external-allocator"]
+[dependencies]
+tavern-device-core = { path = "../core" }
+tavern-device-wire = { path = "../wire" }
+cuda_std = { path = "../runtime" }
+serde_json = { version = "=1.0.151", default-features = false, features = ["alloc"] }

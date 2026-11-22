@@ -1,0 +1,340 @@
+/*
+ * crforge - https://github.com/voonhous/crforge
+ * SPDX-License-Identifier: Apache-2.0
+ * Porting this code? Please cite this file and the commit you read: see the README.
+ */
+
+package org.crforge.core.battle.unit;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.crforge.core.battle.GameData.fields;
+
+import com.fasterxml.jackson.databind.node.ObjectNode;
+import java.io.IOException;
+import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.List;
+import org.crforge.core.battle.BattleEntity;
+import org.crforge.core.battle.GameData;
+import org.crforge.core.battle.data.BattleRecords;
+import org.crforge.core.battle.data.GameTables;
+import org.crforge.core.pathfinding.GridEntityState;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
+
+/**
+ * The evolved Goblin Drill's relocation: it hides at each hit-point threshold and comes up five
+ * ring steps further around the enemy tower it stands by.
+ *
+ * <p>The scene writes every column its points and steps are read from: the towers' places and size,
+ * the relocation's thresholds (66 and 33 percent) and hide time (1000 ms), the hide group's spawns
+ * and delays, and the drill's size, life and hit points, so they are its own and not a version's.
+ */
+class BattleGoblinDrillEvoTest {
+
+  @TempDir static Path folder;
+
+  /** The configured tables with the scene's columns written, and their records. */
+  private static GameTables tables;
+
+  private static BattleRecords records;
+
+  @BeforeAll
+  static void writeTheScene() throws IOException {
+    GameData.altered(
+        folder,
+        "actions",
+        rows -> {
+          ObjectNode relocate = fields(rows, "GoblinDrill_EV1_relocate").put("HideTime", 1000);
+          relocate.putArray("HideHpThresholds").add(66).add(33);
+          fields(rows, "GoblinDrill_EV1_Hide_Group")
+              .putArray("SubActionsDelay")
+              .add(0)
+              .add(50)
+              .add(50);
+          fields(rows, "GoblinDrill_EV1_Hide_Group2").putArray("SubActionsDelay").add(0).add(50);
+          fields(rows, "GoblinDrill_EV1_Disable_Physics").put("ActionDuration", 1000);
+          for (String spawn :
+              List.of("GoblinDrill_EV1_Spawn_Goblin1", "GoblinDrill_EV1_Spawn_Goblin3")) {
+            fields(rows, spawn).put("RelativeX", -1).put("RelativeY", 0).put("DeployTime", 500);
+          }
+          fields(rows, "GoblinDrill_EV1_Spawn_Goblin2")
+              .put("RelativeX", 1)
+              .put("RelativeY", 0)
+              .put("DeployTime", 500);
+        });
+    GameData.alterLoaded(
+        folder,
+        "buildings",
+        rows -> {
+          GameData.columns(rows, "GoblinDrill_EV1")
+              .put("CollisionRadius", 500)
+              .put("LifeTime", 10000)
+              .put("Hitpoints", 513)
+              .put("DeployTime", 1000);
+          GameData.columns(rows, "PrincessTower").put("CollisionRadius", 1000);
+          GameData.columns(rows, "KingTower").put("CollisionRadius", 1400);
+        });
+    GameData.alterLoaded(
+        folder,
+        "characters",
+        rows ->
+            GameData.columns(rows, "GoblinDrill_EV1_Dig")
+                .put("SpawnPathfindSpeed", 300)
+                .put("DeployTime", 1000));
+    GameData.alterLoaded(folder, "spawn_groups", GameData::placeTowers);
+    tables = GameTables.load(folder);
+    records = new BattleRecords(tables);
+  }
+
+  /** The evolved drill standing on the ring of the top side's right princess tower. */
+  private static final int RING_X = 14000;
+
+  private static final int RING_Y = 23000;
+
+  private static Standard1v1Battle passiveTowers() {
+    return new Standard1v1Battle(tables, Standard1v1Battle.DEFAULT_LEVEL, false);
+  }
+
+  /** The evolved drill building, once the dig has surfaced; null before. */
+  static CharacterEntity drill(Standard1v1Battle match) {
+    for (BattleEntity entity : match.getBattle().getHolder().entities()) {
+      if (entity instanceof CharacterEntity unit
+          && unit.getData().building()
+          && unit.getData().onStartingAction() != null) {
+        return unit;
+      }
+    }
+    return null;
+  }
+
+  /** How many area effects of a row the holder lists. */
+  static int areas(Standard1v1Battle match, String row) {
+    int count = 0;
+    for (BattleEntity entity : match.getBattle().getHolder().entities()) {
+      if (entity instanceof AreaEffectEntity area && area.getData().name().equals(row)) {
+        count++;
+      }
+    }
+    return count;
+  }
+
+  /** The points of the live Goblins of a side. */
+  private static List<String> goblins(Standard1v1Battle match) {
+    List<String> out = new ArrayList<>();
+    for (BattleEntity entity : match.getBattle().getHolder().entities()) {
+      if (entity instanceof CharacterEntity unit && unit.getData().name().equals("Goblin")) {
+        out.add(unit.getView().getX() + "," + unit.getView().getY());
+      }
+    }
+    return out;
+  }
+
+  /** Plays the evolved drill onto the ring point and steps until it has surfaced and deployed. */
+  private static CharacterEntity surfacedAndDeployed(Standard1v1Battle match) {
+    return surfacedAndDeployed(match, RING_X, RING_Y);
+  }
+
+  /**
+   * Plays the evolved drill onto a point on the battle's current tick and steps until it has
+   * surfaced and deployed.
+   */
+  private static CharacterEntity surfacedAndDeployed(Standard1v1Battle match, int x, int y) {
+    match.play(
+        match.getBattle().getTick(),
+        records.card("GoblinDrill_EV1"),
+        Standard1v1Battle.DEFAULT_LEVEL,
+        0,
+        x,
+        y,
+        "Drill");
+    CharacterEntity drill = null;
+    for (int step = 0; step < 200 && drill == null; step++) {
+      match.getBattle().step();
+      drill = drill(match);
+    }
+    assertThat(drill).as("the dig surfaced").isNotNull();
+    while (drill.getView().getState() == GridEntityState.DEPLOYING) {
+      match.getBattle().step();
+    }
+    return drill;
+  }
+
+  @Test
+  @DisplayName(
+      "at its first threshold it hides with its hide goblins, moves five ring steps two steps"
+          + " before the hide time ends, and deploys again there")
+  void itHidesAndComesUpFiveRingStepsOn() {
+    Standard1v1Battle match = passiveTowers();
+    CharacterEntity drill = surfacedAndDeployed(match);
+    int maximum = drill.getHitPoints().getMaximum();
+    // 66 percent of the maximum or less: the first threshold.
+    drill.getHitPoints().setHitPoints(maximum * 60 / 100);
+
+    match.getBattle().step();
+    assertThat(drill.getView().getState()).isEqualTo(GridEntityState.SPAWN_PATHFIND);
+    assertThat(drill.hidden()).isTrue();
+    assertThat(goblins(match)).isEmpty();
+
+    match.getBattle().step();
+    // The hide group's two spawns, one half tile either side of the drill.
+    assertThat(goblins(match)).containsExactlyInAnyOrder("13500,23000", "14500,23000");
+
+    for (int step = 0; step < 16; step++) {
+      match.getBattle().step();
+    }
+    assertThat(drill.getView().getX()).as("not moved yet").isEqualTo(RING_X);
+
+    match.getBattle().step();
+    // Five steps from the ring's seventh point: three along the near side, two up the far one.
+    assertThat(drill.getView().getX()).isEqualTo(17000);
+    assertThat(drill.getView().getY()).isEqualTo(25000);
+    assertThat(drill.getView().getState()).isEqualTo(GridEntityState.SPAWN_PATHFIND);
+
+    match.getBattle().step();
+    match.getBattle().step();
+    assertThat(drill.getView().getState()).isEqualTo(GridEntityState.DEPLOYING);
+    assertThat(drill.hidden()).isFalse();
+  }
+
+  @Test
+  @DisplayName(
+      "the hide goblins, spawned with a deploy time of their own, face where the drill faces")
+  void theHideGoblinsFaceAsTheDrillDoes() {
+    Standard1v1Battle match = passiveTowers();
+    CharacterEntity drill = surfacedAndDeployed(match);
+    int dirX = drill.getView().getDirX();
+    int dirY = drill.getView().getDirY();
+    assertThat(dirX).as("the dig's facing, not the side's default").isNotZero();
+    drill.getHitPoints().setHitPoints(drill.getHitPoints().getMaximum() * 60 / 100);
+
+    match.getBattle().step();
+    match.getBattle().step();
+
+    List<CharacterEntity> goblins = new ArrayList<>();
+    for (BattleEntity entity : match.getBattle().getHolder().entities()) {
+      if (entity instanceof CharacterEntity unit && unit.getData().name().equals("Goblin")) {
+        goblins.add(unit);
+      }
+    }
+    assertThat(goblins).hasSize(2);
+    for (CharacterEntity goblin : goblins) {
+      assertThat(goblin.getView().getDirX()).isEqualTo(dirX);
+      assertThat(goblin.getView().getDirY()).isEqualTo(dirY);
+    }
+  }
+
+  @Test
+  @DisplayName("above its threshold it stays standing where it came up")
+  void itStaysAboveItsThreshold() {
+    Standard1v1Battle match = passiveTowers();
+    CharacterEntity drill = surfacedAndDeployed(match);
+    int maximum = drill.getHitPoints().getMaximum();
+    // The lifetime decay takes about 15 percent over the 30 steps, leaving it above 66.
+    drill.getHitPoints().setHitPoints(maximum * 90 / 100);
+
+    for (int step = 0; step < 30; step++) {
+      match.getBattle().step();
+    }
+
+    assertThat(drill.getView().getState()).isNotEqualTo(GridEntityState.SPAWN_PATHFIND);
+    assertThat(drill.getView().getX()).isEqualTo(RING_X);
+    assertThat(drill.getView().getY()).isEqualTo(RING_Y);
+  }
+
+  @Test
+  @DisplayName(
+      "on the ring of the top side's left princess tower, where the forward point lies nearer the"
+          + " enemy king, it walks five ring steps backward")
+  void itWalksBackwardWhenTheForwardPointIsNearerTheKing() {
+    Standard1v1Battle match = passiveTowers();
+    // The left tower's seventh ring point, the mirror of RING_X across the arena's middle: five
+    // steps forward would end nearer the king than five steps backward.
+    CharacterEntity drill = surfacedAndDeployed(match, 3000, RING_Y);
+    drill.getHitPoints().setHitPoints(drill.getHitPoints().getMaximum() * 60 / 100);
+
+    for (int step = 0; step < 19; step++) {
+      match.getBattle().step();
+    }
+
+    // Two steps back along the near side to its corner, then three down the outer side.
+    assertThat(drill.getView().getX()).isEqualTo(1000);
+    assertThat(drill.getView().getY()).isEqualTo(26000);
+    assertThat(drill.getView().getState()).isEqualTo(GridEntityState.SPAWN_PATHFIND);
+  }
+
+  @Test
+  @DisplayName(
+      "a drill that surfaces on no ring point of an enemy tower hides at its threshold and comes up"
+          + " again where it stood")
+  void offTheRingItComesUpWhereItStood() {
+    Standard1v1Battle match = passiveTowers();
+    // Between the king's ring and the right princess tower's: on neither.
+    CharacterEntity drill = surfacedAndDeployed(match, 9000, 20000);
+    int x = drill.getView().getX();
+    int y = drill.getView().getY();
+    drill.getHitPoints().setHitPoints(drill.getHitPoints().getMaximum() * 60 / 100);
+
+    match.getBattle().step();
+    assertThat(drill.getView().getState()).isEqualTo(GridEntityState.SPAWN_PATHFIND);
+    assertThat(drill.hidden()).isTrue();
+    for (int step = 0; step < 18; step++) {
+      match.getBattle().step();
+    }
+    // No ring step: the move writes the half tile it stood on, its own point.
+    assertThat(drill.getView().getX()).isEqualTo(x);
+    assertThat(drill.getView().getY()).isEqualTo(y);
+
+    match.getBattle().step();
+    match.getBattle().step();
+    assertThat(drill.getView().getState()).isEqualTo(GridEntityState.DEPLOYING);
+    assertThat(drill.hidden()).isFalse();
+    assertThat(drill.getView().getX()).isEqualTo(x);
+    assertThat(drill.getView().getY()).isEqualTo(y);
+  }
+
+  @Test
+  @DisplayName(
+      "on the ring of a princess tower destroyed before it surfaced it stands on no ring point:"
+          + " it hides at its threshold and comes up again where it stood")
+  void onADestroyedTowersRingItComesUpWhereItStood() {
+    Standard1v1Battle match = passiveTowers();
+    TowerEntity left = null;
+    for (BattleEntity entity : match.getBattle().getHolder().entities()) {
+      if (entity instanceof TowerEntity tower
+          && tower.side() == 1
+          && tower.getData().summonerTower()
+          && (left == null || tower.getView().getX() < left.getView().getX())) {
+        left = tower;
+      }
+    }
+    assertThat(left).as("the top side's left princess tower").isNotNull();
+    // Destroyed from outside; the next step's cleanup takes it out of the battle and its side's
+    // list.
+    match.getBattle().step();
+    match.getWorld().getHits().dealDamage(left.getTargetView(), 1_000_000, 0, 1);
+    match.getBattle().step();
+    assertThat(match.getBattle().getHolder().entities()).doesNotContain(left);
+
+    // The point of the backward walk's test: the seventh point of that tower's ring.
+    CharacterEntity drill = surfacedAndDeployed(match, 3000, RING_Y);
+    drill.getHitPoints().setHitPoints(drill.getHitPoints().getMaximum() * 60 / 100);
+
+    match.getBattle().step();
+    assertThat(drill.getView().getState()).isEqualTo(GridEntityState.SPAWN_PATHFIND);
+    for (int step = 0; step < 18; step++) {
+      match.getBattle().step();
+    }
+    // No ring step: not the walk around the destroyed tower, the half tile it stood on.
+    assertThat(drill.getView().getX()).isEqualTo(3000);
+    assertThat(drill.getView().getY()).isEqualTo(RING_Y);
+
+    match.getBattle().step();
+    match.getBattle().step();
+    assertThat(drill.getView().getState()).isEqualTo(GridEntityState.DEPLOYING);
+    assertThat(drill.getView().getX()).isEqualTo(3000);
+    assertThat(drill.getView().getY()).isEqualTo(RING_Y);
+  }
+}

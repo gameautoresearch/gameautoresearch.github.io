@@ -1,0 +1,51 @@
+{
+  "ruleset": "douzero-fixed-role-v1",
+  "seed": 17,
+  "deal_seed": 20261108,
+  "device": "cpu",
+  "allocation": {
+    "gpus": 0,
+    "machine": "Apple-M5-Max-Mac17,7-18-core-64GiB",
+    "attached_cpu_threads": 18,
+    "attached_ram_gb": 64,
+    "resource_isolation": "shared local host, no CPU affinity/cgroup isolation"
+  },
+  "max_seconds": 180,
+  "max_episodes": 256,
+  "vector_games": 16,
+  "workers": 0,
+  "torch_threads": 1,
+  "objective": "wp",
+  "architecture": {
+    "hidden": 64,
+    "depth": 2,
+    "history": 32
+  },
+  "epsilon": 0.1,
+  "learning_rate": 0.001,
+  "batch_size": 256,
+  "epochs": 1,
+  "max_grad_norm": 40,
+  "max_candidates": 4096,
+  "factored_history": true,
+  "opponents": {
+    "selfplay_probability": 1.0,
+    "frozen": [
+      {
+        "kind": "heuristic"
+      }
+    ],
+    "historical_every_waves": 4,
+    "historical_size": 4
+  },
+  "split": "heldout",
+  "deals": 64,
+  "opponents_panel": [
+    {
+      "kind": "heuristic"
+    },
+    {
+      "kind": "random"
+    }
+  ]
+}

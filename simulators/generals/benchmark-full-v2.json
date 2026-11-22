@@ -1,0 +1,106 @@
+{
+  "schema_version": 2,
+  "environment_id": "generals-research-1v1-full-v2",
+  "upstream": {
+    "url": "https://github.com/strakam/generals-bots.git",
+    "commit": "954927f508aa47899019d66317cc313af3e9cc19",
+    "license": "MIT; upstream assets retain their individual notices"
+  },
+  "rules_source": "environment.py:RULESET",
+  "seeds": "seeds.json",
+  "action_count": 4609,
+  "observation_shape": [
+    24,
+    24,
+    14
+  ],
+  "modes": {
+    "train": "JAX batched PPO; one learner seat per game, alternating at episode reset",
+    "evaluate": "both physical seats for each map/opponent; no shaping; player-visible policy",
+    "profile": "random legal-action simulator separately from current/history inference + PPO"
+  },
+  "training_opponents": [
+    "current",
+    "episode-frozen historical snapshots",
+    "uniform legal random",
+    "visible expansion heuristic"
+  ],
+  "heldout_opponents": [
+    "upstream MIT HunterAgent (never used by train/development eval)",
+    "external source-bound checkpoint"
+  ],
+  "score": {
+    "primary": "(capture_wins + 0.5*cap_draws) / games",
+    "diagnostics": [
+      "capture wins",
+      "capture losses",
+      "cap draws",
+      "illegal actions",
+      "seed-cluster bootstrap CI",
+      "per-seat score",
+      "final public land"
+    ],
+    "faults": "illegal actions, unresolved games, checksum/rules mismatches and simulator exceptions fail validation; never convert to policy loss"
+  },
+  "budgets": {
+    "unit": "allocated worker wall seconds / 3600 on one GPU machine with fixed attached CPU and RAM",
+    "included": [
+      "CPU simulation",
+      "transfers",
+      "compilation",
+      "inference",
+      "updates",
+      "development evaluation",
+      "idle GPU",
+      "checkpoint IO",
+      "setup inside allocation"
+    ],
+    "supervisor": "lease.py persists cumulative elapsed worker seconds and terminates at deadline; external scheduler defines actual hardware reservation",
+    "sample_limit": "optional bounded local smoke only; not a substitute for allocated-worker budget"
+  },
+  "recipes": {
+    "local_smoke": "recipes/full-smoke.json",
+    "cpu_fast": "recipes/full-cpu-fast.json",
+    "l4": "recipes/full-l4.json",
+    "h100": "recipes/full-h100.json"
+  },
+  "caveats": [
+    "Full-size1v1 standard; frozen pinned classic rules with fog, general trade enabled, no build-castles or deathtouch.",
+    "Not a claim of reproducing the AverageJoe agent: current model is a small14-plane CNN without persistent memory.",
+    "Dimensions are selected explicitly per seed; upstream init_state() alone would only generate23x23.",
+    "Old8x8 rates and checkpoints do not qualify this task; new source-bound checkpoints start from scratch."
+  ],
+  "rules": {
+    "id": "generals-research-1v1-full-v2",
+    "min_grid_size": 17,
+    "max_grid_size": 23,
+    "pad_to": 24,
+    "dimension_sampling": "Independent uniform integer sides, inclusive17..23, fold_in(seed,0x53495a45); board key=PRNGKey(seed)",
+    "mountain_density_range": [
+      0.21,
+      0.21
+    ],
+    "num_castles_range": [
+      9,
+      11
+    ],
+    "castle_val_range": [
+      40,
+      51
+    ],
+    "min_generals_distance": 17,
+    "max_generals_distance": null,
+    "truncation": 2048,
+    "num_players": 2,
+    "perfect_info": false,
+    "build_castles": false,
+    "deathtouch_turn": null,
+    "general_trade": true,
+    "timeout_score": "draw; zero terminal reward; bootstrap final visible value in training",
+    "reward": "capture +/-1; optional public potential shaping only in training",
+    "action_codec": "0 pass; 1+(((row*24+col)*4+direction)*2+split); padded sources/destinations masked",
+    "range_semantics": "Map sides and castle counts inclusive; castle army upper bound exclusive, as in pinned upstream",
+    "observation_codec": "9 spatial + 5 public scalar broadcast planes, normalized; no memory"
+  },
+  "historical_standard": "benchmark.json and prior evidence are immutable8x8-v1 records, not current qualification"
+}

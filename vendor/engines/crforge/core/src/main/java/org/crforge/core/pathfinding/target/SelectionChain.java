@@ -1,0 +1,402 @@
+/*
+ * crforge - https://github.com/voonhous/crforge
+ * SPDX-License-Identifier: Apache-2.0
+ * Porting this code? Please cite this file and the commit you read: see the README.
+ */
+
+package org.crforge.core.pathfinding.target;
+
+import java.util.ArrayList;
+import java.util.IdentityHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.function.BooleanSupplier;
+import java.util.function.Consumer;
+import java.util.function.IntUnaryOperator;
+import java.util.function.Predicate;
+import lombok.Getter;
+import lombok.RequiredArgsConstructor;
+import lombok.Setter;
+import org.crforge.core.fidelity.Fidelity;
+import org.crforge.core.fidelity.FidelityStatus;
+import org.crforge.core.pathfinding.GridEntity;
+import org.crforge.core.pathfinding.index.SpatialIndex;
+import org.crforge.core.pathfinding.index.SpatialQuery;
+import org.crforge.core.pathfinding.state.StateSetter;
+
+/**
+ * Wires the spatial index, the validator, the default target selection and the candidate selector
+ * together into the one answer the targeting visit asks for: "which target should I have now".
+ *
+ * <p>The order matters and is the order of the methods below. One selection does this:
+ *
+ * <ol>
+ *   <li>ask the spatial index for the entities within the unit's sight circle, whose radius is the
+ *       sight range plus the crown-tower sight bonus plus the unit's own collision radius, with
+ *       king towers ordered last;
+ *   <li>return that list to the index;
+ *   <li>work out the default target, which is the opposing side's tower the unit would walk at;
+ *   <li>run the candidate selector, which filters and ranks the candidates and falls back to the
+ *       default;
+ *   <li>copy the chosen reference back into the component.
+ * </ol>
+ *
+ * <p>The selection runs at most once per tick: the visit may ask for it more than once, and the
+ * answer is cached until {@link #beginTick()} clears it. A caller clears the cache once per tick,
+ * before the visit.
+ *
+ * <p>A chain built with every answer given takes the game mode's answers explicitly; the shorter
+ * constructor takes the standard game's.
+ */
+@Fidelity(
+    status = FidelityStatus.PARTIAL,
+    note =
+        "Wires the index, the validator, the selector and default selection into one answer per"
+            + " tick; held by the walks of the reference battles. A reference to an entity that"
+            + " leaves is cleared directly and not through the setter's null path. Hits go to a"
+            + " sink that applies nothing until the owner installs its own. The extra targets of a"
+            + " hit that reaches several come from the lookup, over a query of its own.")
+@RequiredArgsConstructor
+public class SelectionChain implements MultiTargetLookup.Queries, TargetingQueries {
+
+  private final SpatialIndex index;
+  private final TargetingState state;
+
+  /** Arena length in routing cells, used by the default selection's lane bonus. */
+  private final int arenaHeightCells;
+
+  private final ValidatorQueries validatorQueries;
+  private final DefaultSelectionQueries defaultSelectionQueries;
+  private final DefaultTargetSelection.Rules defaultSelectionRules;
+
+  private final Map<GridEntity, TargetView> views = new IdentityHashMap<>();
+
+  /** The opposing side's registered towers, in placement order, king included. */
+  @Getter private final List<TargetView> registeredTowers = new ArrayList<>();
+
+  /** The opposing side's king tower, which seeds the default selection. */
+  @Getter @Setter private TargetView seed;
+
+  /** Where the targeting visit's hits go; the default answers that every hit landed. */
+  @Getter @Setter private HitSink hitSink = (target, sequenceIndex, extra, last) -> false;
+
+  /** Whether the battle holds every attack timer at zero; never until the owner says how to ask. */
+  @Setter private BooleanSupplier attackTimersHeld = () -> false;
+
+  /** Scales a time step by the owner's buffs; unscaled until the owner says how. */
+  @Setter private IntUnaryOperator timeScaler = IntUnaryOperator.identity();
+
+  /**
+   * The index a timer-driven attack sequence's window walk gives for an attack timer; 0 until the
+   * owner says how to walk its sequence.
+   */
+  @Setter private IntUnaryOperator windowWalk = attackTimerMs -> 0;
+
+  /**
+   * Whether a candidate carries the buff the owner ranks lower; none does until the owner says how
+   * to ask.
+   */
+  @Setter private Predicate<TargetView> deprioritizingBuffCarrier = candidate -> false;
+
+  /**
+   * How the visit's request for the attacking state is applied: the bare interrupt guard until the
+   * unit's owner installs the unit's own setter, which also runs the actions a state change
+   * carries.
+   */
+  @Getter @Setter private StateSetter stateSetter = StateSetter.guarded();
+
+  /**
+   * Whether a building that holds no reference still resets its attack, as a walking unit always
+   * does: true for a building whose hit points at the first level are not zero. Only a building's
+   * visit asks.
+   */
+  @Setter private boolean buildingKeepsAttacking;
+
+  /**
+   * The lost-reference query: whether an attack whose reference went during the preloaded windup
+   * stops; it runs on until the owner says how to answer.
+   */
+  @Setter private BooleanSupplier stopsWithoutTarget = () -> false;
+
+  /** Collects the route and resume requests the selection and the visit make. */
+  @Getter private final TargetingOutcome outcome = new TargetingOutcome();
+
+  private boolean selectionDone;
+  private TargetView selectionResult;
+
+  /**
+   * Creates a chain for one unit.
+   *
+   * @param index the spatial index, rebuilt once per tick before the visit
+   * @param state the unit's targeting component
+   * @param arenaHeightCells arena length in routing cells
+   */
+  public SelectionChain(SpatialIndex index, TargetingState state, int arenaHeightCells) {
+    this(
+        index,
+        state,
+        arenaHeightCells,
+        ValidatorQueries.standard1v1(),
+        DefaultSelectionQueries.standard1v1(),
+        DefaultTargetSelection.Rules.standard());
+  }
+
+  /** Registers the view the chain uses for one entity. */
+  public void register(TargetView view) {
+    views.put(view.getEntity(), view);
+  }
+
+  /** Registers one of the opposing side's towers, in placement order. */
+  public void registerTower(TargetView tower) {
+    register(tower);
+    registeredTowers.add(tower);
+  }
+
+  /** The view of an entity, or null when the entity was never registered. */
+  public TargetView view(GridEntity entity) {
+    return views.get(entity);
+  }
+
+  /**
+   * Drops an entity that has left the match, both from the views and, when it was one, from the
+   * opposing side's tower list. A chain that keeps a destroyed tower would keep offering it as the
+   * default target.
+   */
+  public void unregister(GridEntity entity) {
+    TargetView view = views.remove(entity);
+    if (view == null) {
+      return;
+    }
+    registeredTowers.remove(view);
+    if (seed == view) {
+      seed = null;
+    }
+    if (state.getReference() == view) {
+      state.setReference(null);
+    }
+  }
+
+  /** Clears the per-tick selection cache and the outcome. Call once, before the visit. */
+  public void beginTick() {
+    selectionDone = false;
+    selectionResult = null;
+    outcome.clear();
+  }
+
+  // -------------------------------------------------------------------------------------------
+  // TargetingQueries
+  // -------------------------------------------------------------------------------------------
+
+  @Override
+  public TargetView runSelection() {
+    if (selectionDone) {
+      return selectionResult;
+    }
+    CandidateSelector.select(state, false, false, this, outcome);
+    selectionResult = state.getReference();
+    selectionDone = true;
+    return selectionResult;
+  }
+
+  @Override
+  public boolean validateReference(int mode) {
+    return validate(state.getReference(), mode);
+  }
+
+  @Override
+  public boolean buildingKeepsAttacking() {
+    return buildingKeepsAttacking;
+  }
+
+  @Override
+  public boolean stopsWithoutTarget() {
+    return stopsWithoutTarget.getAsBoolean();
+  }
+
+  @Override
+  public boolean attackTimersHeld() {
+    return attackTimersHeld.getAsBoolean();
+  }
+
+  @Override
+  public int scaleTimeStep(int baseMs) {
+    return timeScaler.applyAsInt(baseMs);
+  }
+
+  @Override
+  public int nextAttackSequenceStep(int attackTimerMs) {
+    return windowWalk.applyAsInt(attackTimerMs);
+  }
+
+  @Override
+  public HitSink hitSink() {
+    return hitSink;
+  }
+
+  @Override
+  public StateSetter stateSetter() {
+    return stateSetter;
+  }
+
+  /** What the owner does when it starts an attack, or null for nothing. */
+  private Runnable startingAttack;
+
+  /**
+   * Sets what the owner does when it starts an attack: the battle schedules the owner's row for it.
+   *
+   * @param startingAttack what runs, or null for nothing
+   */
+  public void setOnStartingAttack(Runnable startingAttack) {
+    this.startingAttack = startingAttack;
+  }
+
+  /**
+   * Runs the action the owner performs when it starts an attack. Both the targeting visit and the
+   * reference setter ask for it through this one chain, so the single override below answers both.
+   * An owner the battle gives no such action does nothing.
+   */
+  @Override
+  public void onStartingAttack() {
+    if (startingAttack != null) {
+      startingAttack.run();
+    }
+  }
+
+  /** What the owner does as the visit turns it toward its reference, or null for nothing. */
+  private Consumer<TargetView> turn;
+
+  /**
+   * Sets what the owner does as the visit turns it toward its reference.
+   *
+   * @param turn what runs, given the reference or null, or null for nothing
+   */
+  public void setTurn(Consumer<TargetView> turn) {
+    this.turn = turn;
+  }
+
+  @Override
+  public void turnToward(TargetView reference) {
+    if (turn != null) {
+      turn.accept(reference);
+    }
+  }
+
+  /** The owner's dash: whether a reference is in its dash ring, and the start of a dash. */
+  public interface Dasher {
+
+    /**
+     * Whether the reference is inside the owner's dash ring, or its wind-up is already running.
+     *
+     * @param reference the owner's reference
+     */
+    boolean inDashRange(TargetView reference);
+
+    /**
+     * Starts a dash toward a point.
+     *
+     * @param x the point along the arena's width
+     * @param y the point along the arena's length
+     * @param radius the radius the dash stops short of the point by, beyond the owner's own
+     */
+    void startDash(int x, int y, int radius);
+  }
+
+  /** The owner's dash, or null for an owner that does not dash. */
+  @Setter private Dasher dasher;
+
+  @Override
+  public boolean dashRangeReached(TargetView reference) {
+    return dasher != null && dasher.inDashRange(reference);
+  }
+
+  @Override
+  public void startDash(TargetView target, int x, int y, int radius) {
+    if (dasher != null) {
+      dasher.startDash(x, y, radius);
+    }
+  }
+
+  /**
+   * The extra target of a hit that reaches several, by the lookup. A list of unique targets is
+   * never asked for: the owner refuses a row that sets one.
+   */
+  @Override
+  public TargetView multiTarget(int index, boolean unique) {
+    if (unique) {
+      throw new UnsupportedOperationException("a list of unique extra targets is not modelled");
+    }
+    return MultiTargetLookup.lookup(state, index, this);
+  }
+
+  // -------------------------------------------------------------------------------------------
+  // SelectionQueries
+  // -------------------------------------------------------------------------------------------
+
+  @Override
+  public List<TargetView> lookupCandidates(int x, int y, int radius) {
+    return views(index.query(SpatialQuery.multiTargetCandidates(x, y, radius)));
+  }
+
+  @Override
+  public List<TargetView> candidates(int x, int y, int radius) {
+    return views(index.query(SpatialQuery.targetCandidates(x, y, radius)));
+  }
+
+  /** The registered views of what a query found, in its order; the list goes back to the index. */
+  private List<TargetView> views(List<GridEntity> found) {
+    if (found == null) {
+      return List.of();
+    }
+    List<TargetView> result = new ArrayList<>(found.size());
+    for (GridEntity entity : found) {
+      TargetView view = views.get(entity);
+      if (view != null) {
+        result.add(view);
+      }
+    }
+    index.release(found);
+    return result;
+  }
+
+  @Override
+  public List<TargetView> allCandidates() {
+    List<GridEntity> found = index.listQuery(true);
+    if (found == null) {
+      return List.of();
+    }
+    List<TargetView> result = new ArrayList<>(found.size());
+    for (GridEntity entity : found) {
+      TargetView view = views.get(entity);
+      if (view != null) {
+        result.add(view);
+      }
+    }
+    index.release(found);
+    return result;
+  }
+
+  @Override
+  public boolean carriesDeprioritizingBuff(TargetView candidate) {
+    return deprioritizingBuffCarrier.test(candidate);
+  }
+
+  @Override
+  public boolean validate(TargetView candidate, int mode) {
+    return ReferenceValidator.validate(state, candidate, mode, validatorQueries);
+  }
+
+  @Override
+  public TargetView defaultTarget() {
+    return DefaultTargetSelection.selectDefaultTarget(
+        state.getOwner().getX(),
+        state.getOwner().getY(),
+        state.getOwner().getLane(),
+        state.getOwner().getDelay(),
+        arenaHeightCells,
+        seed,
+        registeredTowers,
+        defaultSelectionRules,
+        defaultSelectionQueries,
+        candidate -> validate(candidate, ReferenceValidator.MODE_TAKE));
+  }
+}

@@ -1,0 +1,339 @@
+/*
+ * crforge - https://github.com/voonhous/crforge
+ * SPDX-License-Identifier: Apache-2.0
+ * Porting this code? Please cite this file and the commit you read: see the README.
+ */
+
+package org.crforge.core.battle.unit;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+
+import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.function.Consumer;
+import org.crforge.core.battle.GameData;
+import org.crforge.core.battle.Shipped;
+import org.crforge.core.battle.action.BattleAction;
+import org.crforge.core.battle.action.ShapeSelector;
+import org.crforge.core.battle.data.GameTables;
+import org.crforge.core.pathfinding.GridEntityState;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
+
+/**
+ * A shape selector run by an area effect where the reference runs do not reach: a circle that holds
+ * nobody, two objects of equal score, a shield that changes the pick, a row that may pick an object
+ * again, an underground object, a circle that checks its origin, and a selector on a crown tower.
+ *
+ * <p>The selector is the Giant hero form's slap selector, a row that scores by hit points and
+ * shield and picks each object once, written with three entries of Vines' air-to-ground group at 0,
+ * 50 and 150 ms, Vines' filter and none of the slap's wait, pause tags, tags or actions on its
+ * owner. Vines' area effect is written to run it 900 ms after it is placed, for 2000 ms, in place
+ * of its filter-form hit pass, and Vines' air-to-ground run to last 2000 ms, its pull down and its
+ * climb 50 ms each. A Guard is written with 30 hit points and a shield of 300, a Minion with 150.
+ */
+class BattleShapeSelectorTest {
+
+  private static final int LEVEL = Standard1v1Battle.DEFAULT_LEVEL;
+
+  private static final String SELECTOR = "GiantHero_Target_Selector";
+
+  /** The group the area effect starts with, a row the test writes. */
+  private static final String START = "Test_Selector_Start";
+
+  /** A point on the top side, away from every tower. */
+  private static final int X = 9000;
+
+  private static final int Y = 20000;
+
+  /**
+   * The configured tables with the selector and Vines' area effect written as the class comment
+   * says, the selector's columns then edited.
+   */
+  private static GameTables selectorTables(Path folder, Consumer<ObjectNode> edit)
+      throws IOException {
+    Files.createDirectories(folder);
+    GameData.altered(
+        folder,
+        "actions",
+        rows -> {
+          ObjectNode f = (ObjectNode) rows.get(SELECTOR).get("fields");
+          for (String column :
+              List.of(
+                  "AbortIfInstigatorDies",
+                  "ActionOnSelfWhenTriggeredLeft",
+                  "ActionOnSelfWhenTriggeredRight",
+                  "GameTagsToSet",
+                  "PauseTags",
+                  "WaitForTarget")) {
+            f.remove(column);
+          }
+          ArrayNode actions = f.putArray("Actions");
+          for (int i = 0; i < 3; i++) {
+            actions.addObject().put("action", "Vines_Action_Group");
+          }
+          f.putArray("Delays").add(0).add(50).add(150);
+          f.put("TargetFilter", "enemy_troops_for_vines");
+          edit.accept(f);
+          ObjectNode airToGround = (ObjectNode) rows.get("Vines_Air_To_Ground").get("fields");
+          airToGround.put("TotalDuration", 2000);
+          airToGround.put("TransitionDuration", 50);
+          ObjectNode start = rows.putObject(START);
+          start.put("class", "LogicActionGroupData");
+          start.put("ClassType", "ActionGroup");
+          ObjectNode group = start.putObject("fields");
+          group.put("ClassType", "ActionGroup");
+          group.putArray("SubActions").addObject().put("action", SELECTOR);
+          group.putArray("SubActionsDelay").add(900);
+        });
+    GameData.alterLoaded(
+        folder,
+        "area_effect_objects",
+        rows -> {
+          ObjectNode columns = GameData.columns(rows, "Vines_AeO");
+          for (String column :
+              List.of(
+                  "Filter",
+                  "HitBiggestTargets",
+                  "HitSpeed",
+                  "HitSpeedOffset",
+                  "MaximumTargets",
+                  "OnHitAction",
+                  "OneHitPerTarget")) {
+            columns.remove(column);
+          }
+          columns.put("LifeDuration", 2000);
+          columns.put("OnStartingAction", START);
+        });
+    GameData.alterLoaded(
+        folder,
+        "characters",
+        rows -> {
+          GameData.columns(rows, "SkeletonWarrior")
+              .put("Hitpoints", 30)
+              .put("ShieldHitpoints", 300);
+          GameData.columns(rows, "Minion").put("Hitpoints", 150);
+        });
+    return GameTables.load(folder);
+  }
+
+  private static GameTables selectorTables(Path folder) throws IOException {
+    return selectorTables(folder, f -> {});
+  }
+
+  /**
+   * A battle with the towers holding fire, and every selector step and air-to-ground re-trigger.
+   */
+  private static final class Scene {
+    final Standard1v1Battle match;
+    final List<String> steps = new ArrayList<>();
+
+    Scene(GameTables tables) {
+      match = new Standard1v1Battle(tables, LEVEL, false);
+      match
+          .getWorld()
+          .addObserver(
+              new WorldObserver() {
+                @Override
+                public void selectorStepped(
+                    int tick, AreaEffectEntity areaEffect, String action, ShapeSelector.Step step) {
+                  List<String> chosen = new ArrayList<>();
+                  for (int[] pick : step.chosen()) {
+                    chosen.add(pick[0] + "=" + named(pick[1]));
+                  }
+                  steps.add(
+                      "%d chosen %s none %s empty %s finished %s"
+                          .formatted(tick, chosen, step.none(), step.empty(), step.finished()));
+                }
+
+                @Override
+                public void airToGroundRetriggered(
+                    int tick, WorldEntity unit, String action, int phase, int counter) {
+                  steps.add(
+                      "%d retrigger %s phase %d counter %d"
+                          .formatted(tick, unit.name(), phase, counter));
+                }
+              });
+    }
+
+    /** A unit's record in the scene's tables. */
+    UnitData unit(String name) {
+      return match.getWorld().getRecords().unit(name);
+    }
+
+    String named(int id) {
+      return ((WorldEntity) match.getWorld().liveObject(id)).name();
+    }
+
+    void vines() {
+      match.placeAreaEffect(0, "Vines_AeO", LEVEL, 0, X, Y, "vines");
+    }
+
+    void steps(int count) {
+      for (int i = 0; i < count; i++) {
+        match.getBattle().step();
+      }
+    }
+  }
+
+  @Test
+  @DisplayName(
+      "a circle that holds nobody ends each due step before its finish's test, so the run finishes"
+          + " a tick after its last due tick")
+  void anEmptyCircle(@TempDir Path folder) throws IOException {
+    Scene scene = new Scene(selectorTables(folder));
+    scene.vines();
+    scene.steps(25);
+    assertThat(scene.steps)
+        .containsExactly(
+            "18 chosen [] none [] empty true finished false",
+            "19 chosen [] none [] empty true finished false",
+            "21 chosen [] none [] empty true finished false",
+            "22 chosen [] none [] empty false finished true");
+  }
+
+  @Test
+  @DisplayName(
+      "of two Knights of equal hit points the lower id is picked first, though the query finds"
+          + " the other first; the third entry picks nobody")
+  void equalScoresGoToTheLowerId(@TempDir Path folder) throws IOException {
+    Scene scene = new Scene(selectorTables(folder));
+    // The query walks its buckets from the left, so it finds the second Knight first.
+    scene.match.deploy(0, GameData.unit("Knight"), LEVEL, 1, X + 2000, Y, "first");
+    scene.match.deploy(0, GameData.unit("Knight"), LEVEL, 1, X - 2000, Y, "second");
+    scene.vines();
+    scene.steps(22);
+    assertThat(scene.steps)
+        .containsExactly(
+            "18 chosen [0=first] none [] empty false finished false",
+            "19 chosen [1=second] none [] empty false finished false",
+            "21 chosen [] none [2] empty false finished true");
+  }
+
+  @Test
+  @DisplayName(
+      "a Guard's shield lifts it over a Minion when shields count; by hit points alone the Minion"
+          + " is picked first")
+  void aShieldCounts(@TempDir Path folder) throws IOException {
+    Scene shields = new Scene(selectorTables(folder.resolve("shields")));
+    shields.match.deploy(0, shields.unit("SkeletonWarrior"), LEVEL, 1, X - 500, Y, "guard");
+    shields.match.deploy(0, shields.unit("Minion"), LEVEL, 1, X + 500, Y, "minion");
+    shields.vines();
+    shields.steps(19);
+    assertThat(shields.steps)
+        .first()
+        .isEqualTo("18 chosen [0=guard] none [] empty false finished false");
+
+    Scene hitPoints =
+        new Scene(
+            selectorTables(
+                folder.resolve("hit_points"),
+                f -> f.put("TargetSelectionMode", "HighestCurrentHp")));
+    hitPoints.match.deploy(0, hitPoints.unit("SkeletonWarrior"), LEVEL, 1, X - 500, Y, "guard");
+    hitPoints.match.deploy(0, hitPoints.unit("Minion"), LEVEL, 1, X + 500, Y, "minion");
+    hitPoints.vines();
+    hitPoints.steps(19);
+    assertThat(hitPoints.steps)
+        .first()
+        .isEqualTo("18 chosen [0=minion] none [] empty false finished false");
+  }
+
+  @Test
+  @DisplayName(
+      "a row that may pick an object again picks a lone Knight with every entry, and each later"
+          + " pick starts its air-to-ground run over")
+  void pickingAgain(@TempDir Path folder) throws IOException {
+    Scene scene = new Scene(selectorTables(folder, f -> f.put("OncePerTarget", false)));
+    scene.match.deploy(0, GameData.unit("Knight"), LEVEL, 1, X, Y, "knight");
+    scene.vines();
+    scene.steps(22);
+    assertThat(scene.steps)
+        .containsExactly(
+            "18 chosen [0=knight] none [] empty false finished false",
+            "19 chosen [1=knight] none [] empty false finished false",
+            "19 retrigger knight phase 0 counter 2000",
+            "21 chosen [2=knight] none [] empty false finished true",
+            "21 retrigger knight phase 0 counter 2000");
+  }
+
+  @Test
+  @DisplayName(
+      "Vines' filter drops underground objects, though not hidden ones: a Miner tunnelling through"
+          + " the circle is never picked")
+  void aTunnellingMinerIsNotPicked(@TempDir Path folder) throws IOException {
+    Scene scene = new Scene(selectorTables(folder));
+    // The top side's Miner tunnels from its king to the bottom side's left lane: it crosses the
+    // circle about (5000, 17500) through every due step of the selector.
+    scene.match.play(0, GameData.card("Miner"), LEVEL, 1, 3500, 8000, "miner");
+    scene.match.placeAreaEffect(0, "Vines_AeO", LEVEL, 0, 5000, 17500, "vines");
+    scene.steps(25);
+    CharacterEntity miner = scene.match.getPlays().get(0).units().get(0);
+    assertThat(miner.getView().getState()).isEqualTo(GridEntityState.SPAWN_PATHFIND);
+    assertThat(scene.steps)
+        .containsExactly(
+            "18 chosen [] none [] empty true finished false",
+            "19 chosen [] none [] empty true finished false",
+            "21 chosen [] none [] empty true finished false",
+            "22 chosen [] none [] empty false finished true");
+  }
+
+  @Test
+  @DisplayName(
+      "a circle that checks its origin drops a Knight whose centre lies beyond its radius though"
+          + " its collision radius reaches in, so the second entry picks nobody; without the check"
+          + " the same Knight is picked")
+  void aCircleThatChecksItsOrigin(@TempDir Path folder) throws IOException {
+    String shape = Shipped.fields(SELECTOR).path("Shape").asText();
+    int radius = Shipped.number(Shipped.row("shapes", shape), "Radius");
+    // Half the Knight's collision radius past the circle: out by its centre, in by its edge.
+    int beyond = radius + Shipped.number(Shipped.unitRow("Knight"), "CollisionRadius") / 2;
+
+    Path checkedFolder = folder.resolve("checked");
+    selectorTables(checkedFolder);
+    GameData.alterLoaded(
+        checkedFolder, "shapes", rows -> GameData.columns(rows, shape).put("CheckOrigin", true));
+    Scene checked = new Scene(GameTables.load(checkedFolder));
+    checked.match.deploy(0, GameData.unit("Knight"), LEVEL, 1, X, Y - radius / 2, "inside");
+    checked.match.deploy(0, GameData.unit("Knight"), LEVEL, 1, X + beyond, Y, "edge");
+    checked.vines();
+    checked.steps(22);
+    assertThat(checked.steps)
+        .containsExactly(
+            "18 chosen [0=inside] none [] empty false finished false",
+            "19 chosen [] none [1] empty false finished false",
+            "21 chosen [] none [2] empty false finished true");
+
+    Scene plain = new Scene(selectorTables(folder.resolve("plain")));
+    plain.match.deploy(0, GameData.unit("Knight"), LEVEL, 1, X, Y - radius / 2, "inside");
+    plain.match.deploy(0, GameData.unit("Knight"), LEVEL, 1, X + beyond, Y, "edge");
+    plain.vines();
+    plain.steps(22);
+    assertThat(plain.steps)
+        .containsExactly(
+            "18 chosen [0=inside] none [] empty false finished false",
+            "19 chosen [1=edge] none [] empty false finished false",
+            "21 chosen [] none [2] empty false finished true");
+  }
+
+  @Test
+  @DisplayName(
+      "a shape selector run on a crown tower, neither an area effect nor a character, is refused")
+  void onATowerIsRefused() {
+    Scene scene = new Scene(GameData.tables());
+    scene.steps(1);
+    TowerEntity king = scene.match.getWorld().kingTower(0);
+    BattleAction selector =
+        GameData.actions().build(SELECTOR, scene.match.getWorld().binding(king));
+    assertThatThrownBy(() -> king.actionHolder().start(selector))
+        .isInstanceOf(UnsupportedOperationException.class)
+        .hasMessageContaining(
+            "a shape selector on an owner other than an area effect or a character");
+  }
+}

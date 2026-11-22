@@ -1,0 +1,15 @@
+[package]
+name = "tavern-device-state-kernels"
+version = "0.1.0"
+edition = "2024"
+license = "MIT"
+[lib]
+crate-type = ["cdylib","rlib"]
+[features]
+ordered_tables = ["tavern-device-core/ordered_tables"]
+arena = ["tavern-device-core/arena", "cuda_std/external-allocator"]
+[dependencies]
+tavern-device-wire = { path = "../wire" }
+tavern-device-core = { path = "../core", features = ["device"] }
+cuda_std = { git = "https://github.com/Rust-GPU/Rust-CUDA", rev = "3a82c35a7196731fb60eebdac2a40d2b1bf0ba95" }
+serde_json = { version = "=1.0.151", default-features = false, features = ["alloc"] }

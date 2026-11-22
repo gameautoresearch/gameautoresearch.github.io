@@ -1,0 +1,8 @@
+.cache/
+task/environment/repo/
+task/environment/ar/
+task/environment/maps/
+task/environment/practice/
+jobs/
+__pycache__/
+*.pyc

@@ -1,0 +1,170 @@
+{
+  "version": 1,
+  "split": "practice",
+  "format": "gen9randombattle",
+  "deterministic_policy": true,
+  "max_decision_phases": 512,
+  "games": [
+    {
+      "seed": 900000000,
+      "learner_seat": 0,
+      "opponent": "random"
+    },
+    {
+      "seed": 900000000,
+      "learner_seat": 0,
+      "opponent": "power"
+    },
+    {
+      "seed": 900000000,
+      "learner_seat": 1,
+      "opponent": "random"
+    },
+    {
+      "seed": 900000000,
+      "learner_seat": 1,
+      "opponent": "power"
+    },
+    {
+      "seed": 900000001,
+      "learner_seat": 0,
+      "opponent": "random"
+    },
+    {
+      "seed": 900000001,
+      "learner_seat": 0,
+      "opponent": "power"
+    },
+    {
+      "seed": 900000001,
+      "learner_seat": 1,
+      "opponent": "random"
+    },
+    {
+      "seed": 900000001,
+      "learner_seat": 1,
+      "opponent": "power"
+    },
+    {
+      "seed": 900000002,
+      "learner_seat": 0,
+      "opponent": "random"
+    },
+    {
+      "seed": 900000002,
+      "learner_seat": 0,
+      "opponent": "power"
+    },
+    {
+      "seed": 900000002,
+      "learner_seat": 1,
+      "opponent": "random"
+    },
+    {
+      "seed": 900000002,
+      "learner_seat": 1,
+      "opponent": "power"
+    },
+    {
+      "seed": 900000003,
+      "learner_seat": 0,
+      "opponent": "random"
+    },
+    {
+      "seed": 900000003,
+      "learner_seat": 0,
+      "opponent": "power"
+    },
+    {
+      "seed": 900000003,
+      "learner_seat": 1,
+      "opponent": "random"
+    },
+    {
+      "seed": 900000003,
+      "learner_seat": 1,
+      "opponent": "power"
+    },
+    {
+      "seed": 900000004,
+      "learner_seat": 0,
+      "opponent": "random"
+    },
+    {
+      "seed": 900000004,
+      "learner_seat": 0,
+      "opponent": "power"
+    },
+    {
+      "seed": 900000004,
+      "learner_seat": 1,
+      "opponent": "random"
+    },
+    {
+      "seed": 900000004,
+      "learner_seat": 1,
+      "opponent": "power"
+    },
+    {
+      "seed": 900000005,
+      "learner_seat": 0,
+      "opponent": "random"
+    },
+    {
+      "seed": 900000005,
+      "learner_seat": 0,
+      "opponent": "power"
+    },
+    {
+      "seed": 900000005,
+      "learner_seat": 1,
+      "opponent": "random"
+    },
+    {
+      "seed": 900000005,
+      "learner_seat": 1,
+      "opponent": "power"
+    },
+    {
+      "seed": 900000006,
+      "learner_seat": 0,
+      "opponent": "random"
+    },
+    {
+      "seed": 900000006,
+      "learner_seat": 0,
+      "opponent": "power"
+    },
+    {
+      "seed": 900000006,
+      "learner_seat": 1,
+      "opponent": "random"
+    },
+    {
+      "seed": 900000006,
+      "learner_seat": 1,
+      "opponent": "power"
+    },
+    {
+      "seed": 900000007,
+      "learner_seat": 0,
+      "opponent": "random"
+    },
+    {
+      "seed": 900000007,
+      "learner_seat": 0,
+      "opponent": "power"
+    },
+    {
+      "seed": 900000007,
+      "learner_seat": 1,
+      "opponent": "random"
+    },
+    {
+      "seed": 900000007,
+      "learner_seat": 1,
+      "opponent": "power"
+    }
+  ],
+  "note": "Frozen reproducible schedule. Held-out seeds must not be used for training or tuning; grader must supply a private replacement for adversarial submissions."
+}

@@ -1,0 +1,6 @@
+{
+ "_doc": "Placeholder network (rl/network.py): linear layers, width 32; every key is passed to network.init.",
+ "width": 32,
+ "blocks": 0,
+ "architecture": "linear"
+}

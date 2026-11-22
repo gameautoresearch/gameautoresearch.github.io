@@ -1,0 +1,43 @@
+/*
+ * crforge - https://github.com/voonhous/crforge
+ * SPDX-License-Identifier: Apache-2.0
+ * Porting this code? Please cite this file and the commit you read: see the README.
+ */
+
+package org.crforge.core.pathfinding.move;
+
+/**
+ * What a pushback request asks of the entity it would push, beyond the entity's own position,
+ * flags, state and movement component.
+ */
+public interface PushbackQueries {
+
+  /** True when the entity's row ignores pushback. */
+  boolean ignoresPushback();
+
+  /** True when one of the entity's buffs refuses pushback; false for an entity without buffs. */
+  default boolean buffRefusesPushback() {
+    return false;
+  }
+
+  /** True while the entity is hidden; false for an entity that never hides. */
+  default boolean hidden() {
+    return false;
+  }
+
+  /**
+   * The wind-up of a dash the entity's targeting component is running, in milliseconds, or 0 or
+   * less for none; 0 for an entity that does not dash.
+   */
+  default int dashWindupMs() {
+    return 0;
+  }
+
+  /** Resumes the entity out of a dash wind-up and resets its dash chain. */
+  default void resumeDashWindup() {}
+
+  /** The longest pushback the battle allows, in game units. */
+  default int maxPushbackLength() {
+    return PushbackRequest.MAX_PUSHBACK_LENGTH;
+  }
+}

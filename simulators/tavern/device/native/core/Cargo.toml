@@ -1,0 +1,22 @@
+[package]
+name = "tavern-device-core"
+version = "0.1.0"
+edition = "2024"
+license = "MIT"
+build = "../../core/build.rs"
+[lib]
+path = "../../core/src/lib.rs"
+[features]
+default = []
+published_cache = []
+ordered_tables = []
+device = []
+arena = ["cuda_std/external-allocator"]
+[dependencies]
+serde = { version = "=1.0.229", default-features = false, features = ["derive", "alloc", "rc"] }
+serde_json = { version = "=1.0.151", default-features = false, features = ["alloc"] }
+hashbrown = { version = "=0.16.1", default-features = false, features = ["inline-more"] }
+cuda_std = { path = "../runtime" }
+
+[build-dependencies]
+serde_json = { version = "=1.0.151", default-features = false, features = ["std"] }

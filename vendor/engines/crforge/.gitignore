@@ -1,0 +1,58 @@
+# Gradle
+.gradle/
+build/
+!gradle/wrapper/gradle-wrapper.jar
+!**/src/main/**/build/
+!**/src/test/**/build/
+
+# IDE
+.idea/
+*.iml
+*.ipr
+*.iws
+.vscode/
+
+# Eclipse
+.classpath
+.project
+.settings/
+.factorypath
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Java
+*.class
+*.jar
+!gradle/wrapper/*.jar
+*.war
+*.ear
+
+# Logs
+*.log
+
+# Python (a local virtual environment and its caches)
+__pycache__/
+*.py[cod]
+venv/
+.venv/
+
+# Fault bundles of the environment (docs/environment.md): local files of a run, never committed
+fault-bundles/
+
+# Backup files
+*.bak
+
+# IDE build output
+bin/
+
+# Environment variables
+.env
+.env.*
+
+# Claude Code instructions
+CLAUDE.md
+
+# Internal scratch/planning files
+scratch/

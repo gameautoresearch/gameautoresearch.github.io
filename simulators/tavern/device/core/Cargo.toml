@@ -1,0 +1,24 @@
+[package]
+name = "tavern-device-core"
+version = "0.1.0"
+edition = "2024"
+license = "MIT"
+
+[features]
+default = []
+published_cache = []
+ordered_tables = []
+device = ["dep:cuda_std"]
+arena = ["device", "cuda_std/external-allocator"]
+
+[dependencies]
+serde = { version = "=1.0.229", default-features = false, features = ["derive", "alloc", "rc"] }
+serde_json = { version = "=1.0.151", default-features = false, features = ["alloc"] }
+hashbrown = { version = "=0.16.1", default-features = false, features = ["inline-more"] }
+cuda_std = { git = "https://github.com/Rust-GPU/Rust-CUDA", rev = "3a82c35a7196731fb60eebdac2a40d2b1bf0ba95", optional = true }
+
+[dev-dependencies]
+oracle = { package = "taverngym", path = "../../../../candidates/AutoTavern/crates/taverngym" }
+
+[build-dependencies]
+serde_json = { version = "=1.0.151", default-features = false, features = ["std"] }

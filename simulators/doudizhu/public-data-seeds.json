@@ -1,0 +1,46 @@
+{
+  "format": 1,
+  "deal_generator": "SHA256 canonical JSON [ruleset,split,deal_seed,index] -> Python3.12 MT19937 -> explicit Fisher-Yates randrange -> sorted rank hands",
+  "algorithm_version": "douzero-fixed-role-v1",
+  "domains": [
+    "train",
+    "practice",
+    "heldout"
+  ],
+  "public_practice": {
+    "deal_seed": 20261108,
+    "indices": [
+      0,
+      63
+    ]
+  },
+  "training": {
+    "deal_seed": 20261108,
+    "indices": "monotonically reserved from next_deal in checkpoint; budget-aborted waves skipped"
+  },
+  "private_grading": "supply evaluator-only --seed-file JSON with split heldout, deal_seed, policy_seed, deals; choose a fresh secret seed, retain file host-side; emitted manifest records its SHA256 and redacts actual seeds",
+  "deal_hash": "SHA256 sorted compact JSON of all private deal fields; stored evaluator-side for audit/overlap checks; not policy-visible",
+  "external_data": "none; no downloaded pretrained weights or pickled evaluation datasets",
+  "executed_gpu_training": {
+    "domain": "train",
+    "seeds": [
+      17,
+      29,
+      43
+    ],
+    "deal_seed": "20261108 + training seed",
+    "indices": [
+      0,
+      2047
+    ]
+  },
+  "executed_gpu_profile": {
+    "domain": "train",
+    "deal_seed": 20261108,
+    "indices": [
+      900000,
+      900127
+    ],
+    "policy": "trained seed17 after2048games"
+  }
+}

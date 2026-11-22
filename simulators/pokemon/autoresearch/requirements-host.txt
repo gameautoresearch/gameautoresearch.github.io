@@ -1,0 +1,3 @@
+# This game's existing .venv-pokemon is sufficient; no other game's venv is used.
+-r ../requirements.txt
+modal[api-proxy-support]==1.5.2

@@ -1,0 +1,800 @@
+/*
+ * crforge - https://github.com/voonhous/crforge
+ * SPDX-License-Identifier: Apache-2.0
+ * Porting this code? Please cite this file and the commit you read: see the README.
+ */
+
+package org.crforge.core.battle.unit;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.crforge.core.battle.GameData.fields;
+
+import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+import java.io.IOException;
+import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
+import org.crforge.core.battle.GameData;
+import org.crforge.core.battle.Shipped;
+import org.crforge.core.battle.action.BattleAction;
+import org.crforge.core.battle.data.BattleRecords;
+import org.crforge.core.battle.data.GameTables;
+import org.crforge.core.battle.match.LadderMatch;
+import org.crforge.core.battle.match.MatchCard;
+import org.crforge.core.battle.match.MatchSide;
+import org.crforge.core.battle.projectile.ProjectileEntity;
+import org.crforge.core.battle.spawn.SpawnHost;
+import org.crforge.core.pathfinding.EntityFlags;
+import org.crforge.core.pathfinding.GridEntity;
+import org.crforge.core.pathfinding.GridEntityState;
+import org.crforge.core.pathfinding.target.TargetView;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
+
+/**
+ * The Wizard's hero form played from the hero slot and its ability used. The ability's activation
+ * lifts the hero off the ground with a ground-to-air run: it climbs to 3500 over 200 ms, raising
+ * FORCE_IS_AIR and NO_ATTACK, turns to the hold at the height, where its path is reset and the
+ * row's action at the height is scheduled on it, and is held there for 3100 ms. The activation's
+ * instant hit, gated by the hero's target within 5500, raises the hero's instant-hit byte as the
+ * run starts, and the hero's next attack visit lands a whole hit at once. The action at the height
+ * swaps the hero onto its flying row, which its champion slot then no longer follows, and whose
+ * shot schedules its action on reaching its target on itself as it arrives: two area effects 1000
+ * beyond its point, in the impact's tick. When the hold ends the descent starts, and its action at
+ * the start swaps the hero back onto its ground row, which its champion slot follows again; the
+ * hero comes down over 200 ms and the run ends.
+ */
+class BattleWizardHeroTest {
+
+  /** Which bit of a tag word each flag is, as the configured tables number the game tags. */
+  private static final EntityFlags BITS = EntityFlags.of(GameData.tables());
+
+  private static final int LEVEL = Standard1v1Battle.DEFAULT_LEVEL;
+
+  private static final String HERO = "WizardHero";
+
+  /** The Wizard first, in the hero slot, and seven other cards. */
+  private static final List<String> DECK =
+      List.of("Wizard", "Archer", "Knight", "Giant", "Minions", "Valkyrie", "Fireball", "Arrows");
+
+  private static final List<String> KNIGHTS = Collections.nCopies(8, "Knight");
+
+  /**
+   * The values this test's numbers follow from, written into a copy of the hero's rows by {@link
+   * #pinned}: the run's flying height, transition and whole duration; the ability's trigger delay,
+   * cast time, cost and charges; how far beyond the flying shot's point its area effects spawn; the
+   * hero's range, the reach its activation's instant hit tests; and the flying row's shot start
+   * height.
+   */
+  private static final int HEIGHT = 3500;
+
+  private static final int TRANSITION = 200;
+
+  private static final int TOTAL = 3500;
+
+  private static final int TRIGGER_DELAY = 200;
+
+  private static final int CAST_TIME = 950;
+
+  private static final int ABILITY_COST = 1;
+
+  private static final int CHARGES = 1;
+
+  private static final int BEYOND = 1000;
+
+  /** The reach the instant hit's gate tests, which the hero's range is set to. */
+  private static final int GATE = 5500;
+
+  /** The flying row's shot start height above its launcher. */
+  private static final int START_Z = 1200;
+
+  /** A knock the tests start on the hero while it casts, so its run starts in the air. */
+  private static final String KNOCK = "MegaKnight_EV1_uppercut_send_flying";
+
+  /** The knock's top height and duration, written into its row by {@link #knocked}. */
+  private static final int KNOCK_HEIGHT = 8000;
+
+  private static final int KNOCK_DURATION = 900;
+
+  /**
+   * A knock height whose first step already lifts the hero above the run's height: a ninth of it
+   * times 1.9.
+   */
+  private static final int KNOCK_HEIGHT_ABOVE = 20000;
+
+  @Test
+  @DisplayName(
+      "used while the hero attacks a tower in range, the activation's instant hit raises the"
+          + " hero's instant-hit byte in the step its run starts, and the byte is kept through the"
+          + " climb")
+  void theInstantHitIsSet(@TempDir Path folder) throws IOException {
+    Scene scene = new Scene(pinned(folder));
+    CharacterEntity hero = scene.abilityUsedAttacking();
+    int cast = scene.stepUntilCasting(hero);
+    scene.steps(2);
+    assertThat(hero.getTargeting().isInstantHit()).isFalse();
+    scene.steps(1);
+    assertThat(scene.runs).containsExactly((cast + 2) + " start phase 1 counter 200");
+    assertThat(hero.getTargeting().isInstantHit()).isTrue();
+    // The climb raises NO_ATTACK: no attack visit takes the byte before the turn.
+    for (int i = 0; i < 4; i++) {
+      scene.steps(1);
+      assertThat(hero.getTargeting().isInstantHit()).isTrue();
+    }
+  }
+
+  @Test
+  @DisplayName(
+      "used while the hero's target is out of 5500, the instant hit's gate is false and the byte"
+          + " is not raised")
+  void theInstantHitIsGated(@TempDir Path folder) throws IOException {
+    Scene scene = new Scene(pinned(folder));
+    CharacterEntity hero = scene.abilityUsed();
+    scene.stepUntilCasting(hero);
+    scene.steps(3);
+    assertThat(scene.runs).hasSize(1);
+    TargetView target = hero.getTargeting().getReference();
+    assertThat(target).as("a princess tower, out of reach").isNotNull();
+    long dx = target.getEntity().getX() - hero.getView().getX();
+    long dy = target.getEntity().getY() - hero.getView().getY();
+    long reach =
+        target.getEntity().getCollisionRadius() + (long) GATE + hero.getView().getCollisionRadius();
+    assertThat(dx * dx + dy * dy).isGreaterThan(reach * reach);
+    assertThat(hero.getTargeting().isInstantHit()).isFalse();
+  }
+
+  @Test
+  @DisplayName(
+      "held at the height on its flying row, the hero's first attack visit after the instant hit"
+          + " rounds its attack time up to a whole hit, which lands at once, and clears the byte")
+  void theInstantHitLandsOnTheFirstAttackVisit(@TempDir Path folder) throws IOException {
+    Scene scene = new Scene(pinned(folder));
+    CharacterEntity hero = scene.abilityUsedAttacking();
+    int cast = scene.stepUntilCasting(hero);
+    scene.steps(3);
+    assertThat(hero.getTargeting().isInstantHit()).isTrue();
+    int hitSpeed = hero.getTargeting().getConfig().hitSpeed();
+    int before = hero.getTargeting().getAttackTimerMs();
+    // The byte waits, through the climb, the turn and the rest of the cast, for the next attack.
+    while (hero.getView().getState() != GridEntityState.ATTACKING) {
+      assertThat(hero.getTargeting().isInstantHit()).isTrue();
+      assertThat(hero.getTargeting().getAttackTimerMs()).isEqualTo(before);
+      assertThat(scene.tick()).isLessThan(cast + 40);
+      scene.steps(1);
+    }
+    assertThat(hero.getTargeting().isInstantHit()).isFalse();
+    assertThat(hero.getTargeting().isAttackTimeRoundedUp()).isTrue();
+    int after = hero.getTargeting().getAttackTimerMs();
+    assertThat(after).as("the next whole hit").isEqualTo((before / hitSpeed + 1) * hitSpeed);
+    scene.steps(1);
+    assertThat(hero.getTargeting().isAttackTimeRoundedUp()).isFalse();
+    assertThat(hero.getTargeting().getAttackTimerMs()).as("then one tick").isEqualTo(after + 50);
+  }
+
+  @Test
+  @DisplayName(
+      "the hero climbs to 3500 in five steps from 200 ms after its cast starts, in the air from"
+          + " the pre-hook after the first, and the action at the height runs on the turn's step,"
+          + " where it swaps the hero onto its flying row")
+  void theHeroClimbs(@TempDir Path folder) throws IOException {
+    Scene scene = new Scene(pinned(folder));
+    CharacterEntity hero = scene.abilityUsed();
+    // The tick count after the step whose state is the cast's first.
+    int cast = scene.stepUntilCasting(hero);
+    // The trigger delay of 200 ms: the activation starts the run on the third step after it, in a
+    // pending pass after that tick's run pass, so its first update is on the next step.
+    scene.steps(2);
+    assertThat(scene.runs).isEmpty();
+    scene.steps(1);
+    int start = cast + 2;
+    assertThat(scene.runs).containsExactly(start + " start phase 1 counter 200");
+    assertThat(hero.flyingHeightOverride()).isEqualTo(3500);
+    scene.steps(1);
+    assertThat(hero.getView().isAir()).as("FORCE_IS_AIR is raised but not yet in").isFalse();
+    scene.steps(1);
+    assertThat(hero.getView().isAir()).isTrue();
+    assertThat(scene.flags(hero) & scene.world().forceIsAir()).isNotZero();
+    scene.steps(2);
+    assertThat(scene.runs)
+        .containsExactly(
+            start + " start phase 1 counter 200",
+            (start + 1) + " phase 1 1 counter 200 150 [0]",
+            (start + 2) + " phase 1 1 counter 150 100 [875]",
+            (start + 3) + " phase 1 1 counter 100 50 [1750]",
+            (start + 4) + " phase 1 1 counter 50 0 [2625]");
+    assertThat(hero.getTargetView().z()).as("folded a step behind the push").isEqualTo(1750);
+    int hitPoints = hero.getHitPoints().getHitPoints();
+    // The turn's step schedules the action at the height, which runs in it: its swap to
+    // WizardHero_air, a flying row. That step ends in the eighth state after the cast's first,
+    // where the reference battle shows the hero as WizardHero_air.
+    assertThat(scene.tick()).isEqualTo(cast + 7);
+    scene.steps(1);
+    assertThat(hero.getData().name()).isEqualTo("WizardHero_air");
+    assertThat(hero.getHitPoints().getHitPoints()).as("kept").isEqualTo(hitPoints);
+    // The live height is the run's push, which the swap leaves alone: the row's own height is
+    // read nowhere while the run holds FORCE_IS_AIR.
+    scene.steps(1);
+    assertThat(hero.getView().isAir()).isTrue();
+    assertThat(hero.getTargetView().z()).isEqualTo(3500);
+  }
+
+  @Test
+  @DisplayName(
+      "the swap onto the flying row has the champion slot work its state out at once: the hero"
+          + " stays a live copy while its new row names the same ability row as the one it follows,"
+          + " and the state is the override the action at the height wrote")
+  void theSwapKeepsTheChampionSlot(@TempDir Path folder) throws IOException {
+    Scene scene = new Scene(pinned(folder));
+    CharacterEntity hero = scene.abilityUsed();
+    int turn = scene.stepUntilCasting(hero) + 7;
+    ChampionController slot = scene.slotFollowing(HERO);
+    while (scene.tick() < turn) {
+      scene.steps(1);
+    }
+    assertThat(slot.champions()).containsExactly(hero);
+    // The ability's one charge is spent: the slot works out that all are consumed.
+    assertThat(slot.getState()).isEqualTo(ChampionController.ALL_CHARGES_CONSUMED);
+    int cooldown = slot.getCooldownMs();
+    scene.steps(1);
+    assertThat(hero.getData().name()).isEqualTo("WizardHero_air");
+    // The slot's own step ran before the swap, in the king's run pass; the swap's pass worked the
+    // state out again, the slot's copies rebuilt from the live list. The group at the height runs
+    // its parts from the last to the first, so its button override, its last part, was written
+    // before the swap and wins that working out. A copy is a unit whose row names the champion's
+    // ability row, which the flying row may share.
+    assertThat(slot.champions()).isEqualTo(copiesOnTheFlyingRow(hero));
+    assertThat(slot.getOverride()).isEqualTo(ChampionController.ON_COOLDOWN);
+    assertThat(slot.getState()).isEqualTo(ChampionController.ON_COOLDOWN);
+    // The ability counts charges and sets no cooldown; the swap leaves it at 0.
+    assertThat(cooldown).isZero();
+    assertThat(slot.getCooldownMs()).as("the swap leaves the cooldown").isZero();
+    // The slot's next step finds the same copies.
+    scene.steps(1);
+    assertThat(slot.champions()).isEqualTo(copiesOnTheFlyingRow(hero));
+  }
+
+  @Test
+  @DisplayName(
+      "the swap onto the flying row comes while the cast holds the hero's targeting component off,"
+          + " and leaves the target the hero held as it stands: the component hears of no swap")
+  void theSwapLeavesTheTargetOfASwitchedOffComponent(@TempDir Path folder) throws IOException {
+    Scene scene = new Scene(pinned(folder));
+    CharacterEntity hero = scene.abilityUsedAttacking();
+    int turn = scene.stepUntilCasting(hero) + 7;
+    while (scene.tick() < turn) {
+      scene.steps(1);
+    }
+    TargetView target = hero.getTargeting().getReference();
+    assertThat(target).as("the tower it attacked when the ability was used").isNotNull();
+    assertThat(hero.isActive(CharacterEntity.TARGETING_SLOT)).as("off through the cast").isFalse();
+    scene.steps(1);
+    assertThat(hero.getData().name()).isEqualTo("WizardHero_air");
+    assertThat(hero.getTargeting().getReference()).isSameAs(target);
+  }
+
+  /**
+   * The live copies a champion slot following the ground row finds while the hero is on its flying
+   * row: the hero when that row names the ground row's ability row, else none.
+   */
+  private static List<CharacterEntity> copiesOnTheFlyingRow(CharacterEntity hero) {
+    String ground = Shipped.text(Shipped.unitRow(HERO), "Ability");
+    String flying = Shipped.text(Shipped.unitRow("WizardHero_air"), "Ability");
+    return ground.equals(flying) ? List.of(hero) : List.of();
+  }
+
+  @Test
+  @DisplayName(
+      "the flying row's shot schedules its action on reaching its target on itself as it arrives,"
+          + " which spawns the tornado and the damage area 1000 beyond its point, in the last"
+          + " pending pass of the impact's tick; the damage area hits the tower on the next tick,"
+          + " and the shot's buff keeps the tower's own side from pushing it")
+  void theAirShotSpawnsItsAreaEffects(@TempDir Path folder) throws IOException {
+    Scene scene = new Scene(pinned(folder));
+    List<String> spawns = new ArrayList<>();
+    scene
+        .world()
+        .addObserver(
+            new WorldObserver() {
+              @Override
+              public void areaEffectSpawned(
+                  int tick,
+                  SpawnHost owner,
+                  String action,
+                  int phase,
+                  SpawnHost source,
+                  AreaEffectEntity areaEffect) {
+                if (owner instanceof ProjectileEntity shot) {
+                  spawns.add(
+                      "%d %s %s phase %d at %d %d from %d %d source %s"
+                          .formatted(
+                              tick,
+                              shot.getData().name(),
+                              areaEffect.getData().name(),
+                              phase,
+                              areaEffect.getX(),
+                              areaEffect.getY(),
+                              shot.x(),
+                              shot.y(),
+                              source == shot ? "itself" : source.name()));
+                }
+              }
+            });
+    CharacterEntity hero = scene.abilityUsedAttacking();
+    GridEntity aimed = hero.getTargeting().getReference().getEntity();
+    TowerEntity tower =
+        scene.world().getHolder().entities().stream()
+            .filter(TowerEntity.class::isInstance)
+            .map(TowerEntity.class::cast)
+            .filter(candidate -> candidate.getView() == aimed)
+            .findFirst()
+            .orElseThrow();
+    int limit = scene.tick() + 60;
+    while (spawns.isEmpty()) {
+      assertThat(scene.tick()).isLessThan(limit);
+      scene.steps(1);
+    }
+    int impact = scene.tick() - 1;
+    String at = " phase 3 at %d %d from %d %d source itself";
+    String point = at.formatted(tower.x(), tower.y() + 1000, tower.x(), tower.y());
+    assertThat(spawns)
+        .containsExactly(
+            impact + " WizardHeroAbilityProjectile WizardHero_DamageAEO" + point,
+            impact + " WizardHeroAbilityProjectile WizardHero_MiniTornadoAEO" + point);
+    int before = tower.getHitPoints().getHitPoints();
+    scene.steps(1);
+    assertThat(tower.getHitPoints().getHitPoints()).as("the damage area's hit").isLessThan(before);
+    assertThat(tower.getView().getFlags() & BITS.noPushedByAlly()).isNotZero();
+  }
+
+  @Test
+  @DisplayName(
+      "the flying row's shot starts at the hero's live height, the height the hold pushed folded"
+          + " in, plus the row's start height: its own height stays 0 in the hold")
+  void theAirShotStartsAtTheLiveHeight(@TempDir Path folder) throws IOException {
+    Scene scene = new Scene(pinned(folder));
+    List<ProjectileEntity> shots = new ArrayList<>();
+    scene
+        .world()
+        .addObserver(
+            new WorldObserver() {
+              @Override
+              public void projectileLaunched(int tick, ProjectileEntity projectile) {
+                if (projectile.getData().name().equals("WizardHeroAbilityProjectile")) {
+                  shots.add(projectile);
+                }
+              }
+            });
+    CharacterEntity hero = scene.abilityUsedAttacking();
+    int limit = scene.tick() + 100;
+    while (shots.isEmpty()) {
+      assertThat(scene.tick()).isLessThan(limit);
+      scene.steps(1);
+    }
+    assertThat(hero.getData().name()).isEqualTo("WizardHero_air");
+    assertThat(hero.getView().getZ()).as("its own height").isZero();
+    assertThat(hero.getTargetView().z()).as("its live height").isEqualTo(HEIGHT);
+    assertThat(shots.get(0).getStartZ()).isEqualTo(HEIGHT + START_Z);
+  }
+
+  @Test
+  @DisplayName(
+      "held at the height the hero carries FORCE_IS_AIR and pushes 3500 on each step for 3100 ms;"
+          + " the hold's last step turns to the descent, with a transition less 50 ms left")
+  void theHeroIsHeld(@TempDir Path folder) throws IOException {
+    Scene scene = new Scene(withoutSwap(folder));
+    CharacterEntity hero = scene.abilityUsed();
+    int turn = scene.stepUntilCasting(hero) + 7;
+    scene.steps(8);
+    assertThat(scene.runs).last().isEqualTo(turn + " phase 1 2 counter 0 3100 [3500]");
+    for (int i = 0; i < 62; i++) {
+      scene.steps(1);
+      assertThat(scene.runs)
+          .last()
+          .isEqualTo(
+              "%d phase 2 2 counter %d %d [3500]"
+                  .formatted(turn + 1 + i, 3100 - 50 * i, 3050 - 50 * i));
+      assertThat(hero.getView().isAir()).isTrue();
+      assertThat(hero.getTargetView().z()).isEqualTo(3500);
+    }
+    // The hold's last step finds its counter out: it still pushes the height, then turns to the
+    // descent with the whole transition and takes 50 ms off it.
+    scene.steps(1);
+    assertThat(scene.runs).last().isEqualTo((turn + 63) + " phase 2 3 counter 0 150 [3500]");
+  }
+
+  @Test
+  @DisplayName(
+      "the hold's last step schedules the action at the start of the descent, which swaps the hero"
+          + " back onto its ground row in that step; the hero comes down in four steps, in the air"
+          + " while the counter is above 149, and the run then ends with its override cleared")
+  void theHeroComesBackDown(@TempDir Path folder) throws IOException {
+    Scene scene = new Scene(pinned(folder));
+    CharacterEntity hero = scene.abilityUsed();
+    int turn = scene.stepUntilCasting(hero) + 7;
+    ChampionController slot = scene.slotFollowing(HERO);
+    while (scene.tick() <= turn + 62) {
+      scene.steps(1);
+    }
+    assertThat(hero.getData().name()).isEqualTo("WizardHero_air");
+    assertThat(slot.champions()).isEqualTo(copiesOnTheFlyingRow(hero));
+    // The hold's last step: its counter is out, the descent starts, and the action at its start
+    // runs in the same step: the swap back to the ground row.
+    scene.steps(1);
+    assertThat(scene.runs).last().isEqualTo((turn + 63) + " phase 2 3 counter 0 150 [3500]");
+    assertThat(hero.getData().name()).isEqualTo(HERO);
+    // The layer is still the run's: FORCE_IS_AIR was raised by that last held step.
+    scene.steps(1);
+    assertThat(scene.runs).last().isEqualTo((turn + 64) + " phase 3 3 counter 150 100 [2625]");
+    assertThat(hero.getView().isAir()).isTrue();
+    assertThat(hero.getTargetView().z()).isEqualTo(3500);
+    // The descent's first step raised FORCE_IS_AIR once more (its counter above 149); the second
+    // does not, so the hero stands on its ground row's layer from the pre-hook after it.
+    scene.steps(1);
+    assertThat(scene.runs).last().isEqualTo((turn + 65) + " phase 3 3 counter 100 50 [1750]");
+    assertThat(hero.getView().isAir()).isTrue();
+    assertThat(hero.getTargetView().z()).isEqualTo(2625);
+    scene.steps(1);
+    assertThat(scene.runs).last().isEqualTo((turn + 66) + " phase 3 3 counter 50 0 [875]");
+    assertThat(hero.getView().isAir()).as("its ground row's layer").isFalse();
+    assertThat(hero.getTargetView().z()).isEqualTo(1750);
+    assertThat(hero.flyingHeightOverride()).isEqualTo(3500);
+    // The step that finds the counter out pushes the row height and ends the run: the override
+    // is cleared there.
+    scene.steps(1);
+    assertThat(scene.runs).last().isEqualTo((turn + 67) + " phase 3 3 counter 0 0 [0]");
+    assertThat(hero.flyingHeightOverride()).isZero();
+    scene.steps(1);
+    assertThat(scene.runs).hasSize(1 + 5 + 63 + 4);
+    assertThat(hero.getView().isAir()).isFalse();
+    assertThat(hero.getTargetView().z()).isZero();
+    assertThat(slot.champions()).as("followed again on the ground row").containsExactly(hero);
+  }
+
+  @Test
+  @DisplayName(
+      "a run that starts on a hero a knock has thrown into the air, below the run's height, climbs"
+          + " only the rest of the way: its counter is the transition less the live height's share"
+          + " of it, so it turns to the hold, swapping the hero onto its flying row, steps sooner")
+  void aKnockedHeroClimbsTheRestOfTheWay(@TempDir Path folder) throws IOException {
+    Scene scene = new Scene(knocked(folder));
+    CharacterEntity hero = scene.abilityUsed();
+    int cast = scene.stepUntilCasting(hero);
+    // The knock starts on the first casting step; the cast goes on through it, and the
+    // activation starts the run two steps after it, with the hero thrown up by then.
+    hero.actionHolder().start(scene.knock(hero), null);
+    scene.steps(3);
+    assertThat(scene.runs).hasSize(1);
+    int height = scene.startHeight;
+    assertThat(height).as("in the air, below the run's height").isPositive().isLessThan(HEIGHT);
+    int counter = TRANSITION - TRANSITION * height / HEIGHT;
+    assertThat(counter).as("part of the climb left").isLessThan(TRANSITION);
+    assertThat(scene.runs).containsExactly((cast + 2) + " start phase 1 counter " + counter);
+    // The climb takes 50 ms off a step until its counter is out, then turns to the hold on the
+    // next step, where the action at the height swaps the hero onto its flying row.
+    int climbs = (counter + 49) / 50;
+    scene.steps(climbs);
+    assertThat(hero.getData().name()).isEqualTo(HERO);
+    scene.steps(1);
+    assertThat(scene.runs).last().asString().startsWith((cast + 3 + climbs) + " phase 1 2 ");
+    assertThat(hero.getData().name()).isEqualTo("WizardHero_air");
+  }
+
+  @Test
+  @DisplayName(
+      "a run that starts on a hero a knock has thrown at or above the run's height starts held at"
+          + " once: no climb, the hold's counter the whole less one transition and no action at the"
+          + " height, so the hero keeps its ground row; held at the height after the knock lands,"
+          + " it then comes down as from a climb and the run ends with its override cleared")
+  void aKnockedHeroAboveTheHeightIsHeldAtOnce(@TempDir Path folder) throws IOException {
+    Scene scene = new Scene(knockedAbove(folder));
+    CharacterEntity hero = scene.abilityUsed();
+    int cast = scene.stepUntilCasting(hero);
+    // The knock starts on the first casting step, and the activation starts the run two steps
+    // after it, with the hero thrown above the run's height by then.
+    hero.actionHolder().start(scene.knock(hero), null);
+    scene.steps(3);
+    assertThat(scene.startHeight).as("at or above the run's height").isGreaterThanOrEqualTo(HEIGHT);
+    int held = TOTAL - TRANSITION;
+    assertThat(scene.runs).containsExactly((cast + 2) + " start phase 2 counter " + held);
+    // Each held step pushes the run's height and takes 50 ms off, through the knock and after it
+    // has landed; with no climb there is no action at the height, so no swap to the flying row.
+    int steps = held / 50;
+    for (int i = 0; i < steps; i++) {
+      scene.steps(1);
+      assertThat(scene.runs)
+          .last()
+          .isEqualTo(
+              "%d phase 2 2 counter %d %d [%d]"
+                  .formatted(cast + 3 + i, held - 50 * i, held - 50 * (i + 1), HEIGHT));
+      assertThat(hero.getData().name()).as("its ground row kept").isEqualTo(HERO);
+      assertThat(hero.getView().isAir()).isTrue();
+    }
+    assertThat(hero.getTargetView().z()).as("held at the run's height").isEqualTo(HEIGHT);
+    // The hold's last step turns to the descent, which comes down over the transition and ends
+    // the run with the override cleared.
+    scene.steps(1);
+    assertThat(scene.runs)
+        .last()
+        .isEqualTo((cast + 3 + steps) + " phase 2 3 counter 0 150 [" + HEIGHT + "]");
+    scene.steps(4);
+    assertThat(scene.runs).last().isEqualTo((cast + 7 + steps) + " phase 3 3 counter 0 0 [0]");
+    assertThat(hero.flyingHeightOverride()).isZero();
+    assertThat(hero.getData().name()).isEqualTo(HERO);
+    scene.steps(1);
+    assertThat(hero.getView().isAir()).isFalse();
+    assertThat(hero.getTargetView().z()).isZero();
+  }
+
+  @Test
+  @DisplayName(
+      "a run that starts on a flying row a knock holds at or above the run's height is refused: it"
+          + " would only wait the whole, which no recording holds")
+  void aKnockedFlyingRowAboveTheHeightIsRefused(@TempDir Path folder) throws IOException {
+    Scene scene = new Scene(knockedAboveFlying(folder));
+    CharacterEntity hero = scene.abilityUsed();
+    scene.stepUntilCasting(hero);
+    hero.actionHolder().start(scene.knock(hero), null);
+    scene.steps(2);
+    assertThatThrownBy(() -> scene.steps(1))
+        .isInstanceOf(UnsupportedOperationException.class)
+        .hasMessageContaining("a flying row already in the air at its flying height");
+  }
+
+  /**
+   * A copy of the configured tables with the values this test's numbers follow from written into
+   * the hero's two rows, its ability row, its ground-to-air run and its flying shot's area effect
+   * spawns.
+   */
+  private static GameTables pinned(Path folder) throws IOException {
+    GameData.altered(
+        folder,
+        "actions",
+        rows -> {
+          ObjectNode lift = fields(rows, "WizardHero_ground_to_air");
+          lift.put("FlyingHeight", HEIGHT);
+          lift.put("TransitionDuration", TRANSITION);
+          lift.put("TotalDuration", TOTAL);
+          fields(rows, "WizardHeroAbilityProjectile_spawn_tornado").put("OffsetY", BEYOND);
+          fields(rows, "WizardHeroAbilityProjectile_spawn_damage_aeo").put("OffsetY", BEYOND);
+        });
+    GameData.alterLoaded(
+        folder,
+        "characters",
+        rows -> {
+          GameData.columns(rows, HERO).put("Range", GATE);
+          GameData.columns(rows, "WizardHero_air").put("Range", GATE);
+          GameData.columns(rows, "WizardHero_air").put("ProjectileStartZ", START_Z);
+        });
+    GameData.alterLoaded(
+        folder,
+        "character_abilities",
+        rows -> {
+          ObjectNode ability = GameData.columns(rows, "WizardHeroAbility");
+          ability.put("TriggerDelay", TRIGGER_DELAY);
+          ability.put("CastTime", CAST_TIME);
+          ability.put("ManaCost", ABILITY_COST);
+          ability.put("MaxCharges", CHARGES);
+        });
+    return GameTables.load(folder);
+  }
+
+  /** The pinned copy with the knock's height and duration written into its row too. */
+  private static GameTables knocked(Path folder) throws IOException {
+    pinned(folder);
+    GameData.alterLoaded(
+        folder,
+        "actions",
+        rows -> {
+          ObjectNode knock = fields(rows, KNOCK);
+          knock.put("Height", KNOCK_HEIGHT);
+          knock.put("Duration", KNOCK_DURATION);
+        });
+    return GameTables.load(folder);
+  }
+
+  /**
+   * The pinned copy with the knock's height written high enough that its first step already throws
+   * the hero above the run's height, and its duration as {@link #knocked}.
+   */
+  private static GameTables knockedAbove(Path folder) throws IOException {
+    knocked(folder);
+    GameData.alterLoaded(
+        folder, "actions", rows -> fields(rows, KNOCK).put("Height", KNOCK_HEIGHT_ABOVE));
+    return GameTables.load(folder);
+  }
+
+  /** The {@link #knockedAbove} copy with the hero's ground row given a flying height. */
+  private static GameTables knockedAboveFlying(Path folder) throws IOException {
+    knockedAbove(folder);
+    GameData.alterLoaded(
+        folder, "characters", rows -> GameData.columns(rows, HERO).put("FlyingHeight", 1));
+    return GameTables.load(folder);
+  }
+
+  /** The pinned copy whose action at the height leaves out the swap to the flying row. */
+  private static GameTables withoutSwap(Path folder) throws IOException {
+    pinned(folder);
+    GameData.alterLoaded(
+        folder,
+        "actions",
+        rows -> {
+          ObjectNode reached = fields(rows, "WizardHero_on_max_height_reached");
+          ((ArrayNode) reached.get("SubActions")).remove(1);
+          ((ArrayNode) reached.get("SubActionsDelay")).remove(1);
+        });
+    return GameTables.load(folder);
+  }
+
+  /** A battle with every start and step of a ground-to-air run recorded. */
+  private static final class Scene {
+    final Standard1v1Battle battle;
+    final LadderMatch match;
+    final BattleRecords records;
+    final List<String> runs = new ArrayList<>();
+
+    /** The live height of the unit the last ground-to-air run started on, as it started. */
+    int startHeight;
+
+    /** A ladder match on the given data whose first hand holds the hero card. */
+    Scene(GameTables tables) {
+      records = new BattleRecords(tables);
+      Standard1v1Battle candidate = null;
+      LadderMatch started = null;
+      for (int word = 0; started == null || !inHand(started, "Wizard"); word++) {
+        candidate = new Standard1v1Battle(tables);
+        started = candidate.startLadderMatch(DECK, KNIGHTS, word, 0, heroFirst(), new int[8]);
+      }
+      battle = candidate;
+      match = started;
+      battle
+          .getWorld()
+          .addObserver(
+              new WorldObserver() {
+                @Override
+                public void groundToAirStarted(
+                    int tick,
+                    WorldEntity unit,
+                    String action,
+                    int phase,
+                    int runPhase,
+                    int counter) {
+                  runs.add("%d start phase %d counter %d".formatted(tick, runPhase, counter));
+                  startHeight = unit.getView().getZ() + unit.getView().getHeightOffset();
+                }
+
+                @Override
+                public void groundToAirStepped(
+                    int tick,
+                    WorldEntity unit,
+                    int phaseBefore,
+                    int phaseAfter,
+                    int counterBefore,
+                    int counterAfter,
+                    List<Integer> pushes) {
+                  runs.add(
+                      "%d phase %d %d counter %d %d %s"
+                          .formatted(
+                              tick, phaseBefore, phaseAfter, counterBefore, counterAfter, pushes));
+                }
+              });
+    }
+
+    /**
+     * Plays the hero Wizard at (3500, 14000), as the reference battle does, and uses its ability a
+     * second after it deploys, once side 0 holds the ability's cost.
+     */
+    CharacterEntity abilityUsed() {
+      int cost = records.matchCard("Wizard").cost();
+      while (battle.getBattle().getTick() < match.getStartCooldownTicks()
+          || match.side(0).wholeElixir() < cost) {
+        steps(1);
+      }
+      battle.play(tick(), records.card("Wizard"), LEVEL, 0, 3500, 14000, "w");
+      int limit = tick() + 200;
+      while (heroes().isEmpty()) {
+        assertThat(tick()).isLessThan(limit);
+        steps(1);
+      }
+      for (int i = 0; i < 40 || match.side(0).wholeElixir() < ABILITY_COST; i++) {
+        steps(1);
+      }
+      CharacterEntity hero = heroes().get(0);
+      battle.useAbility(tick(), 0, hero.name(), "a");
+      return hero;
+    }
+
+    /**
+     * Plays the hero Wizard as {@link #abilityUsed} does, and uses its ability on the first step it
+     * attacks, as the reference battle does while the hero attacks a princess tower.
+     */
+    CharacterEntity abilityUsedAttacking() {
+      int cost = records.matchCard("Wizard").cost();
+      while (battle.getBattle().getTick() < match.getStartCooldownTicks()
+          || match.side(0).wholeElixir() < cost) {
+        steps(1);
+      }
+      battle.play(tick(), records.card("Wizard"), LEVEL, 0, 3500, 14000, "w");
+      int limit = tick() + 600;
+      while (heroes().isEmpty()
+          || heroes().get(0).getView().getState() != GridEntityState.ATTACKING
+          || match.side(0).wholeElixir() < ABILITY_COST) {
+        assertThat(tick()).isLessThan(limit);
+        steps(1);
+      }
+      CharacterEntity hero = heroes().get(0);
+      battle.useAbility(tick(), 0, hero.name(), "a");
+      return hero;
+    }
+
+    /** Steps until the hero casts, and answers the tick of that step. */
+    int stepUntilCasting(CharacterEntity hero) {
+      int limit = tick() + 20;
+      while (hero.getView().getState() != GridEntityState.CASTING) {
+        assertThat(tick()).isLessThan(limit);
+        steps(1);
+      }
+      return tick();
+    }
+
+    /** The side 0 king's champion slot that follows a row. */
+    ChampionController slotFollowing(String row) {
+      TowerEntity king = world().kingTower(0);
+      for (int n = 1; n <= 2; n++) {
+        ChampionController slot = king.championSlot(n);
+        if (slot.getChampion() != null && slot.getChampion().name().equals(row)) {
+          return slot;
+        }
+      }
+      throw new AssertionError("no slot follows " + row);
+    }
+
+    /** The knock's row, built to run on the unit. */
+    BattleAction knock(CharacterEntity unit) {
+      return world().getActions().build(KNOCK, world().binding(unit));
+    }
+
+    List<CharacterEntity> heroes() {
+      return battle.getWorld().getHolder().entities().stream()
+          .filter(CharacterEntity.class::isInstance)
+          .map(CharacterEntity.class::cast)
+          .filter(unit -> unit.getData().name().equals(HERO))
+          .toList();
+    }
+
+    BattleWorld world() {
+      return battle.getWorld();
+    }
+
+    long flags(WorldEntity unit) {
+      return unit.getView().getFlags();
+    }
+
+    int tick() {
+      return battle.getBattle().getTick();
+    }
+
+    void steps(int count) {
+      for (int i = 0; i < count; i++) {
+        battle.getBattle().step();
+      }
+    }
+  }
+
+  /** Slot flags with the first card in the hero slot. */
+  private static int[] heroFirst() {
+    int[] slots = new int[8];
+    slots[0] = MatchSide.HERO_SLOT;
+    return slots;
+  }
+
+  private static boolean inHand(LadderMatch match, String card) {
+    List<MatchCard> deck = match.side(0).deck();
+    return Arrays.stream(match.side(0).getHand().slots())
+        .anyMatch(index -> index >= 0 && deck.get(index).name().equals(card));
+  }
+}

@@ -1,0 +1,44 @@
+{
+  "ruleset": "douzero-fixed-role-v1",
+  "seed": 17,
+  "deal_seed": 20261125,
+  "device": "cuda:0",
+  "allocation": {
+    "gpus": 1,
+    "machine": "Modal-NVIDIA-L4",
+    "attached_cpu_threads": 4,
+    "attached_ram_gb": 16,
+    "resource_limits": "request=limit:4 physical CPU cores and16384MiB RAM"
+  },
+  "max_seconds": 1800,
+  "max_episodes": 10000000,
+  "vector_games": 2048,
+  "workers": 0,
+  "torch_threads": 1,
+  "objective": "wp",
+  "architecture": {
+    "hidden": 512,
+    "depth": 5,
+    "history": 128
+  },
+  "epsilon": 0.1,
+  "learning_rate": 0.001,
+  "batch_size": 4096,
+  "epochs": 1,
+  "max_grad_norm": 40,
+  "max_candidates": 16384,
+  "factored_history": true,
+  "opponents": {
+    "selfplay_probability": 1.0,
+    "frozen": []
+  },
+  "record_games": 4,
+  "actor_rng": "splitmix-counter-v1",
+  "learner_shuffle": "torch",
+  "inference_backend": "eager",
+  "encoding_backend": "direct",
+  "matmul_precision": "ieee",
+  "compute_dtype": "float32",
+  "engine_backend": "cuda",
+  "native_fast": false
+}

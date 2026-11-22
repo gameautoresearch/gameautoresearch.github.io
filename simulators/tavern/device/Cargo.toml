@@ -1,0 +1,15 @@
+[workspace]
+resolver = "2"
+members = ["core", "kernels", "wire", "state-kernels", "build-ptx"]
+
+[profile.release]
+lto = "thin"
+codegen-units = 1
+
+[patch."https://github.com/Rust-GPU/Rust-CUDA"]
+rustc_codegen_nvvm = { path = "compiler/vendor/rustc_codegen_nvvm" }
+rustc_codegen_nvvm_macros = { path = "compiler/vendor/rustc_codegen_nvvm_macros" }
+nvvm = { path = "compiler/vendor/nvvm" }
+cust_raw = { path = "compiler/vendor/cust_raw" }
+cuda_std = { path = "compiler/vendor/cuda_std" }
+cuda_std_macros = { path = "compiler/vendor/cuda_std_macros" }

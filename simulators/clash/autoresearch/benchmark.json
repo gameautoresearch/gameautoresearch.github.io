@@ -1,0 +1,101 @@
+{
+  "schema_version": 1,
+  "game": "clash",
+  "benchmark_id": "clash-autoresearch-fixed8-v1",
+  "task": {
+    "id": "clash-fixed8-v1",
+    "players": 2,
+    "arena_routing_cells": [
+      36,
+      64
+    ],
+    "placement_tiles": [
+      18,
+      32
+    ],
+    "deck": [
+      "Knight",
+      "Archer",
+      "Musketeer",
+      "Giant",
+      "MiniPekka",
+      "Fireball",
+      "Arrows",
+      "Zap"
+    ],
+    "level": 11,
+    "tower_level": 11,
+    "decision_hz": 4,
+    "tick_ms": 50,
+    "decision_ticks": 5,
+    "regulation_seconds": 180,
+    "overtime_seconds": 120,
+    "natural_end": true,
+    "max_ticks": 0,
+    "observation_ints": 7024,
+    "entity_rows": 200,
+    "actions": 2307,
+    "rules_lock": "../rules.lock.json"
+  },
+  "resources": {
+    "gpu": "NVIDIA H100 80GB HBM3",
+    "cpu_cores": 32,
+    "memory_gib": 128
+  },
+  "budget": {
+    "research_worker_seconds": 7200,
+    "smoke_worker_seconds": 600,
+    "accounting": "allocated_worker_wall_time",
+    "model_smoke_usd": 2,
+    "max_active_gpu_workers": 1,
+    "retries": 0,
+    "default_mode": "seconds",
+    "seconds_mode": {
+      "research_seconds": 7200,
+      "smoke_research_seconds": 600,
+      "concurrency": "one job at a time"
+    },
+    "usd_mode": {
+      "research_usd": 5.81,
+      "smoke_research_usd": 0.48,
+      "wall_seconds": 18000,
+      "smoke_wall_seconds": 4800,
+      "concurrency": "parallel: up to 4 jobs, 2 GPUs, 64 CPU cores"
+    }
+  },
+  "starter": {
+    "recipe": "recipes/starter.json",
+    "editable_files": [
+      "starter/policy.py",
+      "starter/learner.py",
+      "starter/train.py",
+      "recipes/starter.json"
+    ],
+    "initialization": "random"
+  },
+  "agent": {
+    "brief": "task/brief.md"
+  },
+  "evaluation": {
+    "primary_metric": "equal_opponent_equal_seat_game_points",
+    "score_scale": [
+      0,
+      100
+    ],
+    "win": 1,
+    "draw": 0.5,
+    "loss": 0,
+    "normalized_reference_score": null,
+    "private_release_seeds": 128,
+    "smoke_private_seeds": 2,
+    "interval": "paired seed cluster bootstrap",
+    "invalid_policy": "null score on any fault/illegal/truncation/incomplete schedule"
+  },
+  "commands": {
+    "prepare": ".venv-clash-ar/bin/python -m harness prepare clash --out NEW_RELEASE --option base_release=EXACT_V31_RELEASE",
+    "smoke": ".venv-clash-ar/bin/python -m harness run clash network --release RELEASE --out SESSION --smoke --model MODEL --execute",
+    "grade": "closed: .venv-clash-ar/bin/python -m harness grade --session SESSION refuses under the current fast-v4 declaration; public practice is the only evaluation",
+    "session": ".venv-clash-ar/bin/python -m harness run clash {recipe|network} --release RELEASE --out NEW_SESSION --model MODEL --execute"
+  },
+  "current_declaration": "benchmark-v4.json"
+}

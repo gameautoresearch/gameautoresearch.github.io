@@ -1,0 +1,31 @@
+# Structures, improvements and map objects
+
+25 relevant definitions include ordinary economic buildings, all seven native task monuments, villages/cities, ruins, lighthouses and the diplomatic Embassy relation. Off-tribe structures and the unimplemented ChurchOfConverts task are excluded.
+
+- [Village](1-village.md)
+- [Ruin](2-ruin.md)
+- [Road](3-road.md)
+- [Farm](5-farm.md)
+- [Windmill](6-windmill.md)
+- [Port](8-port.md)
+- [LumberHut](12-lumberhut.md)
+- [Sawmill](13-sawmill.md)
+- [Temple](17-temple.md)
+- [ForestTemple](18-foresttemple.md)
+- [WaterTemple](19-watertemple.md)
+- [MountainTemple](20-mountaintemple.md)
+- [Mine](21-mine.md)
+- [Forge](22-forge.md)
+- [AltarOfPeace](23-altarofpeace.md)
+- [TowerOfWisdom](24-towerofwisdom.md)
+- [GrandBazaar](25-grandbazaar.md)
+- [EmperorsTomb](26-emperorstomb.md)
+- [GateOfPower](27-gateofpower.md)
+- [ParkOfFortune](28-parkoffortune.md)
+- [EyeOfGod](29-eyeofgod.md)
+- [Lighthouse](47-lighthouse.md)
+- [Bridge](48-bridge.md)
+- [Market](50-market.md)
+- [Embassy](70-embassy.md)
+
+[Wiki home](../README.md)

@@ -1,0 +1,68 @@
+{
+  "schema": "tavern-ppo-recipe-v1",
+  "seed": 531902,
+  "device": "cuda:0",
+  "n_games": 48,
+  "native_threads": 4,
+  "learning_seats": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7
+  ],
+  "opponent": "selfplay",
+  "opponent_checkpoint": null,
+  "rules": {
+    "num_players": 8,
+    "content": "Implemented",
+    "turn_action_caps": [
+      30
+    ],
+    "max_actions_per_turn": 30,
+    "max_turns": 100,
+    "record_log": false,
+    "lobby_races": 5,
+    "hero_choices": 2,
+    "board_size": 7,
+    "hand_size": 10,
+    "timewarp_enabled": false,
+    "experimental_mode": false
+  },
+  "network": {
+    "hidden": 128,
+    "embedding": 8
+  },
+  "updates": 5000,
+  "max_batch_steps": 12000,
+  "learning_rate": 0.0001,
+  "gamma": 1.0,
+  "gae_lambda": 0.97,
+  "ppo_epochs": 4,
+  "minibatch_size": 1024,
+  "clip": 0.2,
+  "entropy_coef": 0.012,
+  "value_coef": 0.5,
+  "max_grad_norm": 0.5,
+  "target_kl": 0.03,
+  "torch_threads": 1,
+  "skip_finished_lobbies": true,
+  "worker_backend": "pooled",
+  "native_scheduler": "dynamic",
+  "vector_bookkeeping": true,
+  "machine": {
+    "gpu": "L4",
+    "cpu_cores": 4,
+    "memory_gib": 16
+  },
+  "mode": "curriculum",
+  "population_snapshot_every": 8,
+  "copy_observations": false,
+  "fast_inference": true,
+  "sparse_observations": true,
+  "anneal_updates": 100000,
+  "anchor_kl_coef": 0.0
+}

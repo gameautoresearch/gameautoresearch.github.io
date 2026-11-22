@@ -1,0 +1,11 @@
+{
+  "seed": 1729,
+  "training_seed_start": 100000,
+  "environments": 64,
+  "rollout_steps": 16,
+  "reset_schedule_length": 4096,
+  "network": {},
+  "learning_rate": 0.001,
+  "minibatch": 1,
+  "ppo_epochs": 1
+}

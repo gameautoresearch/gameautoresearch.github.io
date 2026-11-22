@@ -1,0 +1,56 @@
+# Local dependencies, builds, credentials and generated experiment artifacts.
+.venv*/
+.cache*/
+.local/
+.pytest_cache/
+.ruff_cache/
+__pycache__/
+*.pyc
+*.egg-info/
+.DS_Store
+.env
+.env.*
+# Local service credentials and authentication state.
+credentials.env
+credentials.*.env
+credentials.json
+auth.json
+*.key
+*.pem
+*.p12
+*.pfx
+id_rsa
+id_ed25519
+node_modules/
+target/
+.gradle/
+build/
+dist/
+evidence/
+artifacts/
+runs/
+# Private retained research records and evaluation inputs.
+reports/**/sessions/
+**/docs/run-archive/
+**/benchmark/releases/**/maps.json
+private.tar.gz
+hero-1v1.npz
+# Game-derived decompiles, recordings, data and AI replicas stay private.
+/simulators/polytopia/third_party/
+/archive/polytopia-legacy-polyar/third_party/
+/archive/polytopia-legacy-polyar/runs
+**/obj/
+**/bin/
+**/autoresearch/task/environment/repo/
+**/autoresearch/task/environment/ar/
+**/autoresearch/task/environment/maps/
+**/autoresearch/task/environment/practice/
+# Provenance archives in vendor/upstream-git ARE source inputs, not caches.
+
+# Local inputs for historical reproductions.
+/simulators/generals/seeds.json
+/simulators/doudizhu/data-seeds.lock.json
+
+/vendor/engines/generals-bots/generals/assets/
+/vendor/engines/benzene/regression/gtpregress.jar
+/vendor/engines/crforge/gradle/wrapper/gradle-wrapper.jar

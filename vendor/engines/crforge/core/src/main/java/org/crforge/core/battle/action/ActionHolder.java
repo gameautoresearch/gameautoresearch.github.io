@@ -1,0 +1,697 @@
+/*
+ * crforge - https://github.com/voonhous/crforge
+ * SPDX-License-Identifier: Apache-2.0
+ * Porting this code? Please cite this file and the commit you read: see the README.
+ */
+
+package org.crforge.core.battle.action;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.function.BooleanSupplier;
+import java.util.function.IntSupplier;
+import lombok.Getter;
+import lombok.RequiredArgsConstructor;
+import lombok.Setter;
+import org.crforge.core.battle.BattleEntity;
+import org.crforge.core.battle.EntityActions;
+import org.crforge.core.fidelity.Fidelity;
+import org.crforge.core.fidelity.FidelityStatus;
+
+/**
+ * The scheduled actions of one entity: the entries waiting out their delay, and the instances of
+ * the actions that last.
+ *
+ * <p>The holder tick drives it through {@link EntityActions}: a pending pass per phase starts the
+ * due entries of that phase, the run pass after the component passes steps every listed instance,
+ * and the end pass takes a tick off every waiting delay.
+ *
+ * <p><b>Scheduling.</b> A delay is in milliseconds; {@link #OWN_DELAY} stands for the row's own.
+ * Whether the action starts now is decided on the milliseconds, and the queue keeps the delay as
+ * whole ticks, so a delay under one tick is still queued, with no ticks left, and starts at the
+ * next pending pass. A delay of zero or less starts the action at once only when the schedule asks
+ * for it or a pending pass is in progress; anywhere else - at placement, from a component pass,
+ * from the run pass or a post-hook - it is queued with no ticks left. In a battle the pending
+ * passes run over every entity together, so an action scheduled onto another entity from inside a
+ * pending pass starts at once too. Either way the row is told it was scheduled, and a next action
+ * that does not wait is scheduled alongside, its delay the one carried in less the row's own plus
+ * its own, and never below zero.
+ *
+ * <p><b>Starting.</b> A singleton row whose first listed run has not finished re-triggers that run
+ * and starts nothing; once that run has finished, the row starts a new one. Otherwise a start gate
+ * that answers 0 ends the start; the action then does what it does, its run, if it lasts, is listed
+ * carrying the row's tags, and a next action that waits is scheduled with its own delay.
+ *
+ * <p><b>The passes.</b> A pending pass takes each due entry of its phase whose pause gate does not
+ * hold it, and a held entry keeps counting down past zero. The run pass removes an instance that
+ * finished in an earlier step; otherwise it asks the stop gate, and a run it stops is removed in
+ * the same pass; otherwise it steps the run. An instance that finishes in its own step therefore
+ * stays listed, and keeps setting its tags, until the next run pass.
+ *
+ * <p><b>The context.</b> A schedule may carry a context: it goes with the queue entry or the start,
+ * with the row's hook as it is told it was scheduled, and with a next action, alongside or after
+ * the run. The start gate is asked, and the action started, with it; the run keeps it, and its stop
+ * gate is asked, and each step taken, with it. While the holder does any of this, {@link
+ * #currentContext()} answers that context, which an expression evaluated meanwhile reads.
+ *
+ * <p>Two orders are the standard game's and are kept. A pending pass takes the entry it finds and
+ * moves the last entry into its place, then looks at that place again, so four due entries {@code a
+ * b c d} start as {@code a d c b}. The run pass removes an instance the same way.
+ *
+ * <p>A holder built with an owner and a pending-pass answer belongs to an entity of a battle, whose
+ * pending passes the battle runs over every entity together: while any of them runs, an action with
+ * no delay scheduled here starts at once. The owner may be null for none, and the answer null for a
+ * holder that answers for its own passes.
+ */
+@Fidelity(
+    status = FidelityStatus.PARTIAL,
+    note =
+        "Settled: the three pending passes and where an action with no delay starts - inside any"
+            + " entity's pending pass, as the battle's one flag says - delays in milliseconds"
+            + " queued as whole ticks, the row's own delay standing in for none, the"
+            + " swap-with-last order of a pending pass, the pause, start and stop gates, the"
+            + " singleton re-trigger of a run that has not finished and a new run past a finished"
+            + " one, held by the reference battle evo_babydragon_vs_musketeer and"
+            + " ActionRuntimeTest, the next action scheduled after the run or alongside with the"
+            + " carried delay, the row's tags on the run, the run pass removing a finished run at"
+            + " its next pass and a stopped one at once - the stop asked first, every stopped run"
+            + " removed in that pass by swap-with-last, held by evo_firespirithut_vs_giant, the"
+            + " evolved Furnace's battle - the tags of every listed run folded in, and"
+            + " the delay taken off in the end pass. Held by the recorded runtime cases. The"
+            + " notice to every running instance of an object that leaves, before the drop of"
+            + " what it caused, held by card_GoblinHut. The notice to every running instance,"
+            + " first to last, of an attack that landed, held by cg_giantbuffer_buffs_friends and"
+            + " card_Berserker. The stop of every running instance as the entity leaves, after"
+            + " every notice of it, held by card_GoblinMachine. The owner-leave of every running"
+            + " instance, last to first, before any notice, held by ability_goblinstein. The"
+            + " notice to every running instance, last to first, of an ability its player paid"
+            + " for, held by ability_archer_queen. A buff's hook, which starts at once only"
+            + " inside its holder's own pending pass, held by ActionHolderTest. Not modelled: the"
+            + " row hook asked when an action is scheduled and when its run starts, the target an"
+            + " entry carries, and the notice to an action's instigator. The cause an entry"
+            + " carries is the holder of the entity that caused it. The context a schedule"
+            + " carries, with the queue entry, the start gate and start, the run and its stop"
+            + " gate, the row's hook and a next action either way, held by ActionContextTest and"
+            + " pekka-resurrect-v2.")
+@RequiredArgsConstructor
+public class ActionHolder implements EntityActions {
+
+  /** The delay that stands for the row's own. */
+  public static final int OWN_DELAY = -1;
+
+  /** Milliseconds one tick takes off a queued delay. */
+  private static final int TICK_MS = 50;
+
+  /** What an observer of the holder is told as its actions start, stop, finish and leave. */
+  public interface Listener {
+
+    /**
+     * An action passed its gates and is about to start, in the pending pass of the given phase, or
+     * 0 outside every pass. Whatever it starts in turn is told of after this and before its {@link
+     * #started}.
+     *
+     * @param queued true when the pending pass took it from the queue; false when it starts at once
+     *     as it is scheduled, or as it is started directly
+     */
+    default void starting(BattleAction action, int phase, boolean queued) {}
+
+    /**
+     * A singleton row's start found its run listed and not finished, and is about to re-trigger it,
+     * in the pending pass of the given phase, or 0 outside every pass.
+     *
+     * @param queued true when the pending pass took it from the queue
+     */
+    default void retriggering(BattleAction action, int phase, boolean queued) {}
+
+    /** An action started, in the pending pass of the given phase, or 0 outside every pass. */
+    default void started(BattleAction action, int phase) {}
+
+    /** An instance finished during its step in the run pass. */
+    default void finished(ActionInstance instance) {}
+
+    /** The run pass stopped an instance whose stop gate held. */
+    default void forceStopped(ActionInstance instance) {}
+
+    /** The run pass removed an instance that had finished or was stopped. */
+    default void removed(ActionInstance instance) {}
+
+    /**
+     * A queued action was dropped because the entity that caused it left the battle.
+     *
+     * @param ticksLeft the ticks it still had to wait
+     */
+    default void dropped(BattleAction action, int ticksLeft) {}
+  }
+
+  /**
+   * One queued action as it stands.
+   *
+   * @param action the action
+   * @param ticks the ticks left before it is due, below zero for an entry held past its due tick
+   */
+  public record Queued(BattleAction action, int ticks) {}
+
+  /**
+   * One queued action, what caused it, the context its schedule carried and the ticks left before
+   * it is due.
+   */
+  private static final class Entry {
+    private final BattleAction action;
+    private final ActionHolder instigator;
+    private final ActionContext context;
+
+    /** Where the cause stood along the width as the action was scheduled. */
+    private final int causeX;
+
+    private int ticks;
+
+    private Entry(
+        BattleAction action,
+        ActionHolder instigator,
+        int ticks,
+        ActionContext context,
+        int causeX) {
+      this.action = action;
+      this.instigator = instigator;
+      this.ticks = ticks;
+      this.context = context;
+      this.causeX = causeX;
+    }
+  }
+
+  private final List<Entry> pending = new ArrayList<>();
+  private final List<ActionInstance> running = new ArrayList<>();
+
+  /** The phase of the pending pass in progress, or 0 outside every pending pass. */
+  private int passPhase;
+
+  /**
+   * Where the cause of the action being started stood along the width as the action was scheduled,
+   * which the game keeps in the reference to the cause it makes then; 0 outside a start and for an
+   * action with no cause.
+   */
+  private int startingCauseX;
+
+  /**
+   * The context of what the holder is doing now - scheduling an action, starting one or stepping a
+   * run - which an expression evaluated meanwhile reads; null for none.
+   */
+  private ActionContext current;
+
+  /** The tick of the last run pass, or -1 before the first: the battle's first tick is 0. */
+  @Getter private int lastTick = -1;
+
+  /** The entity the holder belongs to, which the leaves that act on their owner act on. */
+  @Getter private final ActionOwner owner;
+
+  /**
+   * Whether a pending pass is in progress, as the battle answers it for every entity at once, or
+   * null for a holder outside a battle, which answers for its own passes alone.
+   */
+  private final BooleanSupplier battleInPendingPass;
+
+  /** A holder with no owner: its actions act on nothing but each other. */
+  public ActionHolder() {
+    this(null);
+  }
+
+  /**
+   * A holder that belongs to an entity.
+   *
+   * @param owner the entity, or null for none
+   */
+  public ActionHolder(ActionOwner owner) {
+    this(owner, null);
+  }
+
+  @Setter private Listener listener = new Listener() {};
+
+  /**
+   * Schedules an action as the battle does outside a request to start it now: with no delay it
+   * starts at once only inside a pending pass.
+   *
+   * @param action the action
+   * @param delayMs the delay in milliseconds, or {@link #OWN_DELAY} for the row's own
+   */
+  public void schedule(BattleAction action, int delayMs) {
+    schedule(action, delayMs, false);
+  }
+
+  /**
+   * Schedules an action, and the next action alongside it when that one does not wait.
+   *
+   * @param action the action
+   * @param delayMs the delay in milliseconds, or {@link #OWN_DELAY} for the row's own
+   * @param immediate true to start the action at once when its delay is zero or less, wherever the
+   *     schedule is made
+   */
+  public void schedule(BattleAction action, int delayMs, boolean immediate) {
+    schedule(action, delayMs, immediate, null);
+  }
+
+  /**
+   * Schedules an action that an entity caused, and the next action alongside it when that one does
+   * not wait; the cause goes with both.
+   *
+   * @param action the action
+   * @param delayMs the delay in milliseconds, or {@link #OWN_DELAY} for the row's own
+   * @param immediate true to start the action at once when its delay is zero or less
+   * @param instigator the holder of the entity that caused it, or null for none
+   */
+  public void schedule(
+      BattleAction action, int delayMs, boolean immediate, ActionHolder instigator) {
+    schedule(action, delayMs, immediate, instigator, null);
+  }
+
+  /**
+   * Schedules an action that an entity caused, carrying a context: the context goes with the
+   * action's queue entry or its start, with the row's hook as it is told it was scheduled, and with
+   * the next action scheduled alongside.
+   *
+   * @param action the action
+   * @param delayMs the delay in milliseconds, or {@link #OWN_DELAY} for the row's own
+   * @param immediate true to start the action at once when its delay is zero or less
+   * @param instigator the holder of the entity that caused it, or null for none
+   * @param context the context, or null for none
+   */
+  public void schedule(
+      BattleAction action,
+      int delayMs,
+      boolean immediate,
+      ActionHolder instigator,
+      ActionContext context) {
+    int delay = delayMs == OWN_DELAY ? action.delayMs() : delayMs;
+    // The reference to the cause is made here, with the cause's point as it stands now.
+    int causeX = causeX(instigator);
+    if (delay <= 0 && (immediate || inPendingPass())) {
+      start(action, instigator, false, context, causeX);
+    } else {
+      pending.add(new Entry(action, instigator, Math.max(delay, 0) / TICK_MS, context, causeX));
+    }
+    ActionContext before = current;
+    ActionContext activeBefore = ACTIVE.get();
+    current = context;
+    ACTIVE.set(context);
+    try {
+      action.scheduled(this, delay, immediate, instigator, context);
+    } finally {
+      current = before;
+      ACTIVE.set(activeBefore);
+    }
+    BattleAction next = action.nextAction();
+    if (next != null && !action.nextActionWait()) {
+      schedule(
+          next,
+          Math.max(delay - action.delayMs() + next.delayMs(), 0),
+          immediate,
+          instigator,
+          context);
+    }
+  }
+
+  /**
+   * Starts an action now: re-triggers a singleton's listed run, or passes the start gate, does what
+   * the action does, lists its run, calls the run's own start and chains a next action that waits.
+   *
+   * @param action the action
+   */
+  public void start(BattleAction action) {
+    start(action, null);
+  }
+
+  /**
+   * Starts an action an entity caused, as {@link #start(BattleAction)} does; a next action that
+   * waits goes with the same cause.
+   *
+   * @param action the action
+   * @param instigator the holder of the entity that caused it, or null for none
+   */
+  public void start(BattleAction action, ActionHolder instigator) {
+    start(action, instigator, false, null, causeX(instigator));
+  }
+
+  /**
+   * Where the cause of the action being started stood along the width as the action was scheduled:
+   * the point the game copies into the reference to the cause as it schedules the action, whatever
+   * the cause has done since. 0 outside a start and for an action with no cause.
+   */
+  public int startingCauseX() {
+    return startingCauseX;
+  }
+
+  /** Where the holder's owner stands along the width, or 0 for no holder or no owner. */
+  private static int causeX(ActionHolder instigator) {
+    return instigator == null || instigator.owner == null ? 0 : instigator.owner.actionX();
+  }
+
+  /**
+   * Starts an action, as the pending pass does when it takes it from the queue or otherwise; the
+   * start gate is asked and the action started with the context, its run keeps it, and a next
+   * action that waits is scheduled with it.
+   */
+  private void start(
+      BattleAction action,
+      ActionHolder instigator,
+      boolean queued,
+      ActionContext context,
+      int causeX) {
+    if (action.singleton()) {
+      // A row is one of the game's rows, whichever entity's tree it was built in: a second tree
+      // built from the same row finds the first one's run. The first listed run of the row ends
+      // the walk: one that has not finished is re-triggered, and one that has lets the row start
+      // a new run.
+      for (ActionInstance instance : running) {
+        if (instance.getAction().name().equals(action.name())) {
+          if (!instance.isFinished()) {
+            // A class that tells its runs apart by their cause: whether a listed run of another
+            // cause lets the walk go on to the next run of the row is held by no reference.
+            if (!instance.sameRun(instigator)) {
+              throw new UnsupportedOperationException(
+                  action.name()
+                      + " starts again from another cause while a run of it is listed, not"
+                      + " modelled");
+            }
+            listener.retriggering(action, passPhase, queued);
+            instance.retrigger(this, instigator);
+            return;
+          }
+          break;
+        }
+      }
+    }
+    ActionContext before = current;
+    ActionContext activeBefore = ACTIVE.get();
+    int causeXBefore = startingCauseX;
+    current = context;
+    ACTIVE.set(context);
+    startingCauseX = causeX;
+    try {
+      if (!holds(action.executeIf(), true)) {
+        return;
+      }
+      listener.starting(action, passPhase, queued);
+      ActionInstance instance = action.start(this, instigator, context);
+      listener.started(action, passPhase);
+      if (instance != null) {
+        instance.addTags(action.tags());
+        instance.setContext(context);
+        // Listed before its own start, as the game lists a new run before it calls the run's
+        // start: a run that start begins at once comes after it in the run pass.
+        running.add(instance);
+        instance.startListed(this);
+      }
+      BattleAction next = action.nextAction();
+      if (next != null && action.nextActionWait()) {
+        schedule(next, OWN_DELAY, false, instigator, context);
+      }
+    } finally {
+      current = before;
+      ACTIVE.set(activeBefore);
+      startingCauseX = causeXBefore;
+    }
+  }
+
+  /**
+   * The context of what the holder is doing now - scheduling an action, starting one or stepping a
+   * run - or null for none. An expression evaluated meanwhile reads its keys from it.
+   */
+  public ActionContext currentContext() {
+    return current;
+  }
+
+  /**
+   * The context of what any holder of the running battle is doing now, the innermost one: an action
+   * built in one entity's tree may run on another's holder, as a counter's action on the hit's
+   * source does, and the game evaluates its expressions with the context the running holder was
+   * handed. A battle runs on one thread, so the thread keeps it.
+   */
+  private static final ThreadLocal<ActionContext> ACTIVE = new ThreadLocal<>();
+
+  /** The context of what any holder is doing now on this thread, the innermost one, or null. */
+  public static ActionContext activeContext() {
+    return ACTIVE.get();
+  }
+
+  /**
+   * Lists a run made elsewhere, as a copy another holder's run hands over is listed: carrying its
+   * row's tags, with no start of its own.
+   *
+   * @param instance the run
+   */
+  public void list(ActionInstance instance) {
+    instance.addTags(instance.getAction().tags());
+    running.add(instance);
+  }
+
+  /** The phase of this holder's pending pass in progress, or 0 outside every pending pass. */
+  public int passPhase() {
+    return passPhase;
+  }
+
+  /** Whether a pending pass is in progress: the battle's, or this holder's own outside a battle. */
+  private boolean inPendingPass() {
+    return battleInPendingPass != null ? battleInPendingPass.getAsBoolean() : passPhase != 0;
+  }
+
+  /** The tags of every listed instance, finished ones included. */
+  public long tags() {
+    long tags = 0;
+    for (ActionInstance instance : running) {
+      tags |= instance.getTags();
+    }
+    return tags;
+  }
+
+  /** The listed instances, in list order. */
+  public List<ActionInstance> running() {
+    return List.copyOf(running);
+  }
+
+  /** The queued actions, in queue order. */
+  public List<Queued> queued() {
+    return pending.stream().map(e -> new Queued(e.action, e.ticks)).toList();
+  }
+
+  /** What caused each queued action, in queue order; null for none. */
+  public List<ActionHolder> queuedInstigators() {
+    List<ActionHolder> out = new ArrayList<>();
+    for (Entry entry : pending) {
+      out.add(entry.instigator);
+    }
+    return out;
+  }
+
+  @Override
+  public void pendingPass(int phase) {
+    passPhase = phase;
+    try {
+      int i = 0;
+      while (i < pending.size()) {
+        Entry entry = pending.get(i);
+        int wanted = entry.action.phase();
+        if (entry.ticks <= 0
+            && (wanted == BattleAction.ANY_PHASE || wanted == phase)
+            && !holds(entry.action.pausedIf(), false)) {
+          removeBySwap(pending, i);
+          start(entry.action, entry.instigator, true, entry.context, entry.causeX);
+        } else {
+          i++;
+        }
+      }
+    } finally {
+      passPhase = 0;
+    }
+  }
+
+  @Override
+  public void runPass(int tick) {
+    lastTick = tick;
+    int i = 0;
+    while (i < running.size()) {
+      ActionInstance instance = running.get(i);
+      if (instance.isFinished()) {
+        removeBySwap(running, i);
+        listener.removed(instance);
+        continue;
+      }
+      // The stop gate is asked, and the run stepped, with the context its start carried.
+      ActionContext before = current;
+      ActionContext activeBefore = ACTIVE.get();
+      current = instance.context();
+      ACTIVE.set(current);
+      boolean stopped;
+      try {
+        stopped = holds(instance.getAction().forceStopIf(), false);
+        if (!stopped) {
+          instance.update(this);
+        }
+      } finally {
+        current = before;
+        ACTIVE.set(activeBefore);
+      }
+      if (stopped) {
+        instance.finish();
+        listener.forceStopped(instance);
+        removeBySwap(running, i);
+        listener.removed(instance);
+        continue;
+      }
+      if (instance.isFinished()) {
+        listener.finished(instance);
+      }
+      i++;
+    }
+  }
+
+  /**
+   * Tells every running instance, from the last to the first, of a hit that reaches the owner's
+   * damage entry; finished runs still listed are told too. A run listed meanwhile is not.
+   *
+   * @param hit the hit, whose amount a run may change
+   */
+  public void damageHeard(DamageHeard hit) {
+    List<ActionInstance> instances = new ArrayList<>(running);
+    for (int i = instances.size() - 1; i >= 0; i--) {
+      instances.get(i).damageHeard(this, hit);
+    }
+  }
+
+  /**
+   * Tells every running instance, first to last, that one of the owner's attacks ended with a
+   * landed hit.
+   */
+  public void attackEnded() {
+    for (ActionInstance instance : new ArrayList<>(running)) {
+      instance.attackEnded(this);
+    }
+  }
+
+  /**
+   * Tells every running instance, from the last to the first, that the entity's spawner made a
+   * character, as the spawner finishes dressing it.
+   *
+   * @param childId the id of the character made
+   */
+  @Override
+  public void childSpawned(int childId) {
+    List<ActionInstance> instances = new ArrayList<>(running);
+    for (int i = instances.size() - 1; i >= 0; i--) {
+      instances.get(i).childSpawned(childId);
+    }
+  }
+
+  /**
+   * Tells every running instance, from the last to the first, that the entity's reference setter
+   * stored a reference; a run listed meanwhile is not told.
+   *
+   * @param referenceId the id of the reference stored, or -1 for none
+   */
+  public void referenceStored(int referenceId) {
+    List<ActionInstance> instances = new ArrayList<>(running);
+    for (int i = instances.size() - 1; i >= 0; i--) {
+      instances.get(i).referenceStored(referenceId);
+    }
+  }
+
+  /** Tells every running instance, in its listed order, of an object that left the battle. */
+  @Override
+  public void objectLeft(int leftId) {
+    for (ActionInstance instance : new ArrayList<>(running)) {
+      instance.objectLeft(leftId);
+    }
+  }
+
+  /**
+   * Offers a buff about to be applied to the entity to every running instance, from the last to the
+   * first, each handed what the one after it answered; finished runs still listed are asked too.
+   *
+   * @param buff the buff's row name
+   * @return the buff to apply in its place
+   */
+  public String offerBuff(String buff) {
+    String offered = buff;
+    for (int i = running.size() - 1; i >= 0; i--) {
+      offered = running.get(i).offeredBuff(offered);
+    }
+    return offered;
+  }
+
+  /**
+   * Tells every running instance, from the last to the first, that the entity's player paid for a
+   * unit's ability.
+   *
+   * @param unit the unit whose ability was paid for
+   */
+  public void abilityPaid(BattleEntity unit) {
+    List<ActionInstance> instances = new ArrayList<>(running);
+    for (int i = instances.size() - 1; i >= 0; i--) {
+      instances.get(i).abilityPaid(this, unit);
+    }
+  }
+
+  /**
+   * Tells every running instance, from the last to the first, that the entity is leaving the
+   * battle, before any entity hears of it.
+   */
+  @Override
+  public void leaving() {
+    List<ActionInstance> instances = new ArrayList<>(running);
+    for (int i = instances.size() - 1; i >= 0; i--) {
+      instances.get(i).ownerLeaving(this);
+    }
+  }
+
+  /**
+   * Stops every running instance, first to last, as the entity leaves the battle; the instances
+   * stay listed, and the holder goes with its entity.
+   */
+  @Override
+  public void released() {
+    for (ActionInstance instance : new ArrayList<>(running)) {
+      instance.stop(this);
+    }
+  }
+
+  /**
+   * Drops every queued entry the leaving entity caused whose row aborts when its cause leaves. The
+   * walk takes the last entry into a dropped one's place and looks at that place again, as the
+   * pending pass does; running instances are left alone.
+   */
+  @Override
+  public void instigatorLeft(EntityActions left) {
+    if (!(left instanceof ActionHolder cause)) {
+      return;
+    }
+    int i = 0;
+    while (i < pending.size()) {
+      Entry entry = pending.get(i);
+      if (entry.instigator == cause && entry.action.abortIfInstigatorDies()) {
+        listener.dropped(entry.action, entry.ticks);
+        removeBySwap(pending, i);
+      } else {
+        i++;
+      }
+    }
+  }
+
+  @Override
+  public void endOfTick() {
+    // There is no floor: a held entry keeps counting down past zero. By index: every holder
+    // counts down on every step, and the loop changes only the entries, never the list.
+    for (int i = 0, n = pending.size(); i < n; i++) {
+      pending.get(i).ticks--;
+    }
+  }
+
+  /** The value of a gate as a truth, or the given answer for a row without the gate. */
+  private static boolean holds(IntSupplier gate, boolean absent) {
+    return gate == null ? absent : gate.getAsInt() != 0;
+  }
+
+  /** Removes an element by moving the last one into its place. */
+  private static <T> void removeBySwap(List<T> list, int index) {
+    int last = list.size() - 1;
+    list.set(index, list.get(last));
+    list.remove(last);
+  }
+}

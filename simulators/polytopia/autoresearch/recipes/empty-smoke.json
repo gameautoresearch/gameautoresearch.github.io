@@ -1,0 +1,20 @@
+{
+  "_doc": "Boilerplate recipe (rl/gpu_resident.py LearnerConfig fields): self-play rollouts with no learning. \"trainer\" holds gpu_resident_train.py options (games, sets and ring are read by training/launch.py).",
+  "size": 11,
+  "seed": 801,
+  "batch": 16384,
+  "learning_rate": 0.0003,
+  "entropy_coef": 0.0,
+  "checkpoint_every": 5,
+  "snapshot_every": 10,
+  "trainer": {
+    "games": 1024,
+    "sets": 2,
+    "ring": 160
+  },
+  "players": 2,
+  "max_turns": 30,
+  "maps": "drylands",
+  "map_seed_low": 200000,
+  "map_seed_high": 300000
+}

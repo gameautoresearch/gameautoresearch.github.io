@@ -1,0 +1,16 @@
+{
+  "benchmark_id": "clash-autoresearch-short-v1",
+  "declaration": "benchmark-short-v1.json",
+  "contract": "CONTRACT-short-v1.md",
+  "status": "ready for development sessions: native CPU, Java differential (10-tick cadence), CUDA parity, starter graph capture and a live --smoke session pass (November 14)",
+  "readout": "../../../reports/clash-short-form-2026-11-13.md",
+  "previous": {
+    "benchmark_id": "clash-autoresearch-fixed8-v4",
+    "declaration": "benchmark-v4.json",
+    "status": "ready: single-pass atomic checkpoint cleanup qualified; both verification accounts closed; no new spending authorized",
+    "qualification_report": "../../../reports/clash/fast-starter-requalification-2026-11-09.md",
+    "checkpoint_serialization": "single native serialization with entrant metadata before atomic publication",
+    "ready_source_release": "evidence/clash-checkpoint-cleanup-20261109/ready-release",
+    "cleanup_readout": "../../../reports/clash/fast-starter-requalification-2026-11-09.md"
+  }
+}

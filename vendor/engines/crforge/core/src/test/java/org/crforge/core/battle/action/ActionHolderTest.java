@@ -1,0 +1,291 @@
+/*
+ * crforge - https://github.com/voonhous/crforge
+ * SPDX-License-Identifier: Apache-2.0
+ * Porting this code? Please cite this file and the commit you read: see the README.
+ */
+
+package org.crforge.core.battle.action;
+
+import static org.assertj.core.api.Assertions.assertThat;
+
+import java.util.ArrayList;
+import java.util.List;
+import org.crforge.core.battle.EntityActions;
+import org.crforge.core.pathfinding.combat.HitPoints;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+
+/** The action holder's scheduling and run rules, one at a time. */
+class ActionHolderTest {
+
+  /** Two tag bits for the runs to set; the holder only folds them into its word. */
+  private static final long INACTIVE = 1L << 20;
+
+  private static final long ACTIVATING = 1L << 21;
+
+  /** The names of the actions started, in the order they started, with their phase. */
+  private final List<String> started = new ArrayList<>();
+
+  private ActionHolder holder() {
+    ActionHolder holder = new ActionHolder();
+    holder.setListener(
+        new ActionHolder.Listener() {
+          @Override
+          public void started(BattleAction action, int phase) {
+            started.add(action.name() + "@" + phase);
+          }
+        });
+    return holder;
+  }
+
+  @Test
+  @DisplayName(
+      "a pending pass takes due entries by swapping the last one in: a b c d start a d c b")
+  void thePendingPassSwapsTheLastEntryIn() {
+    ActionHolder holder = holder();
+    for (String name : List.of("a", "b", "c", "d")) {
+      holder.schedule(new InertAction(ActionRow.named(name)), 0);
+    }
+
+    holder.pendingPass(EntityActions.PHASE_POST_TICK_INIT);
+
+    assertThat(started).containsExactly("a@1", "d@1", "c@1", "b@1");
+  }
+
+  @Test
+  @DisplayName(
+      "an action with no delay starts at once inside a pending pass and waits for the next one"
+          + " outside it")
+  void aZeroDelayActionStartsAtOnceOnlyInsideAPendingPass() {
+    ActionHolder holder = holder();
+    BattleAction later = new InertAction(ActionRow.named("later"));
+    BattleAction scheduler =
+        new BattleAction() {
+          @Override
+          public String name() {
+            return "scheduler";
+          }
+
+          @Override
+          public ActionInstance start(ActionHolder h) {
+            h.schedule(later, 0);
+            return null;
+          }
+        };
+
+    // Scheduled from inside a pending pass, the second action starts in the same pass.
+    holder.schedule(scheduler, 0);
+    holder.pendingPass(EntityActions.PHASE_POST_TICK_INIT);
+    assertThat(started).containsExactly("later@1", "scheduler@1");
+
+    // Scheduled from outside one, it waits for the next pending pass.
+    started.clear();
+    holder.schedule(later, 0);
+    assertThat(started).isEmpty();
+    holder.pendingPass(EntityActions.PHASE_POST_COMPONENT_TICK);
+    assertThat(started).containsExactly("later@2");
+  }
+
+  @Test
+  @DisplayName(
+      "a battle's holder starts an action with no delay at once inside another entity's pending"
+          + " pass, as a buff's hook on a rider in its parent's pass does, and queues it outside one")
+  void aBattleHolderStartsAtOnceInAnotherEntitysPass() {
+    // A battle's holder: the battle answers whether a pending pass over every entity is running.
+    boolean[] inPass = {true};
+    ActionHolder holder = new ActionHolder(null, () -> inPass[0]);
+    holder.setListener(
+        new ActionHolder.Listener() {
+          @Override
+          public void started(BattleAction action, int phase) {
+            started.add(action.name() + "@" + phase);
+          }
+        });
+    BattleAction hook = new InertAction(ActionRow.named("hook"));
+
+    // Another entity's pass: this holder's own pass phase is 0, yet the action starts at once.
+    holder.schedule(hook, ActionHolder.OWN_DELAY, false, holder);
+    assertThat(started).as("another entity's pass: at once").containsExactly("hook@0");
+
+    // Outside every pending pass it is queued for the holder's next one.
+    started.clear();
+    inPass[0] = false;
+    holder.schedule(hook, ActionHolder.OWN_DELAY, false, holder);
+    assertThat(started).as("outside a pass: queued").isEmpty();
+    inPass[0] = true;
+    holder.pendingPass(EntityActions.PHASE_POST_TICK_INIT);
+    assertThat(started).containsExactly("hook@1");
+  }
+
+  @Test
+  @DisplayName("a delayed entry waits out its ticks in the end passes")
+  void aDelayedEntryWaitsOutItsTicks() {
+    ActionHolder holder = holder();
+    holder.schedule(new InertAction(ActionRow.named("delayed")), 100);
+
+    holder.pendingPass(EntityActions.PHASE_POST_TICK_INIT);
+    holder.endOfTick();
+    holder.pendingPass(EntityActions.PHASE_POST_TICK_INIT);
+    assertThat(started).isEmpty();
+    holder.endOfTick();
+    holder.pendingPass(EntityActions.PHASE_POST_TICK_INIT);
+
+    assertThat(started).containsExactly("delayed@1");
+  }
+
+  @Test
+  @DisplayName(
+      "a 100 ms run finishes on its third step, keeps its tags until the next run pass removes"
+          + " it")
+  void aFinishedRunKeepsItsTagsUntilTheNextRunPass() {
+    ActionHolder holder = holder();
+    holder.schedule(new WithDuration("run", 100, ACTIVATING, null), 0);
+    holder.pendingPass(EntityActions.PHASE_POST_TICK_INIT);
+    assertThat(holder.tags()).isEqualTo(ACTIVATING);
+
+    // The counter is compared before it is advanced: 0, 50 and 100 ms, finished on the third.
+    holder.runPass(0);
+    holder.runPass(1);
+    assertThat(holder.running().get(0).isFinished()).isFalse();
+    holder.runPass(2);
+    assertThat(holder.running().get(0).isFinished()).isTrue();
+    assertThat(holder.tags()).as("finished, still listed").isEqualTo(ACTIVATING);
+
+    holder.runPass(3);
+    assertThat(holder.running()).isEmpty();
+    assertThat(holder.tags()).isZero();
+  }
+
+  @Test
+  @DisplayName(
+      "a wait ends on the run-pass step its condition holds, and its activation starts in the next"
+          + " pending pass")
+  void aWaitEndsOnTheStepItsConditionHolds() {
+    ActionHolder holder = holder();
+    boolean[] condition = {false};
+    BattleAction effect = new InertAction(ActionRow.named("effect"));
+    BattleAction activating = new WithDuration("activating", 3300, ACTIVATING, effect);
+    holder.schedule(new WaitToActivate("wait", () -> condition[0], activating, INACTIVE), 0);
+    holder.pendingPass(EntityActions.PHASE_POST_TICK_INIT);
+    holder.runPass(0);
+    assertThat(holder.tags()).isEqualTo(INACTIVE);
+
+    condition[0] = true;
+    holder.runPass(1);
+    assertThat(started).containsExactly("wait@1");
+    holder.pendingPass(EntityActions.PHASE_POST_COMPONENT_TICK);
+
+    // The activating run and its effect alongside start in phase 2, after the finished wait, which
+    // still sets its tag.
+    assertThat(started).containsExactly("wait@1", "activating@2", "effect@2");
+    assertThat(holder.tags()).isEqualTo(INACTIVE | ACTIVATING);
+    holder.runPass(2);
+    assertThat(holder.tags()).isEqualTo(ACTIVATING);
+  }
+
+  @Test
+  @DisplayName(
+      "an instigator leaving drops the pending entries it caused and that abort, swapping the last in")
+  void anInstigatorLeavingDropsItsPendingEntries() {
+    ActionHolder holder = new ActionHolder();
+    ActionHolder leaving = new ActionHolder();
+    ActionHolder other = new ActionHolder();
+    List<String> dropped = new ArrayList<>();
+    holder.setListener(
+        new ActionHolder.Listener() {
+          @Override
+          public void dropped(BattleAction action, int ticksLeft) {
+            dropped.add(action.name() + " " + ticksLeft);
+          }
+        });
+    // The recorded case: A and D caused by the leaving object with the flag, B by another, C by the
+    // leaving object with the flag off.
+    holder.schedule(new InertAction(ActionRow.named("A")), 100, false, leaving);
+    holder.schedule(new InertAction(ActionRow.named("B")), 100, false, other);
+    holder.schedule(
+        new InertAction(ActionRow.named("C").toBuilder().abortIfInstigatorDies(false).build()),
+        100,
+        false,
+        leaving);
+    holder.schedule(new InertAction(ActionRow.named("D")), 150, false, leaving);
+
+    holder.instigatorLeft(leaving);
+
+    assertThat(dropped).containsExactly("A 2", "D 3");
+    assertThat(holder.queued().stream().map(q -> q.action().name()).toList())
+        .as("the last swapped into each dropped place, and looked at again")
+        .containsExactly("C", "B");
+
+    holder.instigatorLeft(EntityActions.NONE);
+    assertThat(holder.queued()).as("an entity without actions caused nothing").hasSize(2);
+  }
+
+  @Test
+  @DisplayName(
+      "an action caused by an owner keeps the point the owner stood on as it was scheduled: a"
+          + " queued one starts with it after the owner moved, one started at once with the point"
+          + " then")
+  void anActionKeepsTheCausesPointAsItWasScheduled() {
+    PointOwner owner = new PointOwner();
+    ActionHolder cause = new ActionHolder(owner);
+    List<Integer> points = new ArrayList<>();
+    BattleAction push =
+        new BattleAction() {
+          @Override
+          public String name() {
+            return "push";
+          }
+
+          @Override
+          public ActionInstance start(ActionHolder h) {
+            return start(h, null);
+          }
+
+          @Override
+          public ActionInstance start(ActionHolder h, ActionHolder instigator) {
+            points.add(h.startingCauseX());
+            return null;
+          }
+        };
+    ActionHolder holder = holder();
+
+    // Queued outside a pending pass at 100; the owner moves to 900 before the pass starts it.
+    owner.x = 100;
+    holder.schedule(push, 0, false, cause);
+    owner.x = 900;
+    holder.pendingPass(EntityActions.PHASE_POST_TICK_INIT);
+    // Started at once where it is scheduled: the point then.
+    holder.schedule(push, 0, true, cause);
+
+    assertThat(points).containsExactly(100, 900);
+  }
+
+  /** An owner with a point along the width the test moves. */
+  private static final class PointOwner implements ActionOwner {
+    private int x;
+
+    @Override
+    public HitPoints actionHitPoints() {
+      return null;
+    }
+
+    @Override
+    public int variable(int key) {
+      return 0;
+    }
+
+    @Override
+    public void setVariable(int key, int value) {}
+
+    @Override
+    public void killBy(ActionOwner killer) {}
+
+    @Override
+    public void queueTypedHit(ActionOwner source, int amount, DamageType type) {}
+
+    @Override
+    public int actionX() {
+      return x;
+    }
+  }
+}

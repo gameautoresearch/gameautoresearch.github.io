@@ -1,0 +1,19 @@
+--- poke_engine-0.0.48/src/mcts.rs
++++ poke-engine-repro-0.0.48/src/mcts.rs
+@@ -272,7 +272,7 @@
+     children: &mut HashMap<(usize, usize, usize), Box<[Node]>>,
+     limit: SearchLimit,
+ ) {
+-    let mut rng = rng();
++    let mut rng = rand::rngs::StdRng::seed_from_u64(std::env::var("POKE_ENGINE_TEST_SEED").ok().and_then(|v| v.parse::<u64>().ok()).unwrap_or_else(rand::random::<u64>));
+     let start_time = std::time::Instant::now();
+     loop {
+         for _ in 0..1000 {
+--- poke_engine-0.0.48/pyproject.toml
++++ poke-engine-repro-0.0.48/pyproject.toml
+@@ -10,4 +10,4 @@
+ [project]
+ name = "poke-engine"
+ version = "0.0.48"
+-readme = "readme.md"
++readme = "README.md"

@@ -1,0 +1,64 @@
+{
+  "schema": "tavern-ppo-recipe-v1",
+  "seed": 12345,
+  "device": "cuda:0",
+  "machine": {
+    "label": "Modal-L4-fixed-4core-16GiB",
+    "attached_cpu_threads": 4,
+    "attached_ram_gib": 16,
+    "gpu_model": "NVIDIA L4"
+  },
+  "allocated_worker_hours": 0.2,
+  "n_games": 32,
+  "native_threads": 4,
+  "learning_seats": [
+    0
+  ],
+  "opponent": "scripted",
+  "opponent_checkpoint": null,
+  "rules": {
+    "num_players": 8,
+    "content": "Implemented",
+    "turn_action_caps": [
+      30
+    ],
+    "max_actions_per_turn": 30,
+    "max_turns": 100,
+    "record_log": false
+  },
+  "network": {
+    "hidden": 128,
+    "embedding": 8
+  },
+  "updates": 64,
+  "profile_updates": 2,
+  "max_batch_steps": 6000,
+  "learning_rate": 0.0003,
+  "gamma": 1.0,
+  "gae_lambda": 0.95,
+  "ppo_epochs": 3,
+  "minibatch_size": 1024,
+  "clip": 0.2,
+  "entropy_coef": 0.01,
+  "value_coef": 0.5,
+  "max_grad_norm": 0.5,
+  "snapshot_every": 0,
+  "copy_observations": true,
+  "evaluation": {
+    "label": "public-practice",
+    "seeds": [
+      10101,
+      10102
+    ],
+    "games_per_seat": 2,
+    "opponent": "scripted",
+    "deterministic": false
+  },
+  "torch_threads": 1,
+  "worker_backend": "pooled",
+  "fast_inference": true,
+  "skip_finished_lobbies": true,
+  "defer_learner_metrics": true,
+  "save_initial": true,
+  "start_turn": 1
+}

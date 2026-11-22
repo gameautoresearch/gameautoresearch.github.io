@@ -1,0 +1,7 @@
+{
+  "oracle": "candidates/AutoTavern/crates/taverngym/src/obs.rs",
+  "oracle_sha256": "906b2612ffc6eec44b7055f27c8fb31807f30477b0065a3df5bfd80808d7faa1",
+  "derived": "candidates/AutoTavern/crates/taverngym/src/rl_obs.rs",
+  "license": "MIT; candidates/AutoTavern/LICENSE and NOTICE retained",
+  "scope": "Same complete 37.0.2 player-visible observation, fixed caller-owned storage; complete original rule engine remains unchanged"
+}

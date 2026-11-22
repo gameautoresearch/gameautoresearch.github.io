@@ -1,0 +1,7 @@
+modal[api-proxy-support]==1.5.2
+numpy==2.5.4
+synchronicity==0.12.5
+h2==4.3.0
+python-socks==2.8.2
+aiohttp-socks==0.11.0
+matplotlib==3.10.7

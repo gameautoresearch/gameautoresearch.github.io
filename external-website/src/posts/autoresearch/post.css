@@ -1,0 +1,354 @@
+/* The autoresearch post: the site's monochrome voice with one violet accent, scoped to the post wrapper. */
+.pt.ar {
+  /* CMYK process: cyan, magenta, yellow and key (black). Magenta is the text accent (links, selection). */
+  --c: #00a0d6; --c-deep: #0081ad; --c-tint: #e3f5fb;
+  --m: #e0218a; --m-deep: #b8156e; --m-tint: #fde6f1;
+  --y: #d4a000; --y-deep: #8f6c00; --y-tint: #fff5d1;
+  --k: #111;
+  --accent-deep: var(--m-deep);
+  --accent: var(--m);
+  --accent-soft: #f6b6d6;
+  --accent-tint: var(--m-tint);
+  --viz-1: var(--c);
+  --viz-2: var(--m);
+  --viz-flat: #c4c4c4;
+}
+.ar a { text-decoration-color: var(--accent-soft); }
+.ar a:hover { color: var(--accent-deep); text-decoration-color: currentColor; }
+.ar ::selection { background: var(--accent-soft); }
+
+.ar-quote {
+  margin: 24px 0 0;
+  padding: 2px 0 2px 16px;
+  border-left: 2px solid var(--accent-soft);
+}
+.ar-quote p { font-size: 15.5px; line-height: 1.6; }
+.ar-quote footer { margin-top: 6px; color: var(--secondary); font-size: 13px; }
+.ar-quote footer strong { color: var(--ink); font-weight: 600; }
+html.agent-view .ar-quote { margin-top: 12px; padding-left: 2ch; border-left: 2px solid var(--rule); }
+html.agent-view .ar-quote p { font-size: inherit; }
+html.agent-view .ar-quote footer { font-size: inherit; }
+
+.ar-games { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
+.ar-game { padding: 12px 14px; border: 1px solid var(--rule); border-radius: 8px; }
+.ar-game strong { display: block; font-weight: 600; font-size: 14.5px; }
+.ar-game p { margin-top: 4px; color: var(--secondary); font-size: 13px; line-height: 1.45; }
+.ar-game small { display: block; margin-top: 6px; color: var(--accent-deep); font-size: 12px; font-variant-numeric: tabular-nums; }
+@media (max-width: 560px) { .ar-games { grid-template-columns: 1fr; } }
+
+.ar-tag { display: inline-block; padding: 0 6px; border-radius: 4px; background: var(--accent-tint); color: var(--accent-deep); font-size: 12px; font-weight: 600; }
+
+.ar-strip-dot { opacity: 0; transition: opacity 300ms ease calc(var(--i, 0) * 25ms); cursor: default; }
+.ar-strip.seen .ar-strip-dot { opacity: 1; }
+.ar-strip-dot:focus { outline: none; stroke: var(--ink); }
+@media (prefers-reduced-motion: reduce) { .ar-strip-dot { opacity: 1; transition: none; } }
+
+.ar-loop { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; counter-reset: loop; }
+.ar-loop div { position: relative; padding: 10px 12px 11px; border: 1px solid var(--rule); border-radius: 8px; font-size: 13px; line-height: 1.4; color: var(--secondary); }
+.ar-loop div.on { border-color: var(--c); background: radial-gradient(rgba(0, 160, 214, 0.09) 1.2px, transparent 1.3px) 0 0 / 6px 6px, #fff; }
+.ar-loop strong { display: block; margin-bottom: 3px; color: var(--ink); font-size: 13.5px; font-weight: 600; }
+.ar-loop strong::before { counter-increment: loop; content: counter(loop) ". "; color: var(--secondary); font-weight: 400; }
+@media (max-width: 560px) { .ar-loop { grid-template-columns: 1fr 1fr; } }
+
+/* Session timelines */
+.ar-tabs { display: flex; gap: 6px; margin-bottom: 10px; }
+.ar-tabs button { padding: 4px 12px; border: 1px solid #d8d8d3; border-radius: 2px; background: #fff; color: var(--ink); font: inherit; font-size: 13px; cursor: pointer; }
+.ar-tabs button:hover { border-color: #111; }
+.ar-tabs button[aria-selected="true"] { background: var(--c-deep); border-color: var(--c-deep); color: #fff; }
+.ar-tl .viz { cursor: crosshair; }
+.ar-tl-run { cursor: pointer; transition: opacity 120ms; }
+.ar-tl-run:hover { opacity: .8; }
+.ar-tl-run:focus { outline: none; }
+.ar-tl-key { display: flex; flex-wrap: wrap; gap: 4px 14px; margin-top: 6px; color: var(--secondary); font-size: 12px; }
+.ar-tl-key span { display: inline-flex; align-items: center; gap: 5px; }
+.ar-tl-key i.run { display: inline-block; width: 30px; height: 8px; border-radius: 2px; background: linear-gradient(90deg, #e0218a, #e2e2de, #0081ad); }
+.ar-tl-detail { min-height: 40px; margin-top: 8px; padding: 8px 12px; border-radius: 2px; background: #f4f4f2; font-size: 13px; line-height: 1.5; font-variant-numeric: tabular-nums; }
+.ar-tl-detail span { color: var(--secondary); }
+.ar-tl-detail b { color: var(--c-deep); }
+
+/* GPU allocation */
+.ar-alloc { display: grid; gap: 7px; }
+.ar-alloc .viz-legend { margin-bottom: 4px; }
+.ar-alloc-row { display: grid; grid-template-columns: 130px 1fr; gap: 12px; align-items: center; }
+.ar-alloc-label { font-size: 12.5px; line-height: 1.2; }
+.ar-alloc-label small { display: block; color: var(--secondary); font-size: 10.5px; }
+.ar-alloc-bar { display: flex; height: 18px; border-radius: 3px; overflow: hidden; }
+.ar-alloc-bar i { display: block; height: 100%; border-right: 1px solid #fff; }
+.ar-alloc-axis { display: flex; justify-content: space-between; margin-left: 142px; color: var(--viz-axis); font-size: 11px; }
+@media (max-width: 520px) {
+  .ar-alloc-row { grid-template-columns: 96px 1fr; gap: 8px; }
+  .ar-alloc-label { font-size: 11px; }
+  .ar-alloc-axis { margin-left: 104px; }
+}
+
+/* Head-to-head heatmap */
+.ar-heat { display: grid; gap: 3px; font-size: 12px; font-variant-numeric: tabular-nums; }
+.ar-heat-col { align-self: end; padding-bottom: 3px; color: var(--secondary); font-size: 10.5px; text-align: center; overflow-wrap: anywhere; }
+.ar-heat-row { display: flex; align-items: center; font-size: 12px; }
+.ar-heat-cell { display: grid; place-items: center; height: 30px; border-radius: 3px; font-size: 11.5px; }
+@media (max-width: 520px) {
+  .ar-heat { grid-template-columns: 54px repeat(8, 1fr) !important; gap: 2px; }
+  .ar-heat-col { font-size: 8.5px; }
+  .ar-heat-row { font-size: 10px; }
+  .ar-heat-cell { height: 24px; font-size: 9.5px; }
+}
+
+/* Game theaters */
+.ar-tabs-wrap { flex-wrap: wrap; }
+.ar-theater-meta { margin: 0 0 10px; color: var(--secondary); font-size: 13px; }
+.ar-theater-meta strong { color: var(--ink); font-weight: 600; }
+/* Space held for a battle replay while it loads (the field is 16:9, then the 36px bar and the log line). */
+.ar-replay-wait { display: grid; place-items: center; aspect-ratio: 16 / 9; margin-bottom: 76px; border-radius: 6px; background: #f1f1ee; color: var(--secondary); font-size: 13px; }
+
+/* Configuration headings: one per configuration of the task, above the h3 sections inside it. */
+.ar h2.ar-config { margin-top: 72px; padding-top: 18px; border-top: 3px solid var(--k); font-size: 22px; font-weight: 650; line-height: 1.25; letter-spacing: -0.01em; }
+.ar h2.ar-config small { display: block; margin-bottom: 4px; color: var(--secondary); font-size: 12px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; }
+.ar h2.ar-config + p { margin-top: 12px; }
+html.agent-view .ar h2.ar-config { margin-top: 2em; padding-top: 0; border-top: 0; font-size: inherit; }
+html.agent-view .ar h2.ar-config small { display: inline; font-size: inherit; letter-spacing: 0; text-transform: none; color: inherit; }
+html.agent-view .ar h2.ar-config small::after { content: ": "; }
+
+/* CMYK: each configuration owns one plate, on its heading rule, its label and its intro card. */
+.ar h2.ar-c1 { border-top-color: var(--c); } .ar h2.ar-c1 small { color: var(--c-deep); }
+.ar h2.ar-c2 { border-top-color: var(--m); } .ar h2.ar-c2 small { color: var(--m-deep); }
+.ar h2.ar-c3 { border-top-color: var(--y); } .ar h2.ar-c3 small { color: var(--y-deep); }
+.ar-configs .pt-cards { grid-template-columns: 1fr; gap: 8px; }
+.ar-configs .pt-card { border-radius: 2px; border-width: 0 0 0 4px; border-style: solid; background-size: 6px 6px; padding: 12px 16px; }
+.ar-configs .pt-card p { color: #3d3d3d; }
+.ar-configs .pt-card:nth-child(1) { border-left-color: var(--c); background-color: #e6f6fc; background-image: radial-gradient(rgba(0, 160, 214, 0.15) 1.2px, transparent 1.3px); }
+.ar-configs .pt-card:nth-child(2) { border-left-color: var(--m); background-color: #fdeaf3; background-image: radial-gradient(rgba(224, 33, 138, 0.13) 1.2px, transparent 1.3px); }
+.ar-configs .pt-card:nth-child(3) { border-left-color: var(--y); background-color: #fff6d8; background-image: radial-gradient(rgba(212, 160, 0, 0.17) 1.2px, transparent 1.3px); }
+.ar-configs .pt-card:nth-child(1) .pt-card-kicker { color: var(--c-deep); }
+.ar-configs .pt-card:nth-child(2) .pt-card-kicker { color: var(--m-deep); }
+.ar-configs .pt-card:nth-child(3) .pt-card-kicker { color: var(--y-deep); }
+html.agent-view .ar-configs .pt-card { background-image: none; }
+
+/* Generals wave 1: session timeline legend and the pending final-tournament ladder. */
+.ar-gw-legend i { border-radius: 2px; }
+.ar-tl-detail span { margin-left: 4px; }
+.ar-pending { display: grid; gap: 8px; }
+.ar-pending-row { display: grid; grid-template-columns: 150px 1fr 44px; gap: 12px; align-items: center; }
+.ar-pending-label { font-size: 13px; line-height: 1.2; }
+.ar-pending-label small { display: block; color: var(--secondary); font-size: 11px; }
+.ar-pending-track { position: relative; height: 18px; border: 1px dashed #d6d6d1; border-radius: 2px; background: repeating-linear-gradient(135deg, transparent 0 6px, #f3f3f0 6px 7px); }
+.ar-pending-track i { position: absolute; top: -4px; bottom: -4px; left: 50%; width: 1px; background: #bdbdbd; }
+.ar-pending-value { color: var(--secondary); font-size: 12px; text-align: right; font-variant-numeric: tabular-nums; }
+.ar-pending-axis { display: flex; justify-content: space-between; margin: 0 56px 0 162px; color: var(--viz-axis); font-size: 11px; }
+.ar-pending-note { margin-top: 4px; color: var(--secondary); font-size: 12.5px; }
+@media (max-width: 520px) {
+  .ar-pending-row { grid-template-columns: 104px 1fr 32px; gap: 8px; }
+  .ar-pending-axis { margin: 0 40px 0 112px; }
+}
+
+/* Open-source credits at the end of the post. */
+.ar-credits { margin-top: 12px; padding-left: 18px; font-size: 14.5px; line-height: 1.55; }
+.ar-credits li + li { margin-top: 6px; }
+
+/* Opening showcase: compact two-column layout (selector + policy info on left, replay stage on right). */
+.sc { margin: 22px 0 8px; padding: 10px 12px; border: 1px solid var(--rule); border-radius: 4px; container-type: inline-size; }
+.sc-grid { display: grid; grid-template-columns: 214px minmax(0, 1fr); gap: 12px; align-items: stretch; }
+.sc-nav { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.sc-games { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0; border: 1px solid var(--k); border-radius: 2px; overflow: hidden; }
+.sc-games button { padding: 5px 4px; border: 0; border-right: 1px solid var(--k); background: #fff; color: var(--ink); font: inherit; font-size: 12px; font-weight: 600; cursor: pointer; text-align: center; }
+.sc-games button:last-child { border-right: 0; }
+.sc-games button:nth-child(1)[aria-selected="true"] { background: var(--c); color: #fff; }
+.sc-games button:nth-child(2)[aria-selected="true"] { background: var(--m); color: #fff; }
+.sc-games button:nth-child(3)[aria-selected="true"] { background: var(--y); color: #111; }
+.sc-matchups { display: flex; flex-direction: column; gap: 4px; }
+.sc-matchups button { display: block; width: 100%; padding: 5px 8px; border: 1px solid #e2e2de; border-radius: 2px; background: #fff; color: var(--secondary); font: inherit; font-size: 11.5px; line-height: 1.3; text-align: left; cursor: pointer; }
+.sc-matchups button strong { display: block; font-weight: 500; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sc-matchups button span { display: block; font-size: 11px; color: var(--secondary); }
+.sc-matchups button:hover { border-color: #111; }
+.sc-matchups button[aria-selected="true"] { border-color: var(--k); background: #f7f7f4; }
+.sc-matchups button[aria-selected="true"] strong { font-weight: 600; }
+.sc-policies { margin-top: auto; padding-top: 8px; border-top: 1px solid var(--rule); display: flex; flex-direction: column; gap: 4px; }
+.sc-pol-head { font-size: 10px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--c-deep); }
+.sc-pol-row { display: flex; justify-content: space-between; align-items: baseline; gap: 6px; font-size: 11.5px; line-height: 1.3; }
+.sc-pol-row strong { font-weight: 600; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sc-pol-row span { color: var(--secondary); font-size: 11px; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.sc-note { margin-top: 3px; color: var(--secondary); font-size: 11px; line-height: 1.35; }
+.sc-main { min-width: 0; display: flex; flex-direction: column; }
+.sc-progress { height: 2px; margin-bottom: 6px; background: var(--k); transform-origin: left; animation: sc-fill linear forwards; }
+@keyframes sc-fill { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+/* Steady, compact stage height across all three games (~270px total). */
+.sc-stage { min-height: 272px; }
+.sc-stage .psr-log { display: none; }
+.sc-stage .replay-board { display: block; max-height: 215px; margin: 0 auto; }
+.sc-stage .gr-board { max-height: 215px; }
+.sc-stage .replay, .sc-stage .gr { padding: 4px 6px; border: 0; border-radius: 3px; background: #fafaf8; }
+.sc-stage .replay-hud, .sc-stage .gr-hud { margin-bottom: 4px; gap: 8px; }
+.sc-stage .replay-hud strong, .sc-stage .gr-side strong { font-size: 12px; line-height: 1.2; }
+.sc-stage .replay-hud span, .sc-stage .gr-side span { font-size: 11px; }
+.sc-stage .gr-controls, .sc-stage .replay-controls { margin-top: 6px; gap: 6px; font-size: 11.5px; }
+.sc-stage .gr-controls > button, .sc-stage .gr-speed button, .sc-stage .replay-controls button { padding: 2px 7px; font-size: 11.5px; }
+.sc-stage .gr-tick { min-width: 78px; font-size: 11px; }
+.sc-stage .replay-turn { min-width: 118px; font-size: 11px; }
+.sc-wait { display: grid; place-items: center; aspect-ratio: 16 / 9; border-radius: 4px; background: #f1f1ee; color: var(--secondary); font-size: 13px; }
+.sc-stage .replay-loading, .sc-stage .gr-loading { min-height: 264px; }
+@container (max-width: 560px) {
+  .sc-grid { grid-template-columns: 1fr; gap: 8px; }
+  .sc-matchups { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .sc-matchups button span { display: none; }
+  .sc-stage { min-height: 240px; }
+  .sc-stage .replay-hud span, .sc-stage .gr-side span { display: none; }
+  .sc-stage .replay-turn, .sc-stage .gr-tick { display: none; }
+}
+
+/* Generals board player. */
+.gr { padding: 10px; border: 1px solid var(--rule); border-radius: 8px; background: #fcfcfb; }
+.gr-loading { display: grid; place-items: center; min-height: 360px; color: var(--secondary); font-size: 14px; }
+.gr-hud { display: flex; justify-content: space-between; gap: 16px; margin-bottom: 8px; }
+.gr-side { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+.gr-side:last-child { flex-direction: row-reverse; text-align: right; }
+.gr-side i { width: 12px; height: 12px; border-radius: 2px; }
+.gr-side strong { display: block; font-weight: 600; }
+.gr-side span { color: var(--secondary); font-size: 12px; font-variant-numeric: tabular-nums; }
+.gr-board { display: block; width: 100%; max-height: 430px; }
+.gr-board text { font-family: inherit; font-variant-numeric: tabular-nums; }
+.gr-controls { display: flex; align-items: center; gap: 10px; margin-top: 8px; font-size: 12.5px; }
+.gr-controls > button, .gr-speed button { padding: 3px 10px; border: 1px solid #d8d8d3; border-radius: 2px; background: #fff; font: inherit; font-size: 12.5px; cursor: pointer; }
+.gr-controls input { flex: 1; accent-color: #111; }
+.gr-tick { min-width: 104px; color: var(--secondary); font-variant-numeric: tabular-nums; }
+.gr-speed { display: inline-flex; gap: 4px; }
+.gr-speed button[aria-pressed="true"] { background: #111; border-color: #111; color: #fff; }
+@media (max-width: 520px) { .gr-speed { display: none; } .gr-tick { min-width: 0; } }
+
+/* Polytopia, 13 models: best-so-far race and Elo leaderboard. */
+.fr { position: relative; }
+.fr svg { display: block; width: 100%; height: auto; overflow: visible; }
+.fr-controls { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 6px 12px; }
+.fr-ref { fill: var(--viz-axis); font-size: 10.5px; }
+.fr-legend { display: flex; flex-wrap: wrap; gap: 4px 6px; margin-top: 8px; }
+.fr-legend button { display: inline-flex; align-items: center; gap: 6px; padding: 2px 8px; border: 1px solid #e2e2de; border-radius: 2px; background: #fff; color: var(--ink); font: inherit; font-size: 12px; cursor: pointer; }
+.fr-legend button[aria-pressed="false"] { color: #b0b0b0; }
+.fr-legend button[aria-pressed="false"] i { opacity: 0.25; }
+.fr-legend i { display: inline-block; width: 14px; height: 3px; border-radius: 2px; }
+.fr-legend i.dashed { background: repeating-linear-gradient(90deg, currentColor 0 4px, transparent 4px 7px); }
+.fr-legend .fr-all { color: var(--secondary); }
+.fr-board table { width: 100%; border-collapse: collapse; font-size: 13.5px; font-variant-numeric: tabular-nums; }
+.fr-board th { padding: 6px 8px 6px 0; border-bottom: 1px solid #d8d8d3; color: var(--secondary); font-size: 12.5px; font-weight: 600; text-align: left; }
+.fr-board th button { padding: 0; border: 0; background: none; color: inherit; font: inherit; cursor: pointer; }
+.fr-board th[aria-sort="descending"] button { color: var(--ink); }
+.fr-board td { padding: 6px 8px 6px 0; border-bottom: 1px solid #efefec; vertical-align: top; }
+.fr-board td small { display: block; max-width: 340px; margin-top: 2px; color: var(--secondary); font-size: 11.5px; line-height: 1.35; }
+.fr-rank { width: 22px; color: var(--secondary); }
+.fr-name { display: inline-flex; align-items: center; gap: 7px; font-weight: 600; }
+.fr-name i { width: 10px; height: 10px; border-radius: 2px; }
+.fr-num { display: inline-block; min-width: 46px; }
+.fr-on .fr-num { font-weight: 600; }
+.fr-bar { position: relative; display: inline-block; width: 120px; height: 8px; margin-left: 6px; vertical-align: middle; background: #f3f3f0; border-radius: 1px; }
+.fr-bar b { position: absolute; top: 0; height: 8px; border-radius: 1px; }
+.fr-bar em { position: absolute; top: -2px; width: 1px; height: 12px; background: #111; }
+@media (max-width: 520px) { .fr-bar { width: 60px; } .fr-board td small { display: none; } }
+
+/* Question-based layout: which setup a result came from, as a small line under its heading. */
+.ar .ar-setup { margin-top: 6px; color: var(--secondary); font-size: 12.5px; letter-spacing: 0.01em; }
+.ar .ar-setup a { color: inherit; }
+.ar h3 + .ar-setup + p, .ar h4 + .ar-setup + p { margin-top: 10px; }
+.ar h5 { margin-top: 22px; font-size: 13.5px; font-weight: 600; color: var(--secondary); }
+html.agent-view .ar .ar-setup { font-size: inherit; }
+
+/* Figure 1: agent + budget -> training runs -> a trained policy against an opponent on the board. The drawing is
+   setup-figure.svg, inlined by BudgetCartoon; these rules are its stylesheet. */
+.ar-fig1 {
+  overflow-x: auto;
+  --bg: #fff; --panel: #fcfcfb; --g: #2f9e5c; --g-tint: #e1f4e7; --probe: #a3a39d;
+  --land: #f4f4f0; --land2: #eaeae5; --side: #cfcfc9; --side2: #dcdcd6; --them: #eb6834;
+}
+.ar-fig1 > svg { display: block; width: 100%; min-width: 640px; height: auto; font-family: inherit; }
+.ar-fig1 text { fill: var(--ink); }
+.ar-fig1 .hd { font-size: 13.5px; font-weight: 600; }
+.ar-fig1 .let { font-weight: 700; font-size: 15px; }
+.ar-fig1 .lab { font-size: 13.5px; font-weight: 600; }
+.ar-fig1 .sub { font-size: 11.5px; fill: var(--secondary); }
+.ar-fig1 .mid { text-anchor: middle; }
+.ar-fig1 .mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 10.5px; }
+.ar-fig1 .dim { fill: var(--secondary); }
+.ar-fig1 .pickt { fill: var(--m); font-weight: 600; }
+.ar-fig1 .box { fill: var(--panel); stroke: var(--ink); stroke-width: 1.2; }
+.ar-fig1 .hair { stroke: var(--rule); fill: none; }
+.ar-fig1 .dot { fill: var(--rule); }
+.ar-fig1 .ink, .ar-fig1 .cursor { fill: var(--ink); }
+.ar-fig1 .pin { stroke: var(--ink); stroke-width: 1.2; fill: none; }
+.ar-fig1 .gold, .ar-fig1 .seg-long { fill: var(--g); }
+.ar-fig1 .notch { stroke: var(--bg); stroke-width: 1; opacity: .6; fill: none; }
+.ar-fig1 .seg { fill: var(--g-tint); stroke: var(--g); stroke-width: 1; }
+.ar-fig1 .arr { stroke: var(--ink); stroke-width: 1.5; fill: none; stroke-linecap: round; }
+.ar-fig1 .dash { stroke-dasharray: 4 3; }
+#ar-fig1-ah path { fill: var(--ink); }
+.ar-fig1 .axis { stroke: var(--rule); stroke-width: 1; fill: none; }
+.ar-fig1 .curve { fill: none; stroke-linejoin: round; stroke-linecap: round; stroke-width: 1.3; stroke: var(--probe); }
+.ar-fig1 .curve.pick { stroke: var(--m); }
+.ar-fig1 .curve.long { stroke: var(--m); stroke-width: 2.2; }
+.ar-fig1 .end { fill: var(--bg); stroke: var(--probe); stroke-width: 1.3; }
+.ar-fig1 .end.pick { stroke: var(--m); }
+.ar-fig1 .tickm { stroke: var(--m); stroke-width: 1; fill: none; }
+.ar-fig1 .halo { fill: url(#ar-fig1-dots); stroke: var(--c); stroke-width: 1.4; }
+.ar-fig1 .edge { stroke: var(--c-deep); stroke-width: .7; opacity: .55; fill: none; }
+.ar-fig1 .node { fill: var(--bg); stroke: var(--c); stroke-width: 1.5; }
+.ar-fig1 .land { fill: var(--land); stroke: var(--bg); stroke-width: 1; }
+.ar-fig1 .land2 { fill: var(--land2); stroke: var(--bg); stroke-width: 1; }
+.ar-fig1 .water { fill: var(--c-tint); stroke: var(--bg); stroke-width: 1; }
+.ar-fig1 .side { fill: var(--side); }
+.ar-fig1 .side2 { fill: var(--side2); }
+.ar-fig1 .shadow { fill: var(--ink); opacity: .13; }
+.ar-fig1 .us { fill: var(--c); stroke: var(--bg); stroke-width: 1; }
+.ar-fig1 .them { fill: var(--them); stroke: var(--bg); stroke-width: 1; }
+.ar-fig1 .pole { stroke: var(--ink); stroke-width: 1.2; fill: none; }
+.ar-fig1 .say { font-size: 13.5px; }
+.ar-fig1 .eg { font-size: 13.5px; }
+.ar-fig1 .ge { stroke: var(--probe); stroke-width: .7; fill: none; opacity: .8; }
+.ar-fig1 .gn { fill: var(--bg); stroke: var(--probe); stroke-width: 1.2; }
+.ar-fig1 .ge.gp, .ar-fig1 .gn.gp { stroke: var(--m); }
+.ar-fig1 .gn.gl { fill: var(--m); }
+.ar-fig1 .eye, .ar-fig1 .led { fill: var(--c); }
+.ar-fig1 .cover { stroke: var(--panel); stroke-width: 2.4; fill: none; }
+.ar-fig1 .face { stroke: var(--ink); stroke-width: 1.2; stroke-linejoin: round; }
+.ar-fig1 .fr { fill: var(--panel); }
+.ar-fig1 .fl { fill: var(--side2); }
+.ar-fig1 .ft { fill: var(--land); }
+.ar-fig1 .unit { fill: var(--land2); }
+.ar-fig1 .vent { stroke: var(--probe); stroke-width: 1; fill: none; }
+.ar-fig1 .bill { fill: var(--g-tint); stroke: var(--g); stroke-width: 1; stroke-linejoin: round; }
+.ar-fig1 .billin { fill: none; stroke: var(--g); stroke-width: .8; }
+.ar-fig1 .coin { fill: var(--g); }
+.ar-fig1 .note { fill: var(--g-tint); stroke: var(--g); stroke-width: 1; }
+.ar-fig1 .notein { fill: none; stroke: var(--g); stroke-width: .6; opacity: .7; }
+.ar-fig1 .notetx { fill: var(--bg); font-size: 7px; font-weight: 700; text-anchor: middle; }
+.ar-fig1 .opp .halo { fill: var(--bg); stroke: var(--them); }
+.ar-fig1 .opp .node { stroke: var(--them); }
+.ar-fig1 .opp .edge { stroke: var(--them); }
+.ar-fig1 .cointx { fill: var(--bg); font-size: 8.5px; font-weight: 700; text-anchor: middle; }
+.ar .ar-tipline { margin-top: 4px; min-height: 1.4em; color: var(--secondary); font-size: 12.5px; }
+/* Technique table: a verdict chip per horizon. */
+.ar-chip { display: inline-block; padding: 1px 8px; border-radius: 999px; font-size: 12px; font-weight: 600; white-space: nowrap; }
+.ar-v-up { background: #e6f3e6; color: #0a6d0a; }
+.ar-v-even { background: #ecebe6; color: #5e5d58; }
+.ar-v-down { background: #f8e3e3; color: #b02e2e; }
+html.agent-view .ar-chip { padding: 0; background: none; color: inherit; font-size: inherit; font-weight: inherit; }
+/* Elo against total cost: legend marks for the frontier ring, the 1 h final squares and the untrained network. */
+.ar-cost-plot { position: relative; }
+.ar-cost .viz-legend i.ring { width: 10px; height: 10px; border: 1.5px solid #111; border-radius: 50%; background: #bdbdbd; box-sizing: border-box; }
+.ar-cost .viz-legend i.ring.open { background: #fff; border-color: #8a8a85; }
+.ar-cost .viz-legend i.sq { width: 9px; height: 9px; border: 1px solid #111; border-radius: 1.5px; background: #bdbdbd; box-sizing: border-box; }
+
+/* Figure 1: the research loop animation. */
+.rl svg { display: block; width: 100%; height: auto; cursor: pointer; user-select: none; }
+.rl-say { font-size: 14.5px; font-weight: 500; fill: #141414; }
+.rl-name { font-size: 13px; font-weight: 600; fill: #111; }
+.rl-head { font-size: 12px; font-weight: 600; fill: #111; }
+.rl-small { font-size: 10.5px; fill: #8a8a85; }
+.rl-seal { font-size: 7.5px; font-weight: 700; fill: #fff; text-anchor: middle; }
+.rl-seg-dollar { font-size: 8.5px; font-weight: 700; fill: #2f9e5c; text-anchor: middle; }
+.rl-halo { paint-order: stroke; stroke: #fff; stroke-width: 3px; stroke-linejoin: round; }
+.rl-amount { font-size: 12px; font-weight: 600; fill: #2f7a4c; font-variant-numeric: tabular-nums; }
+.rl-result { font-size: 11px; font-weight: 600; }
+.rl-tiny { font-size: 7.5px; fill: #6b6b6b; }
+.rl-army { font-size: 8.5px; font-weight: 600; text-anchor: middle; font-variant-numeric: tabular-nums; }
+
+/* Overall model score chart. */
+.ar-top-row { cursor: default; }
+.ar-top .viz-legend i.ts-dot { width: 10px; height: 10px; border-radius: 50%; box-sizing: border-box; }
+.ar-top .viz-legend i.ts-dot.solid { background: var(--c); }
+.ar-top .viz-legend i.ts-dot.hollow { background: #fff; border: 2px solid var(--c); }
+.ar-top .viz-legend i.ts-whisk { width: 18px; height: 4px; border-radius: 2px; background: var(--c); opacity: 0.35; }

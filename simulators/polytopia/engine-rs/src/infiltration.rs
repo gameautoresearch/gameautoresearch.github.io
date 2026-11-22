@@ -1,0 +1,90 @@
+//! gpu/infiltration.py: native Cloak infiltration.
+
+use crate::geom::Geom;
+use crate::hash::{hash_word, hash_words};
+use crate::kernels::{combat, max_health};
+use crate::military::{defense_bonus, direction, direction_xy, remove, summon};
+use crate::rules::Rules;
+use crate::state::State;
+
+/// Spawn tiles for `target`'s city in priority order (eligible only): InfiltrationRewardAction.ExecuteDefault's
+/// Evaluate (InfiltrationRewardAction.c:8306-8403): tie noise + city +2, water -0.1, a resource the player sees +0.5,
+/// defence bonus +1, a Poison improvement -0.5. Sorted best first (the comparison b__1, c:8406-8423).
+pub fn spawn_order(s: &State, target: usize, g: &Geom) -> Vec<usize> {
+    let (n, size) = (s.n, s.size);
+    let t = &s.tiles;
+    let tech = &s.players.tech[s.p()];
+    let mut keyed: Vec<(f32, usize)> = Vec::new();
+    for i in 0..n {
+        let water = t.terrain[i] <= 2;
+        let mut eligible = t.city[i] == target as i32 && s.units.owner[i] == 0;
+        eligible &= (t.terrain[i] != 4 || tech[20]) && (t.terrain[i] != 1 || tech[10]) && (t.terrain[i] != 2 || tech[13]);
+        // PathFinder.IsTileAccessible: only tiles the infiltrator's owner has explored
+        eligible &= t.explored[s.p()][i];
+        if !eligible {
+            continue;
+        }
+        let defense = (t.terrain[i] == 4 && tech[20]) || (t.terrain[i] == 5 && tech[18]) || (water && tech[12]);
+        // TileData.GetResource (TileData.c:1650-1656): no resource on a tile with an improvement (a farm, a mine, the
+        // city), whatever lies under it
+        let known_resource = t.resource[i] > 0 && t.structure[i] == 0 && (t.resource[i] != 2 || tech[6] || tech[8] || tech[9])
+            && (t.resource[i] != 5 || tech[20] || tech[23] || tech[24]);
+        // an improvement with ImprovementAbility Poison (Fungi 37, Clathrus 41) for a tribe without PoisonResist
+        // (Bardur): -0.5 (c:8371-8394)
+        let poison = t.structure[i] == 37 || t.structure[i] == 41;
+        // c:8335-8342: GameState.RandomHash.GetHash(x, y, CurrentTurn) (vtable slot 0x1A8 = HashFunction.GetHash(int,
+        // int, int), ISIL: `mov esi,[r14+10h]; mov edx,[r14+14h]; mov ecx,[rcx+1Ch]` = x, y, GameState+0x1C
+        // CurrentTurn), then HashFunction.Range(0f, 0.1f, that hash) (0x6E8A30, HashFunction.c:260-270):
+        // 0.1 * XXHash.GetHash(int) * 2^-32. Our `turn` is CurrentTurn (tools/il2cpp-host/to_polyfish.py).
+        let words = [(i % size) as u32, (i / size) as u32, s.turn as u32];
+        let noise = (hash_word(s.initial_seed, hash_words(s.initial_seed, &words)) as f32) * 0.1f32 / 4294967296.0f32;
+        let priority = noise + (t.structure[i] == 1) as i32 as f32 * 2.0 - water as i32 as f32 * 0.1 + known_resource as i32 as f32 * 0.5
+            + defense as i32 as f32 - poison as i32 as f32 * 0.5;
+        keyed.push((-priority, i));
+    }
+    // stable argsort on the float key, ties by index
+    keyed.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap().then(a.1.cmp(&b.1)));
+    let _ = g;
+    keyed.into_iter().map(|(_, i)| i).collect()
+}
+
+pub fn execute(s: &mut State, source: usize, target: usize, r: &Rules, g: &Geom) {
+    let owner = s.current_player;
+    let po = s.p();
+    let c = &s.cities;
+    // InfiltrationRewardAction: TileDataExtensions.CalculateRawProduction, no negative-progress term
+    let innate = (c.production[target] + (s.tiles.capital[target] == c.owner[target]) as i32).max(0);
+    let count = c.level[target].min(5) as usize;
+    remove(s, source, r, None, true);
+    let enemy = s.units.owner[target] > 0 && s.units.owner[target] != owner;
+    let tk = s.units.kind[target] as usize;
+    let damage = combat(r.unit_attack[37], r.unit_health[37], r.unit_health[37], r.unit_defense[tk], s.units.health[target],
+                        max_health(s, r, target), defense_bonus(s, r, target)).0;
+    s.units.health[target] += if enemy { -damage } else { 0.0 };
+    let dead = enemy && s.units.health[target] <= 0.0;
+    if dead {
+        remove(s, target, r, None, true);
+    } else if enemy {
+        // ActionUtils.PerformAttack(state, player, WorldCoordinates.NULL, city, damage) (c:7994-8004): no unit on the
+        // null origin (-1, -1), and the city's unit turns toward it (ActionUtils.PerformAttackDefault, ActionUtils.c:4346)
+        let size = s.size as i32;
+        s.units.direction[target] = direction_xy((target as i32 % size, target as i32 / size), (-1, -1));
+    }
+    s.players.kills[po] += dead as i32;
+    s.players.stars[po] += innate;
+    s.cities.infiltrated[target] = s.turn * s.np as i32 + owner;
+    s.cities.riot[target] = true;
+    let order = spawn_order(s, target, g);
+    for (i, &at) in order.iter().enumerate() {
+        if i >= count.min(5) {
+            break;
+        }
+        let water = s.tiles.terrain[at] <= 2;
+        summon(s, at, if water { 40 } else { 37 }, r, g, false);
+        s.units.home[at] = 0;
+        // TrainAction(player, Dagger, tile, 0, LookCoordinates = the city) (c:7965): TrainAction.ExecuteDefault turns
+        // the new unit toward LookCoordinates (TrainAction.c:651-660; the same tile gives 8, none); on water the
+        // queued EmbarkAction (c:7936) copies the facing to the Pirate (EmbarkAction.c:96-97)
+        s.units.direction[at] = direction(s.size, at, target);
+    }
+}

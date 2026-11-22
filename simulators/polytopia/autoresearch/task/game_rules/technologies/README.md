@@ -1,0 +1,32 @@
+# Native Bardur technology catalog
+
+26 existing tech records, including Basic. Hunting is known initially; other research follows the exact native adjacency and city-scaled price rules. Special-tribe technology IDs are not enabled merely because they occur in the shared table.
+
+- [Basic](0-basic.md)
+- [Riding](1-riding.md)
+- [FreeSpirit](2-freespirit.md)
+- [Chivalry](3-chivalry.md)
+- [Roads](4-roads.md)
+- [Trade](5-trade.md)
+- [Organization](6-organization.md)
+- [Strategy](7-strategy.md)
+- [Farming](8-farming.md)
+- [Construction](9-construction.md)
+- [Fishing](10-fishing.md)
+- [Aquatism](12-aquatism.md)
+- [Sailing](13-sailing.md)
+- [Navigation](14-navigation.md)
+- [Hunting](15-hunting.md)
+- [Forestry](16-forestry.md)
+- [Mathematics](17-mathematics.md)
+- [Archery](18-archery.md)
+- [Spiritualism](19-spiritualism.md)
+- [Climbing](20-climbing.md)
+- [Meditation](21-meditation.md)
+- [Philosophy](22-philosophy.md)
+- [Mining](23-mining.md)
+- [Smithery](24-smithery.md)
+- [Diplomacy](38-diplomacy.md)
+- [Ramming](44-ramming.md)
+
+[Research and economy](../rules/cities-and-economy.md) · [Wiki home](../README.md)

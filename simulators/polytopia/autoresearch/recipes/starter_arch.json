@@ -1,0 +1,6 @@
+{
+ "_doc": "Starter network: 2 residual blocks x 32 channels (rl/network.py); every key is passed to network.init.",
+ "width": 32,
+ "blocks": 2,
+ "architecture": "normalized-v2"
+}

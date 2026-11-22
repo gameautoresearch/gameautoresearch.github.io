@@ -1,0 +1,18 @@
+[package]
+name = "tavern-device-compiler"
+version = "0.1.0"
+edition = "2024"
+license = "MIT"
+[workspace]
+[dependencies]
+cuda_builder = { git = "https://github.com/Rust-GPU/Rust-CUDA", rev = "3a82c35a7196731fb60eebdac2a40d2b1bf0ba95", features = ["rustc_codegen_nvvm","llvm21"] }
+[profile.release]
+opt-level = 2
+lto = false
+codegen-units = 16
+
+[patch."https://github.com/Rust-GPU/Rust-CUDA"]
+rustc_codegen_nvvm = { path = "vendor/rustc_codegen_nvvm" }
+rustc_codegen_nvvm_macros = { path = "vendor/rustc_codegen_nvvm_macros" }
+nvvm = { path = "vendor/nvvm" }
+cust_raw = { path = "vendor/cust_raw" }

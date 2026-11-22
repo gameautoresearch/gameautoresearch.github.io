@@ -1,0 +1,10 @@
+[package]
+name = "tavern-device-wire"
+version = "0.1.0"
+edition = "2024"
+license = "MIT"
+[lib]
+path = "../../wire/src/lib.rs"
+[dependencies]
+tavern-device-core = { path = "../core" }
+serde = { version = "=1.0.229", default-features = false, features = ["derive", "alloc"] }

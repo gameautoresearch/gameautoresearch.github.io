@@ -1,0 +1,96 @@
+/* The view toggle: on the footer's row of links, styled like them, pushed to the right. */
+.view-toggle {
+  margin-left: auto;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--secondary);
+  font: inherit;
+  font-size: 14px;
+  cursor: pointer;
+}
+.view-toggle:hover { color: var(--ink); }
+.view-toggle:focus-visible { outline: 2px solid currentColor; outline-offset: 4px; border-radius: 1px; }
+
+/* Agent view: plain monospace text. Every rule starts with html.agent-view so it outranks the site's own
+   selectors whatever order the stylesheets load in. */
+html.agent-view {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-variant-ligatures: none;
+}
+html.agent-view .page-shell { padding: 24px 16px 32px; }
+html.agent-view .page-shell { --dock-h: 0px; }
+html.agent-view .site-layout { width: min(100%, 76ch); }
+html.agent-view :is(.profile, .site-nav) { font-size: 13.5px; line-height: 1.55; }
+html.agent-view .site-nav { position: static; flex-direction: row; gap: 2ch; margin-bottom: 20px; font-size: inherit; }
+html.agent-view .site-nav a { color: var(--ink); text-decoration: underline; }
+
+html.agent-view .profile :is(h1, h2, h3, h4) {
+  margin: 24px 0 8px;
+  color: var(--ink);
+  font-size: inherit;
+  font-weight: 700;
+  letter-spacing: 0;
+}
+html.agent-view .profile h1 { margin-top: 0; }
+html.agent-view .profile-header { margin-bottom: 16px; }
+html.agent-view .profile > section + section,
+html.agent-view .post-callout + section,
+html.agent-view .agent-callout + section { margin-top: 24px; }
+html.agent-view :is(.intro, .pt, .post-content, .agent-aside) > * + * { margin-top: 10px; }
+html.agent-view :is(.topic + .topic, .invitation, .agent-callout) { margin-top: 16px; }
+html.agent-view .topic h3 { margin: 0 0 4px; }
+html.agent-view :is(ul, ol) { margin-top: 8px; padding-left: 3ch; }
+html.agent-view ul { list-style: "- "; }
+html.agent-view ol { list-style: decimal; }
+html.agent-view li { padding: 0; }
+html.agent-view li + li { margin-top: 4px; }
+html.agent-view a { text-underline-offset: 3px; text-decoration-color: currentColor; }
+html.agent-view :is(.pt-lede, code, time) { font-size: inherit; }
+html.agent-view code { padding: 0; background: none; }
+html.agent-view hr { margin-top: 24px; }
+
+/* Blog index, post header and footer. */
+html.agent-view .post-list li { display: list-item; padding: 0; border: 0; }
+html.agent-view .post-list li + li { margin-top: 4px; }
+html.agent-view .post-list a { text-decoration: underline; }
+html.agent-view :is(.back-link, .blog-post h2) { margin-bottom: 8px; font-size: inherit; }
+html.agent-view .blog-post time { display: block; }
+html.agent-view .post-content { margin-top: 16px; }
+html.agent-view .profile-footer { margin-top: 32px; padding-top: 12px; }
+html.agent-view .profile-footer nav { gap: 4px 2ch; font-size: inherit; }
+html.agent-view .profile-footer a { color: var(--ink); text-decoration: underline; }
+html.agent-view .view-toggle { color: var(--ink); font-size: inherit; text-decoration: underline; text-underline-offset: 3px; }
+
+/* The post: numbered timeline, footnote markers, figures, tables, asides. */
+html.agent-view .pt-timeline { padding-left: 4ch; list-style: decimal; }
+html.agent-view .pt-timeline li { padding: 0; }
+html.agent-view .pt-timeline li + li { margin-top: 8px !important; }
+html.agent-view .pt-timeline li::before,
+html.agent-view .pt-timeline li::after { content: none; }
+html.agent-view .pt-timeline span { display: block; margin: 0; color: var(--secondary); font-size: inherit; font-weight: 400; }
+html.agent-view .pt-timeline span::before { content: "Result: "; }
+html.agent-view .pt-fn { margin: 0; font-size: inherit; line-height: inherit; vertical-align: baseline; }
+html.agent-view .pt-fn a { color: var(--ink); }
+html.agent-view .pt-footnotes { padding-left: 3ch; color: var(--ink); font-size: inherit; }
+html.agent-view .agent-figure { margin: 16px 0 0; }
+html.agent-view .agent-figure > * + * { margin-top: 8px; }
+html.agent-view .agent-figure figcaption { color: var(--secondary); }
+html.agent-view .agent-figure figcaption strong { color: var(--ink); }
+html.agent-view .agent-table { overflow-x: auto; }
+html.agent-view .agent-table table { width: 100%; border-collapse: collapse; font-size: 12.5px; line-height: 1.45; }
+html.agent-view .agent-table :is(th, td) {
+  padding: 3px 1ch;
+  border: 1px solid var(--rule);
+  text-align: left;
+  vertical-align: top;
+  overflow-wrap: break-word;
+}
+html.agent-view .agent-table th { font-weight: 700; }
+@media (max-width: 480px) {
+  html.agent-view .agent-table table { font-size: 11.5px; }
+  html.agent-view .agent-table :is(th, td) { padding: 2px 0.5ch; }
+}
+html.agent-view .agent-aside { padding-left: 2ch; border-left: 2px solid var(--rule); }
+
+html.agent-view :is(.critter-dock, .inline-critter) { display: none; }

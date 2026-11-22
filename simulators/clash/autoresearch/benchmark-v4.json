@@ -1,0 +1,139 @@
+{
+  "agent": {
+    "brief": "task/brief.md",
+    "harness": "../../../harness/README.md",
+    "researcher": "Harbor Terminus-2 in the uniform workspace; model calls are made by Harbor on the host"
+  },
+  "benchmark_id": "clash-autoresearch-fixed8-v4",
+  "budget": {
+    "accounting": "allocated_worker_wall_time",
+    "max_active_gpu_workers": 1,
+    "model_smoke_usd": 2,
+    "research_worker_seconds": 7200,
+    "retries": 0,
+    "smoke_worker_seconds": 600
+  },
+  "commands": {
+    "finalize": "ar finalize (inside a session)",
+    "practice": "ar eval RUN (inside a session)",
+    "prepare": "python -m harness prepare clash --out NEW_RELEASE --option base_release=EXACT_V31_RELEASE",
+    "run": "ar run RUN --seconds SECONDS (inside a session); SECONDS is the worker's hard time, 90..3300, and reserves SECONDS plus a 30-second settlement reserve",
+    "session": "python -m harness run clash {recipe|network} --release RELEASE --out NEW_SESSION --model MODEL [--execute]",
+    "submit": "ar submit RUN (network sessions) or ar submit (recipe sessions)"
+  },
+  "evaluation": {
+    "draw": 0.5,
+    "execution_observer": "refusal_diagnostics.py",
+    "grading_pair_workers": 3,
+    "interface": {
+      "actions": 2307,
+      "bundle_format": "clash-ar-bundle-v1",
+      "decisions_per_second": 4,
+      "entity_rows": 200,
+      "entrant_dtype": "float32",
+      "entrant_inference": "stateless per-seat pure NN, deterministic masked greedy argmax; no search",
+      "entrant_parameter_cap": 1000000,
+      "entrant_pipe_deadline_seconds": 15,
+      "execution_observer": "clash-visible-execution-observer-v1",
+      "grading_pair_workers": 3,
+      "legacy_engine_binding_unchanged": true,
+      "observation_ints": 7024,
+      "official_grading_cpu_cores": 8,
+      "official_grading_memory_gib": 32,
+      "overtime_seconds": 120,
+      "private_bank_units": 32,
+      "reference_normalized_score": null,
+      "regulation_seconds": 180,
+      "score": "equal opponent/seat natural game points; paired seed-cluster interval",
+      "simulation_threads_per_pair": 1,
+      "task": "clash-fixed8-v1",
+      "trusted_opponent_inference": {
+        "CPU_only": true,
+        "inputs": "single seat public observation and legal mask only",
+        "model_parameter_cap_applies": false,
+        "per_decision_deadline_seconds": 0.2,
+        "search": false
+      },
+      "version": "clash-evaluation-v3.1"
+    },
+    "interval": "paired seed cluster bootstrap",
+    "invalid_policy": "null score on any fault/illegal/truncation/incomplete schedule",
+    "loss": 0,
+    "normalized_reference_score": null,
+    "opponent_registry": "immutable release/public/opponent-registry.json",
+    "primary_metric": "equal_opponent_equal_seat_game_points",
+    "private_release_seeds": 32,
+    "protected_validation_is_public": true,
+    "score_scale": [
+      0,
+      100
+    ],
+    "selection_before_fresh_bank_required": true,
+    "simulation_threads_per_pair": 1,
+    "smoke_private_seeds": 2,
+    "win": 1
+  },
+  "game": "clash",
+  "historical_declaration": "benchmark-v3.1.json",
+  "provider": "harness/games/clash/provider.py FastProvider; one finite session ledger per harness session; no old campaign",
+  "qualification": {
+    "requires": "exact immutable official public trajectory-parity and selected successor workflow receipts",
+    "strength_labels_independent": true,
+    "strong_panel_qualified": false,
+    "superhuman_evidence": false,
+    "private_grading": "closed during starter verification; separate final authorization required"
+  },
+  "resources": {
+    "cpu_cores": 4,
+    "gpu": "NVIDIA L40S",
+    "memory_gib": 16
+  },
+  "schema_version": 4,
+  "starter": {
+    "editable_files": [
+      "starter/policy.py",
+      "starter/learner.py",
+      "starter/train.py",
+      "recipes/starter.json"
+    ],
+    "initialization": "random Policy64/embedding12; sparse terminal selfplay, no teacher, no pretrained weights",
+    "recipe": "recipes/starter.json",
+    "training_route": "native-fast-v1",
+    "envs": 1024
+  },
+  "task": {
+    "actions": 2307,
+    "arena_routing_cells": [
+      36,
+      64
+    ],
+    "decision_hz": 4,
+    "decision_ticks": 5,
+    "deck": [
+      "Knight",
+      "Archer",
+      "Musketeer",
+      "Giant",
+      "MiniPekka",
+      "Fireball",
+      "Arrows",
+      "Zap"
+    ],
+    "entity_rows": 200,
+    "id": "clash-fixed8-v1",
+    "level": 11,
+    "max_ticks": 0,
+    "natural_end": true,
+    "observation_ints": 7024,
+    "overtime_seconds": 120,
+    "placement_tiles": [
+      18,
+      32
+    ],
+    "players": 2,
+    "regulation_seconds": 180,
+    "rules_lock": "../rules.lock.json",
+    "tick_ms": 50,
+    "tower_level": 11
+  }
+}

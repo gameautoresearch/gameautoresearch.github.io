@@ -1,0 +1,140 @@
+{
+  "schema_version": 1,
+  "game": "pokemon",
+  "benchmark_id": "pokemon-3v3-v1",
+  "task": {
+    "format": "gen9randombattle@@@Max Team Size = 3",
+    "base_format": "gen9randombattle",
+    "showdown_pin": "567c1cedddeaa2f35576005d3bfd526cf4f8a13e",
+    "players": 2,
+    "team_size": 3,
+    "active_per_player": 1,
+    "actions": 14,
+    "observation_values": 700,
+    "training_backend": "admitted-native-cpp-engine",
+    "evaluation_backend": "pinned-showdown-cpu",
+    "native_full_format_admitted": true,
+    "decision_phase_safety_limit": 4096,
+    "team_building": false,
+    "terminal_reward_only": true
+  },
+  "resources": {
+    "gpu": "L40S",
+    "cpu_cores": 4,
+    "cpu_cores_are_physical": true,
+    "memory_gib": 16,
+    "runtime_image": "im-JwNTde85zO3cAKA9qnqInr",
+    "private_grading": "CPU-only worker, 4 physical cores, 16 GiB"
+  },
+  "budget": {
+    "research_worker_seconds": 14400,
+    "final_training_worker_seconds": 3600,
+    "smoke_worker_seconds": 600,
+    "smoke_final_training_worker_seconds": 240,
+    "accounting": "allocated_worker_wall_time",
+    "min_training_lease_seconds": 180,
+    "min_practice_lease_seconds": 240,
+    "default_practice_lease_seconds": 360,
+    "max_lease_seconds": 3600,
+    "training_setup_and_publication_reserve_seconds": 120,
+    "practice_counts_against_research_allocation": true,
+    "default_budget_mode": "seconds",
+    "budget_modes": {
+      "seconds": {
+        "research_worker_seconds": 14400,
+        "smoke_worker_seconds": 600,
+        "max_concurrent_jobs": 1
+      },
+      "usd": {
+        "research_usd": 11.61,
+        "smoke_research_usd": 0.48,
+        "usd_per_worker_second": 0.0008064,
+        "research_wall_seconds": 18000,
+        "smoke_research_wall_seconds": 4800,
+        "max_concurrent_jobs": 4,
+        "max_concurrent_gpus": 2,
+        "max_concurrent_cpu_cores": 64,
+        "grant_held_until_settled": true,
+        "cash_admission_enforced": true
+      }
+    },
+    "automatic_retries": 0,
+    "cash_admission_enforced": false,
+    "default_mode": "seconds",
+    "seconds_mode": {
+      "research_seconds": 14400,
+      "smoke_research_seconds": 600,
+      "concurrency": "one job at a time"
+    },
+    "usd_mode": {
+      "research_usd": 11.61,
+      "smoke_research_usd": 0.48,
+      "wall_seconds": 18000,
+      "smoke_wall_seconds": 4800,
+      "concurrency": "parallel: up to 4 jobs, 2 GPUs, 64 CPU cores"
+    }
+  },
+  "starter": {
+    "recipe": "recipes/starter.json",
+    "smoke_recipe": "recipes/smoke.json",
+    "editable_files": [
+      "runtime/starter/policy.py",
+      "runtime/starter/learner.py",
+      "runtime/starter/train.py",
+      "recipes/starter.json"
+    ],
+    "initialization": "random",
+    "scored_policy": "exported tensor graph (runtime/GRAPH_CONTRACT.md)"
+  },
+  "agent": {
+    "brief": "task/brief.md",
+    "game_rules": "task/game_rules/README.md"
+  },
+  "evaluation": {
+    "primary_metric": "balanced_panel_game_points",
+    "score_scale": [
+      0,
+      100
+    ],
+    "both_seats": true,
+    "opponents": [
+      "power",
+      "retained-3v3-a",
+      "retained-3v3-b",
+      "foul-play-two-beliefs-10ms"
+    ],
+    "practice_public_seeds": [
+      900420000,
+      900420001,
+      900420002,
+      900420003,
+      900420004,
+      900420005,
+      900420006,
+      900420007,
+      900420008,
+      900420009,
+      900420010,
+      900420011,
+      900420012,
+      900420013,
+      900420014,
+      900420015
+    ],
+    "practice_games": 128,
+    "full_private_seeds": 64,
+    "full_games": 512,
+    "smoke_private_seeds": 2,
+    "smoke_games": 16,
+    "private_seeds_created_after_final_identity_locks": true,
+    "truncation_policy": "incomplete_panel_score_null",
+    "normalized_reference_score": null,
+    "calibration_qualified": false,
+    "confidence_interval": "95% bootstrap over seed clusters, both seats and opponent strata preserved"
+  },
+  "commands": {
+    "prepare": ".venv-pokemon/bin/python -m harness prepare pokemon --out NEW_RELEASE",
+    "smoke": ".venv-pokemon/bin/python -m harness run pokemon network --release RELEASE --out NEW_SESSION --model MODEL --smoke --execute",
+    "grade": ".venv-pokemon/bin/python -m harness grade --session SESSION"
+  }
+}

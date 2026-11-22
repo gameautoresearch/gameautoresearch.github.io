@@ -1,0 +1,177 @@
+/*
+ * crforge - https://github.com/voonhous/crforge
+ * SPDX-License-Identifier: Apache-2.0
+ * Porting this code? Please cite this file and the commit you read: see the README.
+ */
+
+package org.crforge.desktop.render;
+
+import static org.crforge.desktop.render.RenderConstants.CELL_PIXELS;
+import static org.crforge.desktop.render.RenderConstants.COLOR_CELL_HOVER;
+
+import com.badlogic.gdx.Gdx;
+import com.badlogic.gdx.graphics.GL20;
+import com.badlogic.gdx.graphics.glutils.ShapeRenderer.ShapeType;
+import java.util.Locale;
+import org.crforge.core.pathfinding.GridEntityState;
+import org.crforge.core.pathfinding.grid.CellCostField;
+import org.crforge.core.pathfinding.grid.CellCosts;
+import org.crforge.core.pathfinding.grid.CellGrid;
+import org.crforge.core.pathfinding.grid.TileMap;
+
+/**
+ * Paints the arena's routing grid, one filled square per 500-unit cell, coloured by what the route
+ * search would charge a unit to enter it.
+ *
+ * <p>The cost of a cell is not one number: it depends on the unit asking. This overlay prices every
+ * cell for one fixed unit and says so in the status column - a plain ground unit of the blue side,
+ * in the moving state, assigned to lane 1, with neither water permission. That choice matters as
+ * follows:
+ *
+ * <ul>
+ *   <li><b>ground, no water permission</b> - the river costs the blocked weight rather than the
+ *       water weight, which is what makes an ordinary troop walk to a bridge. Air units are not
+ *       driven by the routing grid, so no managed unit has a water permission today;
+ *   <li><b>the moving state</b> - the three pathfinding states charge every cell the default
+ *       weight, which would hide the roads entirely. Moving is the state a troop walks in;
+ *   <li><b>lane 1</b> - a cell carrying the unit's own road and a cell carrying the other road cost
+ *       the same on the standard arena, so the lane changes nothing here; it is pinned only so the
+ *       overlay answers for a definite unit;
+ *   <li><b>the blue side</b> - the side plays no part in the cost rule at all. It is named for
+ *       completeness, because the unit the overlay describes has to be somebody.
+ * </ul>
+ *
+ * <p>The grid is the battle's live one, so a building deployed mid-match shows up. Note that the
+ * overlay a tick stamps is rotated into the grid's previous slot at the end of that tick, so
+ * between ticks the stamps live there and the current slot is a fresh zeroed array; this renderer
+ * reads the slot that carries the stamps.
+ *
+ * <p>No number is drawn per cell - that would be 2304 glyphs a frame. The cell under the mouse is
+ * outlined and its column, row, cost and class are printed in the status column instead.
+ */
+public class CellCostOverlayRenderer {
+
+  /** The lane the priced unit is assigned to. */
+  private static final int OVERLAY_LANE = 1;
+
+  /** The state the priced unit is in. */
+  private static final int OVERLAY_STATE = GridEntityState.MOVING;
+
+  private final RenderContext ctx;
+
+  private final CellCosts costs = CellCosts.standard();
+
+  public CellCostOverlayRenderer(RenderContext ctx) {
+    this.ctx = ctx;
+  }
+
+  /**
+   * Fills every cell of the battle's live routing grid, drawn the way up the view has the arena,
+   * and outlines the one under the mouse. The grid's stamps are read from the slot the end of a
+   * tick rotates them into.
+   *
+   * @param grid the live grid, between two ticks
+   * @param hoverCol the battle's column under the mouse, or a value outside the grid
+   * @param hoverRow the battle's row under the mouse
+   * @param view which way up the arena is drawn
+   */
+  public void render(CellGrid grid, int hoverCol, int hoverRow, ViewOrientation view) {
+    render(live(grid), hoverCol, hoverRow, view);
+  }
+
+  private void render(Snapshot snapshot, int hoverCol, int hoverRow, ViewOrientation view) {
+    CellGrid grid = snapshot.grid();
+
+    Gdx.gl.glEnable(GL20.GL_BLEND);
+    ctx.getShapeRenderer().begin(ShapeType.Filled);
+    for (int row = 0; row < grid.getHeight(); row++) {
+      for (int col = 0; col < grid.getWidth(); col++) {
+        ctx.getShapeRenderer().setColor(snapshot.classOf(col, row).color());
+        ctx.getShapeRenderer()
+            .rect(
+                view.left(col * TileMap.CELL_UNITS, TileMap.CELL_UNITS),
+                view.bottom(row * TileMap.CELL_UNITS, TileMap.CELL_UNITS),
+                CELL_PIXELS,
+                CELL_PIXELS);
+      }
+    }
+    ctx.getShapeRenderer().end();
+
+    if (snapshot.inside(hoverCol, hoverRow)) {
+      ctx.getShapeRenderer().begin(ShapeType.Line);
+      ctx.getShapeRenderer().setColor(COLOR_CELL_HOVER);
+      ctx.getShapeRenderer()
+          .rect(
+              view.left(hoverCol * TileMap.CELL_UNITS, TileMap.CELL_UNITS),
+              view.bottom(hoverRow * TileMap.CELL_UNITS, TileMap.CELL_UNITS),
+              CELL_PIXELS,
+              CELL_PIXELS);
+      ctx.getShapeRenderer().end();
+    }
+  }
+
+  /**
+   * The status line for the cell under the mouse: its column and row, what it costs the priced unit
+   * and why. Never null; a cell outside the arena says so.
+   */
+  public String hoverStatus(CellGrid grid, int hoverCol, int hoverRow) {
+    return hoverStatus(live(grid), hoverCol, hoverRow);
+  }
+
+  private static String hoverStatus(Snapshot snapshot, int hoverCol, int hoverRow) {
+    String where = "cell (" + hoverCol + ", " + hoverRow + ")";
+    if (!snapshot.inside(hoverCol, hoverRow)) {
+      return where + " " + CellCostClass.OUT_OF_ARENA.name().toLowerCase(Locale.ROOT);
+    }
+    return where
+        + " cost "
+        + snapshot.cost(hoverCol, hoverRow)
+        + " "
+        + snapshot.classOf(hoverCol, hoverRow).name().toLowerCase(Locale.ROOT);
+  }
+
+  /** A live grid between two ticks: its stamps are in the slot the tick's end rotated them into. */
+  private Snapshot live(CellGrid grid) {
+    return new Snapshot(costs, grid, grid.getPrevious(), grid.getActive() != 0);
+  }
+
+  /**
+   * One frame's view of the grid: the cell map, the footprint overlay that is in force and whether
+   * it is in force at all.
+   */
+  private record Snapshot(CellCosts costs, CellGrid grid, int[] overlay, boolean overlayActive) {
+
+    private boolean inside(int col, int row) {
+      return col >= 0 && row >= 0 && col < grid.getWidth() && row < grid.getHeight();
+    }
+
+    private int overlayCost(int col, int row) {
+      return overlay[row * grid.getWidth() + col];
+    }
+
+    private int cost(int col, int row) {
+      return CellCostField.cellCost(
+          grid.getWidth(),
+          grid.getHeight(),
+          col,
+          row,
+          grid.tiles(col, row),
+          costs,
+          true,
+          false,
+          false,
+          OVERLAY_STATE,
+          OVERLAY_LANE,
+          overlayActive,
+          overlayCost(col, row));
+    }
+
+    private CellCostClass classOf(int col, int row) {
+      if (!inside(col, row)) {
+        return CellCostClass.OUT_OF_ARENA;
+      }
+      return CellCostClass.classify(
+          true, grid.tiles(col, row), overlayActive, overlayCost(col, row), grid.getBuildingCost());
+    }
+  }
+}
