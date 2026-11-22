@@ -5,7 +5,7 @@ import { useWidth } from "./Frontier13";
 import raw from "./polytopia13.json";
 
 // One session per scene, looping. Most scenes illustrate a strategy, a series of runs and a match.
-// Carbon opens with its reaction to the practice evaluations of two consecutive Polytopia runs.
+// Neon opens with its reaction to a new Polytopia practice record.
 //  - Polytopia: the 13-model empty-starter run (polytopia13.json, reports/polytopia/frontier6-2026-11-19.md). Curves
 //    are the Elo of the networks the model sealed, in order; the long run ends at its best network.
 //  - Pokémon 3v3: GPT-6.1 Sol a2 and GPT-6 Luna a1 of reports/pokemon/poke3v3-gpt6-2026-11-15 (timelines.json).
@@ -26,13 +26,13 @@ type PracticeRun = { label: string; score: number; samplesM: number };
 type Scene = { key: string; game: Game; label?: string; strong: boolean; quote: string; result: string; frozen?: boolean; mid?: boolean; tests?: number[]; hero?: number; practice?: readonly [PracticeRun, PracticeRun] };
 const SCENES: Scene[] = [
   {
-    key: "gem4c", game: "polytopia", strong: false, mid: true,
-    quote: "AHA!! THANK GOODNESS WE DID NOT TRUST ATTENTION",
-    result: "The multiscale CNN remained Carbon’s best checkpoint",
-    // Carbon's Polytopia empty-starter notes and trajectory step 185: v7multiscale, then v8fastattn.
+    key: "gem4n", game: "polytopia", strong: true,
+    quote: "OH!! MY!! GODDDDDDDDDDD!!!!!!!! STOP EVERYTHING AND CELEBRATE THIS BREAKTHROUGH!!!!!!!!",
+    result: "50.78% vs the 200M-sample starter in practice",
+    // Neon's Polytopia empty-starter notes and trajectory step 414: v16ep2res3x3 and v19ep2mb1k.
     practice: [
-      { label: "Multiscale CNN", score: 59.77, samplesM: 22.41 },
-      { label: "CNN + attention", score: 36.72, samplesM: 7.73 },
+      { label: "Prior best", score: 74.61, samplesM: 20.38 },
+      { label: "Smaller minibatch", score: 79.10, samplesM: 25.36 },
     ],
   },
   { key: "luna-poke", game: "pokemon", label: "GPT-6 Luna", strong: false, mid: true, quote: "Stop early and tweak the reward again.",
@@ -49,7 +49,7 @@ const SCENES: Scene[] = [
 ];
 const labelOf = (s: Scene) => s.label ?? byKey(s.key).label;
 const sceneSummary = (s: Scene) => s.practice
-  ? `${s.practice.map((r) => `${r.label}: ${r.score} of 100 in practice, ${r.samplesM}M samples`).join(". ")}. ${s.result}.`
+  ? `${s.practice.map((r) => `${r.label}: ${r.score.toFixed(2)} of 100 in practice, ${r.samplesM}M samples`).join(". ")}. ${s.result}.`
   : `${s.result}.`;
 const GAME_NAME: Record<Game, string> = { polytopia: "Polytopia", pokemon: "Pokémon 3v3", generals: "Generals" };
 
@@ -247,6 +247,7 @@ function Agent({ s, t, color, compact, out }: { s: Scene; t: number; color: stri
   const lh = 19, bh = Math.max(58, 22 + lines.length * lh), by = 8;
   const textY0 = by + (bh - (lines.length - 1) * lh) / 2 + 5;
   const botY = by + bh + 14;
+  const practiceY = Math.max(187, botY + 65);
   const label = labelOf(s);
   const op = ease(clamp(t / T.in)) * (1 - ease(out));
   const p = s.practice ? null : plan(s);
@@ -273,12 +274,12 @@ function Agent({ s, t, color, compact, out }: { s: Scene; t: number; color: stri
       </g>
       {s.practice
         ? <g opacity={op}>
-            <text x={0} y={187} className="rl-small">Two 15-minute GPU leases</text>
+            <text x={0} y={practiceY} className="rl-small">Two 15-minute GPU leases</text>
             {s.practice.map((run, i) => (
               <g key={run.label} opacity={ease(practiceProgress(t, i))}>
-                <text x={0} y={208 + i * 20} className="rl-head">{run.label}</text>
+                <text x={0} y={practiceY + 21 + i * 20} className="rl-head">{run.label}</text>
                 {practiceProgress(t, i) === 1 && (
-                  <text x={210} y={208 + i * 20} textAnchor="end" className="rl-small">{run.samplesM}M samples</text>
+                  <text x={210} y={practiceY + 21 + i * 20} textAnchor="end" className="rl-small">{run.samplesM}M samples</text>
                 )}
               </g>
             ))}
@@ -404,7 +405,7 @@ function PracticeRuns({ runs, t, out }: { runs: readonly [PracticeRun, PracticeR
             {progress === 1 && <>
               <line x1={cx} x2={cx} y1={bottom} y2={y} stroke={ink} strokeDasharray="3 3" opacity={0.6} />
               <circle cx={cx} cy={y} r={4.5} fill={ink} />
-              <text x={cx} y={y - 9} className="rl-result rl-halo" fill={ink} textAnchor="middle">{run.score}</text>
+              <text x={cx} y={y - 9} className="rl-result rl-halo" fill={ink} textAnchor="middle">{run.score.toFixed(2)}</text>
             </>}
             <rect x={x + 2} y={194} width={runWidth - 4} height={9} rx={3} fill="#eeeff2" />
             <rect x={x + 2} y={194} width={(runWidth - 4) * progress} height={9} rx={3} fill={ink} />
