@@ -158,56 +158,32 @@ export default function AutoresearchPost() {
         We kept practice and grading separate. Practice gave agents feedback
         they could act on during the session. The host evaluated the final
         policies on held-out games and played them against one another in a
-        round robin. We also trained copies of the untouched starter so we could
-        tell whether the field had improved on what it was given. The three
-        setups changed what the agent handed in and how we charged for research.
+        round robin, alongside copies of the untouched starter. Across our
+        tasks, we used two submission formats:
       </p>
 
       <div className="ar-configs">
         <Cards
           items={[
             {
-              id: "config-network",
-              kicker: "Configuration 1",
-              title: "Submit a trained network",
+              title: "Submit a trained model",
               body: (
                 <>
-                  Agents use one compute budget to experiment, train, and choose
-                  a checkpoint. We grade the submitted weights directly, as a
-                  team would evaluate a model before shipping it.
-                  <br />
-                  In Generals, agents had 4.5 GPU-hours and a compute limit on
-                  each move.
+                  The agent submits model weights directly (as in Generals).
+                  Research and training share one compute budget, so the agent
+                  must weigh spending compute on tests and research against
+                  saving it for the final training run.
                 </>
               ),
             },
             {
-              id: "config-recipe-time",
-              kicker: "Configuration 2",
-              title: "Submit a recipe under a GPU-time cap",
+              title: "Submit a training recipe",
               body: (
                 <>
-                  Agents get a fixed number of GPU-hours for experiments and
-                  submit their training code and settings. We retrain each
-                  recipe from scratch to see how well it works when handed off.
-                  <br />
-                  In Pokémon 3v3, agents had four GPU-hours to improve a working
-                  starter, followed by a one-hour retrain.
-                </>
-              ),
-            },
-            {
-              id: "config-recipe-dollars",
-              kicker: "Configuration 3",
-              title: "Submit a recipe under a dollar budget",
-              body: (
-                <>
-                  Agents spend a fixed cloud budget on experiments and submit a
-                  training recipe. We retrain it and check whether the training
-                  savings cover the cost of finding it.
-                  <br />
-                  In Polytopia, agents could spend up to $23 and rent two GPUs
-                  at once.
+                  The agent submits training code and settings, and we retrain
+                  the recipe from scratch (as in Pok&eacute;mon 3v3 and
+                  Polytopia). Because the compute of the final run is fixed, the
+                  agent&rsquo;s session budget goes purely to research.
                 </>
               ),
             },

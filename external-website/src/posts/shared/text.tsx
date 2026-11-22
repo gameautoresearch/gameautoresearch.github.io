@@ -125,15 +125,23 @@ export function Stats({ items }: { items: { value: string; label: string }[] }) 
   );
 }
 
-export function Cards({ items }: { items: { id?: string; kicker: string; title: ReactNode; body: ReactNode }[] }) {
+export function Cards({ items }: { items: { id?: string; kicker?: string; title: ReactNode; body: ReactNode }[] }) {
   if (useAgentView()) {
-    return <ul>{items.map((c) => <li key={c.id ?? String(c.title)} id={c.id}><strong>{c.kicker}: {c.title}.</strong> {c.body}</li>)}</ul>;
+    return (
+      <ul>
+        {items.map((c) => (
+          <li key={c.id ?? String(c.title)} id={c.id}>
+            <strong>{c.kicker ? `${c.kicker}: ` : ""}{c.title}.</strong> {c.body}
+          </li>
+        ))}
+      </ul>
+    );
   }
   return (
     <div className="pt-cards">
       {items.map((c) => (
         <div key={c.id ?? String(c.title)} className="pt-card">
-          <span className="pt-card-kicker">{c.kicker}</span>
+          {c.kicker && <span className="pt-card-kicker">{c.kicker}</span>}
           <h3 id={c.id}>{c.title}</h3>
           <p>{c.body}</p>
         </div>

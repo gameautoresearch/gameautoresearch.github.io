@@ -117,10 +117,8 @@ html.agent-view .ar h2.ar-config small::after { content: ": "; }
 .ar-configs .pt-card p { color: #3d3d3d; }
 .ar-configs .pt-card:nth-child(1) { border-left-color: var(--c); background-color: #e6f6fc; background-image: radial-gradient(rgba(0, 160, 214, 0.15) 1.2px, transparent 1.3px); }
 .ar-configs .pt-card:nth-child(2) { border-left-color: var(--m); background-color: #fdeaf3; background-image: radial-gradient(rgba(224, 33, 138, 0.13) 1.2px, transparent 1.3px); }
-.ar-configs .pt-card:nth-child(3) { border-left-color: var(--y); background-color: #fff6d8; background-image: radial-gradient(rgba(212, 160, 0, 0.17) 1.2px, transparent 1.3px); }
 .ar-configs .pt-card:nth-child(1) .pt-card-kicker { color: var(--c-deep); }
 .ar-configs .pt-card:nth-child(2) .pt-card-kicker { color: var(--m-deep); }
-.ar-configs .pt-card:nth-child(3) .pt-card-kicker { color: var(--y-deep); }
 html.agent-view .ar-configs .pt-card { background-image: none; }
 
 /* Generals wave 1: session timeline legend and the pending final-tournament ladder. */
