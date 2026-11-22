@@ -1,3 +1,4 @@
+import { Fragment } from "react";
 import { PAGE } from "./meta";
 import AutoresearchPost from "./posts/autoresearch/Post";
 import Toc from "./Toc";
@@ -16,7 +17,13 @@ export default function App() {
           <article className="blog-post" aria-labelledby="post-title">
             <h2 id="post-title">{PAGE.title}</h2>
             <p className="post-byline">
-              {PAGE.authors.join(" and ")} · <time dateTime={PAGE.date}>{displayDate(PAGE.date)}</time>
+              {PAGE.authors.map(({ name, url }, index) => (
+                <Fragment key={url}>
+                  {index > 0 && " and "}
+                  <a href={url} rel="author">{name}</a>
+                </Fragment>
+              ))}
+              {" · "}<time dateTime={PAGE.date}>{displayDate(PAGE.date)}</time>
             </p>
             <div className="post-content" id="post-body"><AutoresearchPost /></div>
           </article>

@@ -4,7 +4,10 @@ export const PAGE = {
   title:
     "VibeResearch Bench: Can AI agents train strong game bots on a budget?",
   date: "2026-11-19",
-  authors: ["Kevin Zhang", "Max Bittker"],
+  authors: [
+    { name: "Kevin Zhang", url: "https://x.com/kzdagoof" },
+    { name: "Max Bittker", url: "https://x.com/maxbittker" },
+  ],
   description:
     "We gave AI agents a GPU budget and had them train reinforcement learning bots for Pokémon, Polytopia and Generals: how well they do it, which models are best, and what separates good research from bad.",
 };
