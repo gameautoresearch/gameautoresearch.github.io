@@ -30,12 +30,7 @@ const verdict = (v: keyof typeof VERDICT | string) =>
     v
   );
 const techniques: [string, string, string, string][] = [
-  [
-    "Opportunity maps",
-    "Show the bot what it can do on each tile",
-    "up",
-    "up",
-  ],
+  ["Opportunity maps", "Show the bot what it can do on each tile", "up", "up"],
   [
     "Turn-based credit",
     "Measure time in game turns, not single commands",
@@ -48,36 +43,21 @@ const techniques: [string, string, string, string][] = [
     "even",
     "even",
   ],
-  [
-    "Bigger learning steps",
-    "Raise the learning rate about 3×",
-    "up",
-    "even",
-  ],
+  ["Bigger learning steps", "Raise the learning rate about 3×", "up", "even"],
   [
     "Strategy hints",
     "Write Polytopia know-how into the bot by hand",
     "even",
     "down",
   ],
-  [
-    "Bigger network",
-    "More layers or wider layers",
-    "even",
-    "even",
-  ],
+  ["Bigger network", "More layers or wider layers", "even", "even"],
   [
     "Reward for progress",
     "Pay the bot for score or economy along the way",
     "down",
     "even",
   ],
-  [
-    "One shared network",
-    "Merge the player and the judge",
-    "even",
-    "down",
-  ],
+  ["One shared network", "Merge the player and the judge", "even", "down"],
   [
     "Playing old versions",
     "Practise against past copies of itself",
@@ -88,12 +68,7 @@ const techniques: [string, string, string, string][] = [
 function TechniqueTable() {
   return (
     <Table
-      head={[
-        "Technique",
-        "In plain words",
-        "After 1 hour",
-        "After 8 hours",
-      ]}
+      head={["Technique", "In plain words", "After 1 hour", "After 8 hours"]}
       rows={techniques.map(([name, plain, early, late]) => [
         <strong>{name}</strong>,
         plain,
@@ -399,8 +374,7 @@ export default function AutoresearchPost() {
           <>
             Forecast skill across {pokeSkill.items} Pokémon runs (0 = blind
             guess, 1 = perfect; 90% intervals over sessions). Dotted line: ridge
-            regression on run length and practice history (+
-            {pokeSkill.rule.toFixed(2)}).
+            regression
           </>
         }
       >

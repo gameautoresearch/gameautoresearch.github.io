@@ -4,6 +4,8 @@ import { Table } from "../shared/text";
 import { CMYK, modelStyle } from "./colors";
 import { useWidth } from "./Frontier13";
 import raw from "./top-scores.json";
+import budgetRaw from "./budget.json";
+import { starterHoursFor } from "./CostMultiplier";
 
 // Composite model scores across all campaigns (reports/top-level-score-2026-11-20/build.py).
 // Default view ("two"): every model ran the same two tasks (Polytopia empty file, Pokémon 3v3); each task is
@@ -38,6 +40,61 @@ const DATA = raw as unknown as {
 const CORE = DATA.pooled.filter((r) => r.tasks.length >= 3);
 const TASK_MAP = Object.fromEntries(DATA.tasks.map((t) => [t.id, t]));
 
+// "Recipe" view: the two shared tasks plus forecasting and the Polytopia research-budget campaign, restricted to
+// models with all four. The recipe task is each model's $8.70 session (one fixed budget level, so models with more
+// sessions aren't favoured) read off its 8 h training curve: Figure 2's training-compute multiplier (starter's training hours to reach the same Elo / the
+// recipe's 8 h; research spend not counted), standardized on a log scale since it is a ratio. Same method as "two" otherwise: each task
+// standardized (population SD) across just these models, averaged; the whisker spans the tasks taken alone.
+// 50 = average of this smaller field, so not comparable to the other views.
+const BUDGET = budgetRaw as unknown as {
+  recipes: { model: string; cell: string; curve: { hours: number; elo: number }[] }[];
+};
+const budgetModel = (mo: string) => (mo === "Opus 5.5" ? "Claude Opus 5.5" : mo);
+const RECIPE_CELL = "$8.70";
+const RECIPE8: Record<string, number> = {};
+for (const r of BUDGET.recipes) {
+  if (r.cell !== RECIPE_CELL || !r.curve.length) continue;
+  const end = r.curve[r.curve.length - 1];
+  RECIPE8[budgetModel(r.model)] = starterHoursFor(end.elo).hours / end.hours;
+}
+TASK_MAP.recipe8 = {
+  id: "recipe8",
+  name: "Polytopia, $8.70 recipe at 8 h",
+  game: "Polytopia",
+  unit: "× the starter's training compute (research not counted)",
+  sessions: 1,
+  scores: RECIPE8,
+};
+const RECIPE_TASKS = ["poly_empty", "poke", "forecast", "recipe8"];
+const RECIPE: Row[] = (() => {
+  const models = Object.keys(TASK_MAP.poly_empty.scores).filter((mo) =>
+    RECIPE_TASKS.every((id) => TASK_MAP[id].scores[mo] !== undefined),
+  );
+  const val = (id: string, mo: string) => (id === "recipe8" ? Math.log(TASK_MAP[id].scores[mo]) : TASK_MAP[id].scores[mo]);
+  const z = Object.fromEntries(
+    RECIPE_TASKS.map((id) => {
+      const v = models.map((mo) => val(id, mo));
+      const mu = v.reduce((a, b) => a + b, 0) / v.length;
+      const sd = Math.sqrt(v.reduce((a, b) => a + (b - mu) ** 2, 0) / v.length);
+      return [id, Object.fromEntries(models.map((mo) => [mo, 50 + (10 * (val(id, mo) - mu)) / sd]))];
+    }),
+  );
+  return models
+    .map((mo) => {
+      const each = RECIPE_TASKS.map((id) => z[id][mo]);
+      return {
+        model: mo,
+        score: each.reduce((a, b) => a + b, 0) / each.length,
+        lo: Math.min(...each),
+        hi: Math.max(...each),
+        tasks: RECIPE_TASKS,
+        rank: 0,
+      };
+    })
+    .sort((a, b) => b.score - a.score)
+    .map((r, i) => ({ ...r, rank: i + 1 }));
+})();
+
 const SHORT_TASK: Record<string, string> = {
   poly_empty: "Polytopia empty",
   poke: "Pokémon 3v3",
@@ -48,10 +105,11 @@ const SHORT_TASK: Record<string, string> = {
   slowsim: "Generals slow sim",
   clash: "Clash",
   forecast: "Forecasting",
+  recipe8: "$8.70 recipe, 8 h",
 };
 
 function fmtTaskScore(id: string, v: number) {
-  if (id === "poly_budget") return `${v.toFixed(2)}×`;
+  if (id === "poly_budget" || id === "recipe8") return `${v.toFixed(2)}×`;
   if (id === "forecast") return `+${v.toFixed(2)}`;
   return v.toFixed(1);
 }
@@ -65,7 +123,7 @@ function markColor(model: string, deep: boolean) {
   return c;
 }
 
-type Mode = "two" | "all" | "core" | "forecast";
+type Mode = "two" | "recipe" | "all" | "core" | "forecast";
 
 export default function TopScore() {
   const agent = useAgentView();
@@ -74,11 +132,15 @@ export default function TopScore() {
   const [mode, setMode] = useState<Mode>("two");
   const [tip, setTip] = useState<string | null>(null);
 
-  const two = mode === "two";
+  const recipe = mode === "recipe";
+  // "two" and "recipe" share a method: every listed model ran every task, whiskers are each task alone.
+  const two = mode === "two" || recipe;
   const rows: Row[] =
-    two
+    mode === "two"
       ? DATA.two
-      : mode === "forecast"
+      : recipe
+        ? RECIPE
+        : mode === "forecast"
         ? DATA.judgement
         : mode === "core"
           ? CORE
@@ -118,6 +180,9 @@ export default function TopScore() {
         <button role="tab" aria-selected={mode === "two"} onClick={() => { setMode("two"); setTip(null); }}>
           Two tasks, every model ({DATA.two.length})
         </button>
+        <button role="tab" aria-selected={recipe} onClick={() => { setMode("recipe"); setTip(null); }}>
+          Two tasks + forecasting + $8.70 recipe ({RECIPE.length})
+        </button>
         <button role="tab" aria-selected={mode === "all"} onClick={() => { setMode("all"); setTip(null); }}>
           All research, pooled ({DATA.pooled.length})
         </button>
@@ -129,7 +194,7 @@ export default function TopScore() {
         </button>
       </div>
       <div className="viz-legend">
-        <span><i className="ts-dot solid" />{two ? "Polytopia empty + Pokémon 3v3" : "3+ tasks"}</span>
+        <span><i className="ts-dot solid" />{recipe ? "Polytopia empty + Pokémon 3v3 + forecasting + $8.70 recipe at 8 h" : two ? "Polytopia empty + Pokémon 3v3" : "3+ tasks"}</span>
         {!two && mode !== "core" && <span><i className="ts-dot hollow" />1–2 tasks</span>}
         <span><i className="ts-whisk" />{two ? "Each task alone" : "Range dropping any one task"}</span>
       </div>
@@ -155,7 +220,7 @@ export default function TopScore() {
           average (50)
         </text>
         <text x={(sx(LO) + sx(HI)) / 2} y={H - 4} className="viz-axis" textAnchor="middle">
-          {two ? "two-task index (50 = average model, +10 = +1 SD)" : "pooled index (50 = average entrant, +10 = +1 SD)"}
+          {recipe ? "four-task index (50 = average of these models, +10 = +1 SD)" : two ? "two-task index (50 = average model, +10 = +1 SD)" : "pooled index (50 = average entrant, +10 = +1 SD)"}
         </text>
         {rows.map((r, i) => {
           const y = m.t + i * rowH + (narrow ? rowH * 0.68 : rowH / 2);

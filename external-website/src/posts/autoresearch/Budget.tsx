@@ -636,7 +636,6 @@ export function ForecastLead() {
   const agent = useAgentView();
   const ref = useRef<HTMLDivElement>(null);
   const W = useWidth(ref);
-  const [tip, setTip] = useState<number | null>(null);
   const range = (ci: [number, number]) => `${f2(ci[0])} to ${f2(ci[1])}`;
   if (agent) {
     return (
@@ -653,9 +652,8 @@ export function ForecastLead() {
   const row = narrow ? 42 : 30, m = { l: narrow ? 10 : 150, r: narrow ? 46 : 52, t: 22, b: 40 };
   const H = m.t + m.b + SKILL.length * row;
   const sx = (v: number) => m.l + (Math.max(0, Math.min(HI, v)) / HI) * (W - m.l - m.r);
-  const hover = tip === null ? null : SKILL[tip];
   return (
-    <div className="viz" ref={ref} onMouseLeave={() => setTip(null)}>
+    <div className="viz" ref={ref}>
       <div className="viz-legend">
         {pokeSkill.above.length > 0 && <span><i style={{ background: SKILL_TONE.above }} />Reliably better than the curve fit</span>}
         <span><i style={{ background: SKILL_TONE.same }} />Cannot be told apart from it</span>
@@ -675,8 +673,7 @@ export function ForecastLead() {
         {SKILL.map((mo, i) => {
           const y = m.t + i * row + row / 2 + (narrow ? 7 : 0), c = SKILL_TONE[skillTone(mo)];
           return (
-            <g key={mo.model} tabIndex={0} onMouseEnter={() => setTip(i)} onFocus={() => setTip(i)} opacity={tip !== null && tip !== i ? 0.45 : 1}>
-              <rect x={0} y={m.t + i * row} width={W} height={row} fill="transparent" />
+            <g key={mo.model}>
               {narrow
                 ? <text x={m.l} y={y - 13} className="viz-label">{mo.model}</text>
                 : <text x={m.l - 12} y={y} className="viz-label" textAnchor="end" dominantBaseline="middle">{mo.model}</text>}
@@ -687,11 +684,6 @@ export function ForecastLead() {
           );
         })}
       </svg>
-      <p className="ar-tipline">
-        {hover
-          ? `${hover.model}: relative skill ${f2(hover.skill)}, 90% interval ${range(hover.skillCi)}. Against the curve fit (${f2(FIT)}) its lead is ${f2(hover.lead)}, 90% interval ${range(hover.ci)}.`
-          : "Hover a row for its intervals."}
-      </p>
     </div>
   );
 }
