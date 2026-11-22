@@ -9,24 +9,24 @@ export const CMYK = {
   grey: "#bdbdbd",
 } as const;
 
-// One color (and dash) per researcher, used by every line and dot chart. Keys are matched in this order against the
+// One color per researcher (no dashes: color alone identifies a model), used by every line and dot chart. Keys are matched in this order against the
 // lower-cased model name, so more specific names come first ("6.2 astra" before "astra"). The extra hues (blue,
 // orange, purple, teal) pass the dataviz validator together with cyan, magenta and yellow in legend order.
-const MODEL: Record<string, { color: string; dashed?: boolean }> = {
-  "6.2 astra": { color: "#f08cc0", dashed: true },
+const MODEL: Record<string, { color: string }> = {
+  "6.2 astra": { color: "#f08cc0" },
   neon: { color: "#2f55c4" },
-  carbon: { color: "#7f9ae0", dashed: true },
+  carbon: { color: "#7f9ae0" },
   hydrogen: { color: "#1f9e89" },
   fable: { color: "#e8740f" },
   muse: { color: "#8a5cc4" },
   sol: { color: CMYK.c },
   astra: { color: CMYK.m },
   opus: { color: CMYK.y },
-  kimi: { color: CMYK.k, dashed: true },
+  kimi: { color: CMYK.k },
   deepseek: { color: "#6b6b6b" },
   glm: { color: "#9a9a9a" },
   luna: { color: "#b5b5b5" },
-  inkling: { color: "#b5b5b5", dashed: true },
+  inkling: { color: "#b5b5b5" },
   hy4: { color: "#b5b5b5" },
 };
 

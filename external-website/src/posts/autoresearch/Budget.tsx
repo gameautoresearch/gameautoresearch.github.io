@@ -361,7 +361,7 @@ export function CostCurves({ only }: { only?: "zero" | "trained" | "long" } = {}
     <div className="viz ar-cost" ref={ref}>
       {tabs}
       <div className="viz-legend">
-        {models.map((mo) => { const st = modelStyle(mo); return <span key={mo}><i className={st.dashed ? "dashed" : undefined} style={st.dashed ? { color: st.color } : { background: st.color }} />{mo}'s recipes</span>; })}
+        {models.map((mo) => { const st = modelStyle(mo); return <span key={mo}><i style={{ background: st.color }} />{mo}'s recipes</span>; })}
         <span><i style={{ background: CMYK.k }} />Unmodified starter</span>
         <span><i className="ring" />Best recipe Elo yet for that total cost</span>
         <span><i className="sq" />Fresh 1 h finals, two seeds</span>
@@ -393,7 +393,7 @@ export function CostCurves({ only }: { only?: "zero" | "trained" | "long" } = {}
         {/* At rest the best recipe is in full colour and the others sit faded behind it; hovering a recipe takes over. */}
         {[...withCurves].sort((a, b) => rank(a) - rank(b)).map((r) => {
           const st = modelStyle(r.model), lit = on === r.key, dim = on !== null && !lit, top = lit || (on === null && r === TOP);
-          const stroke = { fill: "none", stroke: st.color, strokeWidth: lit ? 2.6 : top ? 2.4 : 1.4, strokeDasharray: st.dashed ? "5 3" : undefined, opacity: dim ? 0.18 : top ? 1 : 0.22 };
+          const stroke = { fill: "none", stroke: st.color, strokeWidth: lit ? 2.6 : top ? 2.4 : 1.4, opacity: dim ? 0.18 : top ? 1 : 0.22 };
           const first = r.curve[0];
           return (
             <g key={r.key}>
@@ -475,7 +475,7 @@ function LongRunPlot({ W }: { W: number }) {
   return (
     <>
       <div className="viz-legend">
-        <span><i className={st.dashed ? "dashed" : undefined} style={st.dashed ? { color: st.color } : { background: st.color }} />{BEST.model}, {BEST.cell}: one run, still training</span>
+        <span><i style={{ background: st.color }} />{BEST.model}, {BEST.cell}: one run, still training</span>
         <span><i style={{ background: CMYK.k }} />Unmodified starter</span>
         <span><i style={{ background: st.color, opacity: 0.18 }} />95% interval past 8 h</span>
       </div>
@@ -501,7 +501,7 @@ function LongRunPlot({ W }: { W: number }) {
           <path d={`${band.map(([c, lo], i) => `${i ? "L" : "M"}${sx(c).toFixed(1)},${sy(lo).toFixed(1)}`).join("")}${[...band].reverse().map(([c, , hi]) => `L${sx(c).toFixed(1)},${sy(hi).toFixed(1)}`).join("")}Z`} fill={st.color} opacity={0.14} />
           <path d={path(yard.map((p) => [p.hours * RATE, p.elo]))} fill="none" stroke={CMYK.k} strokeWidth={hit?.key === "starter" ? 3.2 : 2.2} strokeLinejoin="round" />
           {yard.map((p) => { const cx = sx(p.hours * RATE), cy = sy(p.elo), q = 3.6; return <path key={p.hours} d={`M${cx},${cy - q}L${cx + q},${cy}L${cx},${cy + q}L${cx - q},${cy}Z`} fill={CMYK.k} stroke="#fff" strokeWidth={0.9} />; })}
-          <path d={path(run.map((p) => [costOf(BEST, p.hours), p.elo]))} fill="none" stroke={st.color} strokeWidth={hit?.key === BEST.key ? 3.2 : 2.4} strokeDasharray={st.dashed ? "5 3" : undefined} strokeLinejoin="round" />
+          <path d={path(run.map((p) => [costOf(BEST, p.hours), p.elo]))} fill="none" stroke={st.color} strokeWidth={hit?.key === BEST.key ? 3.2 : 2.4} strokeLinejoin="round" />
           {run.map((p) => <circle key={p.hours} cx={sx(costOf(BEST, p.hours))} cy={sy(p.elo)} r={3} fill={st.color} stroke="#fff" strokeWidth={1} />)}
           {!narrow && <text x={sx(costOf(BEST, lastRun.hours)) + 9} y={sy(lastRun.elo) - 12} className="viz-label" style={{ fontWeight: 600, paintOrder: "stroke", stroke: "#fff", strokeWidth: 4 }}>{BEST.model}, {hrs(lastRun.hours)}</text>}
           {!narrow && <text x={sx(lastYard.hours * RATE) + 9} y={sy(lastYard.elo)} className="viz-label" dominantBaseline="middle" style={{ fontWeight: 600 }}>Starter, {hrs(lastYard.hours)}</text>}

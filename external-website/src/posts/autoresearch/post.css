@@ -322,7 +322,7 @@ html.agent-view .ar .ar-setup { font-size: inherit; }
 html.agent-view .ar-chip { padding: 0; background: none; color: inherit; font-size: inherit; font-weight: inherit; }
 /* Elo against total cost: legend marks for the frontier ring, the 1 h final squares and the untrained network. */
 .ar-cost-wrap { margin-top: 28px; }
-.ar-cost-pair { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; align-items: start; }
+.ar-cost-pair { display: grid; grid-template-columns: 2fr 1fr; gap: 20px; align-items: start; }
 .ar-cost-fig { margin: 0; min-width: 0; }
 .ar-cost-head { margin-bottom: 6px; font-size: 13px; font-weight: 600; color: var(--ink); }
 .ar-cost-legend { margin-bottom: 12px; gap: 4px 12px; font-size: 12px; }

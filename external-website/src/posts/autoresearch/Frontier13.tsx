@@ -63,16 +63,18 @@ export function ResearchRace() {
   const [hit, setHit] = useState<Hit | null>(null);
   const H = Math.round(Math.max(340, Math.min(500, W * 0.55)) * 1.2);
   const m = { l: 46, r: narrow ? 12 : 118, t: 22, b: 40 };
-  const [yMin, yMax] = [-1550, 340];
+  // Y is win % vs the 15-min starter on a log axis, 0.01% to 100%. yMin is the Elo at the bottom edge.
+  const [pLo, pHi] = [0.01, 100], yMin = -400 * Math.log10(100 / pLo - 1);
   const xLo = 0.04, xHi = 5.1;
   const sx = (h: number) => {
     const t = log ? (Math.log10(Math.max(h, xLo)) - Math.log10(xLo)) / (Math.log10(xHi) - Math.log10(xLo)) : h / 5;
     return m.l + t * (W - m.l - m.r);
   };
   // Values below the shown range run off the bottom of the plot (clipped), rather than piling up on its edge.
-  const sy = (e: number) => m.t + ((yMax - e) / (yMax - yMin)) * (H - m.t - m.b);
+  const syP = (p: number) => m.t + ((Math.log10(pHi) - Math.log10(p)) / (Math.log10(pHi) - Math.log10(pLo))) * (H - m.t - m.b);
+  const sy = (e: number) => syP(Math.max(winPct(e), 1e-9));
   const xTicks = log ? [0.05, 0.1, 0.25, 0.5, 1, 2, 5] : [0, 1, 2, 3, 4, 5];
-  const yTicks = [-1500, -1000, -500, 0];
+  const yTicks = [0.01, 0.1, 1, 10, 100];
 
   if (agent) {
     return (
@@ -106,7 +108,7 @@ export function ResearchRace() {
     }
     setHit(near);
   };
-  const path = (pts: [number, number][]) => pts.map(([x, y], i) => (i ? `H${sx(x).toFixed(1)}V${sy(y).toFixed(1)}` : `M${sx(x).toFixed(1)},${sy(y).toFixed(1)}`)).join("");
+  const path = (pts: [number, number][]) => pts.map(([x, y], i) => `${i ? "L" : "M"}${sx(x).toFixed(1)},${sy(y).toFixed(1)}`).join("");
   const tipLeft = hit ? Math.max(0, hit.cx + 12 + 250 > W ? hit.cx - 262 : hit.cx + 12) : 0;
 
   return (
@@ -118,7 +120,7 @@ export function ResearchRace() {
       <div className="viz-legend">
         {MODELS.map(({ key, label }) => {
           const st = modelStyle(label);
-          return <span key={key}><i className={st.dashed ? "dashed" : undefined} style={st.dashed ? { color: st.color } : { background: st.color }} />{label}</span>;
+          return <span key={key}><i style={{ background: st.color }} />{label}</span>;
         })}
       </div>
       <div className="ar-cost-plot">
@@ -126,8 +128,8 @@ export function ResearchRace() {
           onPointerMove={move} onPointerDown={move} onPointerLeave={() => setHit(null)} style={{ touchAction: "pan-y" }}>
           {yTicks.map((t) => (
             <g key={t}>
-              <line x1={m.l} x2={W - m.r} y1={sy(t)} y2={sy(t)} className="viz-grid" />
-              <text x={m.l - 8} y={sy(t)} className="viz-axis" textAnchor="end" dominantBaseline="middle">{signed(t)}</text>
+              <line x1={m.l} x2={W - m.r} y1={syP(t)} y2={syP(t)} className="viz-grid" />
+              <text x={m.l - 8} y={syP(t)} className="viz-axis" textAnchor="end" dominantBaseline="middle">{t}%</text>
             </g>
           ))}
           {xTicks.map((t) => (
@@ -136,7 +138,7 @@ export function ResearchRace() {
               <text x={sx(t)} y={H - m.b + 16} className="viz-axis" textAnchor="middle">{t >= 1 || t === 0 ? `${t}h` : `${Math.round(t * 60)}m`}</text>
             </g>
           ))}
-          <text x={m.l} y={m.t - 9} className="viz-axis">Elo relative to the 15-minute PPO starter</text>
+          <text x={m.l} y={m.t - 9} className="viz-axis">Win % vs the 15-minute PPO starter (log scale)</text>
           <text x={W - m.r} y={H - 4} className="viz-axis" textAnchor="end">research GPU-hours spent</text>
           {REFS.map((r) => (
             <g key={r.name}>
@@ -150,8 +152,7 @@ export function ResearchRace() {
               const st = modelStyle(model.label), lit = model.key === highlighted;
               return (
                 <g key={model.key}>
-                  <path d={path(bestSoFar(model))} fill="none" stroke={st.color} strokeWidth={lit ? 2.4 : 1.4}
-                    strokeDasharray={st.dashed ? "5 3" : undefined} strokeLinejoin="round" opacity={lit ? 1 : hit ? 0.18 : 0.22} />
+                  <path d={path(bestSoFar(model))} fill="none" stroke={st.color} strokeWidth={lit ? 2.4 : 1.4} strokeLinejoin="round" opacity={lit ? 1 : hit ? 0.18 : 0.22} />
                   {model.nets.map(([hours, elo, , submitted], i) => elo >= yMin && (
                     <circle key={i} cx={sx(hours)} cy={sy(elo)} r={submitted ? 3.5 : 2.8} fill={st.color}
                       stroke="#fff" strokeWidth={1} opacity={lit ? 1 : hit ? 0.2 : 0.3} />

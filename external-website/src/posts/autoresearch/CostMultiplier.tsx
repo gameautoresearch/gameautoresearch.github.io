@@ -1,9 +1,22 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useAgentView } from "../../view";
 import { Table } from "../shared/text";
 import raw from "./budget.json";
 import { CMYK, modelStyle } from "./colors";
-import { useWidth } from "./Frontier13";
+
+function usePanelWidth(ref: React.RefObject<HTMLElement>, fallback: number) {
+  const [w, setW] = useState(fallback);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const measure = () => setW(Math.max(160, Math.round(el.getBoundingClientRect().width)));
+    measure();
+    const ro = typeof ResizeObserver !== "undefined" ? new ResizeObserver(measure) : null;
+    ro?.observe(el);
+    return () => ro?.disconnect();
+  }, [ref]);
+  return w;
+}
 
 // Figure 2 in compute multipliers instead of Elo (owner request, 2026-11-20). Every recipe point of the Polytopia
 // research-budget campaign is placed on the unmodified starter's compute curve: the multiplier is the starter's
@@ -100,14 +113,17 @@ function TrainBars({
   on: string | null;
   onHover: (model: string | null) => void;
 }) {
-  const compact = W < 480;
+  const compact = W < 420;
   const hasBelow = bars.some((p) => p.x < 1);
   const row = compact ? 38 : 30;
   const m = compact ? { l: 10, r: 44, t: 22, b: 36 } : { l: 148, r: 96, t: 22, b: 36 };
   const H = m.t + m.b + bars.length * row;
-  const L0 = Math.log2(hasBelow ? 1 / 2 : 1), L1 = Math.log2(64);
+  const maxBar = Math.max(...bars.map((p) => p.x));
+  const topTick = 2 ** Math.max(4, Math.ceil(Math.log2(maxBar)));
+  const L0 = Math.log2(hasBelow ? 1 / 2 : 1), L1 = Math.log2(topTick);
   const sx = (x: number) => m.l + ((Math.log2(Math.min(Math.max(x, 2 ** L0), 2 ** L1)) - L0) / (L1 - L0)) * (W - m.l - m.r);
-  const ticks = hasBelow ? [1 / 2, 1, 2, 4, 8, 16, 32, 64] : [1, 2, 4, 8, 16, 32, 64];
+  const ticks: number[] = hasBelow ? [1 / 2] : [];
+  for (let t = 1; t <= topTick; t *= 2) ticks.push(t);
   return (
     <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label="Training-only compute multiplier of each model's best recipe">
       {ticks.map((t) => (
@@ -118,14 +134,15 @@ function TrainBars({
       ))}
       <line x1={sx(1)} x2={sx(1)} y1={m.t - 4} y2={H - m.b} stroke={CMYK.k} strokeWidth={1.6} />
       <text x={m.l} y={m.t - 9} className="viz-axis">
-        {compact ? "best recipe, 6–8 h mean (log scale)" : "best recipe, mean of 6–8 h: starter's training ÷ recipe's (log scale)"}
+        {compact ? "best recipe, 6–8 h mean" : "best recipe, mean of 6–8 h: starter's training ÷ recipe's (log scale)"}
       </text>
-      <text x={W - m.r} y={H - 4} className="viz-axis" textAnchor="end">training compute multiplier</text>
+      <text x={W - m.r} y={H - 4} className="viz-axis" textAnchor="end">
+        {compact ? "training multiplier (log)" : "training compute multiplier"}
+      </text>
       {bars.map((p, i) => {
         const st = modelStyle(p.r.model);
         const y = m.t + i * row;
         const x0 = sx(1), x1 = sx(p.x);
-        const range = p.extrap && p.lo !== null && p.hi !== null;
         const dim = on !== null && on !== p.r.model;
         const barY = compact ? y + 19 : y + 5;
         const barH = compact ? 11 : row - 10;
@@ -138,31 +155,23 @@ function TrainBars({
             onPointerLeave={() => onHover(null)}
             style={{ cursor: "default" }}
           >
-            <title>{`${p.r.model}, best recipe (${p.r.cell}): ${p.extrap ? "≈" : ""}${fx(p.x)} averaged over 6, 7 and 8 h of training; at 8 h as strong as the starter after ${p.extrap ? "about " : ""}${hrs(p.sh8)}${range ? ` (extrapolated past the starter's ${hrs(TOP.hours)} run; 8 h 95% range ${fx(p.lo!)} to ${fx(p.hi!)})` : ""}`}</title>
+            <title>{`${p.r.model}, best recipe (${p.r.cell}): ${p.extrap ? "≈" : ""}${fx(p.x)} averaged over 6, 7 and 8 h of training; at 8 h as strong as the starter after ${p.extrap ? "about " : ""}${hrs(p.sh8)}${p.extrap ? ` (extrapolated past the starter's ${hrs(TOP.hours)} run)` : ""}`}</title>
             <rect x={0} y={y} width={W} height={row} fill="transparent" />
             {compact ? (
               <text
                 x={x0 + 5}
                 y={y + 13}
                 className="viz-label"
-                style={{ fontSize: 12, paintOrder: "stroke", stroke: "#fff", strokeWidth: 3 }}
+                style={{ fontSize: 11.5, paintOrder: "stroke", stroke: "#fff", strokeWidth: 3 }}
               >
                 {p.r.model}
-                {p.extrap && <tspan className="viz-axis"> · extrapolated</tspan>}
+                {p.extrap && <tspan className="viz-axis"> · extrap.</tspan>}
               </text>
             ) : (
               <text x={m.l - 10} y={midY} className="viz-label" textAnchor="end" dominantBaseline="middle">{p.r.model}</text>
             )}
             <rect x={Math.min(x0, x1)} y={barY} width={Math.max(1, Math.abs(x1 - x0))} height={barH} rx={2} fill={st.color} />
-            {range && (
-              <path
-                d={`M${sx(p.lo!)},${midY}H${sx(p.hi!)}M${sx(p.lo!)},${midY - 4}V${midY + 4}M${sx(p.hi!)},${midY - 4}V${midY + 4}`}
-                stroke={CMYK.k}
-                strokeWidth={1.3}
-                fill="none"
-              />
-            )}
-            <text x={Math.max(x0, x1, range ? sx(p.hi!) : 0) + 6} y={midY} className="viz-label" dominantBaseline="middle" style={{ fontSize: compact ? 11.5 : 12.5 }}>
+            <text x={Math.max(x0, x1) + 6} y={midY} className="viz-label" dominantBaseline="middle" style={{ fontSize: compact ? 11.5 : 12.5 }}>
               <tspan style={{ fontWeight: 600 }}>{p.extrap ? "≈" : ""}{fx(p.x)}</tspan>
               {!compact && p.extrap && <tspan className="viz-axis" dx={6}>extrapolated</tspan>}
             </text>
@@ -179,9 +188,10 @@ export function CostMultiplier() {
   const agent = useAgentView();
   const leftRef = useRef<HTMLDivElement>(null);
   const rightRef = useRef<HTMLDivElement>(null);
-  const W = useWidth(leftRef);
-  const WR = useWidth(rightRef);
-  const compact = W < 480;
+  const W = usePanelWidth(leftRef, 446);
+  const WR = usePanelWidth(rightRef, 224);
+  const sideBySide = WR < 420;
+  const compact = W < 520;
   const [hit, setHit] = useState<Hit | null>(null);
   const [legendModel, setLegendModel] = useState<string | null>(null);
   if (agent) {
@@ -194,8 +204,8 @@ export function CostMultiplier() {
       />
     );
   }
-  const H = compact ? 22 + 36 + bars.length * 38 : Math.round(Math.max(300, Math.min(420, W * 0.52)));
-  const m = { l: compact ? 36 : 46, r: compact ? 10 : 88, t: 22, b: 36 };
+  const H = sideBySide ? 22 + 36 + bars.length * 38 : Math.round(Math.max(300, Math.min(400, W * 0.52)));
+  const m = { l: compact ? 38 : 46, r: compact ? 12 : 88, t: 22, b: 36 };
   const all = curves.flatMap((c) => [...c.pts, ...c.finals]);
   const cx = (q: Pt) => q.cost, vy = (q: Pt) => q.x;
   const COST_MAX = Math.ceil(Math.max(...all.map(cx)) / 5) * 5;
@@ -204,7 +214,7 @@ export function CostMultiplier() {
   const sy = (x: number) => m.t + (1 - (Math.log2(Math.max(x, 2 ** L0)) - L0) / (L1 - L0)) * (H - m.t - m.b);
   const yTicks = [1 / 16, 1 / 8, 1 / 4, 1 / 2, 1, 2, 4, 8, 16];
   const xTicks: number[] = [];
-  for (let x = 0; x <= COST_MAX; x += compact ? 10 : 5) xTicks.push(x);
+  for (let x = 0; x <= COST_MAX; x += W < 380 ? 10 : 5) xTicks.push(x);
   const models = [...bars.map((b) => b.r.model), ...recipes.map((r) => r.model)].filter((mo, i, a) => a.indexOf(mo) === i);
   // Hovering a recipe, bar, or legend entry highlights that model across both figures.
   const on = hit?.model ?? legendModel;

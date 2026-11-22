@@ -235,7 +235,7 @@ export default function EmptyEfficiency() {
       ? pts.map(([x, y], i) => (i ? `H${sx(x).toFixed(1)}V${sy(Math.max(y, yMin)).toFixed(1)}` : `M${sx(x).toFixed(1)},${sy(Math.max(y, yMin)).toFixed(1)}`)).join("") +
         `H${sx(endX).toFixed(1)}`
       : "";
-    return { key: k, d, color: modelStyle(MODEL_BY_KEY[k].label).color, dashed: modelStyle(MODEL_BY_KEY[k].label).dashed };
+    return { key: k, d, color: modelStyle(MODEL_BY_KEY[k].label).color };
   });
 
   // Build hover targets.
@@ -443,7 +443,6 @@ export default function EmptyEfficiency() {
                 fill="none"
                 stroke={ln.color}
                 strokeWidth={activeKey === ln.key ? 2.4 : 1.7}
-                strokeDasharray={ln.dashed ? "5 3" : undefined}
                 strokeLinejoin="round"
                 opacity={dim ? 0.2 : 0.9}
               />
@@ -595,7 +594,7 @@ export default function EmptyEfficiency() {
               onClick={() => setHl((cur) => (cur === mo.key ? null : mo.key))}
               title="Click to highlight this model"
             >
-              <i className={st.dashed ? "dashed" : ""} style={st.dashed ? { color: st.color } : { background: st.color }} />
+              <i style={{ background: st.color }} />
               {mo.label}
             </button>
           );

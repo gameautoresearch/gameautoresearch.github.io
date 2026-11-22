@@ -147,16 +147,9 @@ export default function AutoresearchPost() {
         practice result strong enough to bet the rest of the budget on it? Each
         agent got the same kind of workspace: a game rulebook, simulator code,
         editable training code and configs, and a command-line tool to launch
-        experiments on an NVIDIA L40S, run practice matches, and submit its
-        work.
+        experiments on an NVIDIA L40S.
       </p>
-      <p>
-        We kept practice and grading separate. Practice gave agents feedback
-        they could act on during the session. The host evaluated the final
-        policies on held-out games and played them against one another in a
-        round robin, alongside copies of the untouched starter. Across our
-        tasks, we used two submission formats:
-      </p>
+      <p>Across our tasks, we used two submission formats:</p>
 
       <div className="ar-configs">
         <Cards
@@ -218,25 +211,19 @@ export default function AutoresearchPost() {
       </p>
       <p>
         We measure a recipe by its <strong>compute multiplier</strong>: how much
-        less compute it needs than our unmodified starter to train a network of
-        the same strength. A better recipe only saves compute once it pays back
-        the GPU hours spent finding it, so we retrained all {costMult.n} working
-        recipes from our Polytopia budget sweep for 8 hours and charged each one
-        its research spend on top of training. Most do not pay back within 8
-        hours: only {costMult.above} of {costMult.n} are above 1×. The best pays
-        back dramatically, though. {costMult.top.model}&rsquo;s $
-        {costMult.top.spent.toFixed(2)} session trains in 8 hours a network that
-        our starter would need about {Math.round(costMult.top.starterHours)}{" "}
+        less compute it needs to train a network of equivilent strength to a
+        basic PPO recipe. We were curious about the "payoff" timelines of tokens
+        and compute spent on improving this recipe. Most runs do not pay back
+        within 8 hours of training. The best pays back dramatically, though. One
+        of {costMult.top.model} sessions trains in 8 hours a network that our
+        default recipe would need about {Math.round(costMult.top.starterHours)}{" "}
         hours to match ($
         {costMult.top.starterUsd}
-        {costMult.top.extrap
-          ? ", extrapolated past our starter's 64-hour run"
-          : ""}
         ), so it needs{" "}
-        <strong>about {costMult.top.x.toFixed(0)}× less compute</strong> even
-        with its research paid for. The next best, {costMult.second.model}
+        <strong>about {costMult.top.x.toFixed(0)}× less total compute</strong>.
+        The next best, {costMult.second.model}
         &rsquo;s ${costMult.second.spent.toFixed(2)} session, reaches{" "}
-        {costMult.second.x.toFixed(1)}×.
+        {costMult.second.x.toFixed(1)}× savings.
       </p>
       <CostMultiplier />
 
@@ -247,12 +234,9 @@ export default function AutoresearchPost() {
 
       <h3 id="inside">Experimental discipline</h3>
       <p>
-        Most models propose plausible changes; what separates strong researchers
-        from weak ones is how they test them. In Pokémon, GPT-6.1 Sol and GPT-6
-        Astra launch full-length 1-hour runs matching the graded final, let them
-        finish, evaluate once, and move on—using 2–4M prompt tokens per session.
-        Weaker models average 30–80M tokens thrashing through aborted 5–20
-        minute probes that do not predict 1-hour performance.
+        Most models propose plausible changes and do experiments, but some
+        models are dramatically more effective at chosing good interventions and
+        interpreting results accurately.
       </p>
       <Figure
         n={3}
