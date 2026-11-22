@@ -15,7 +15,10 @@ import "./post.css";
 // The slow-simulator and forecast designs are documented in reports/generals/slowsim-2026-11-20.md
 // and reports/forecast-skill-2026-11-19/PLAN.md.
 
-// Polytopia dollar-budget recipes: each technique's effect after a 1 h and an 8 h retrain.
+// What went into Gemini 4 Neon's $8.70 Polytopia recipe, the strongest 8 h retrain in budget.json (416 Elo),
+// and its $2.90 recipe (330), read from their recipe.json / arch.json / network.py. The last column is the 8 h
+// verdict from the single-technique comparisons on Opus 5.5, GPT-6.2 Sol and GPT-6.2 Astra recipes
+// (reports/polytopia/techniques-combined-2026-11-19 in the bench repo), which predate Neon's runs.
 const VERDICT = {
   up: ["ar-v-up", "▲ Helps"],
   even: ["ar-v-even", "● About even"],
@@ -29,51 +32,74 @@ const verdict = (v: keyof typeof VERDICT | string) =>
   ) : (
     v
   );
-const techniques: [string, string, string, string][] = [
-  ["Opportunity maps", "Show the bot what it can do on each tile", "up", "up"],
+const techniques: [string, string, boolean, boolean, string][] = [
+  [
+    "Playing old versions",
+    "Practise against a pool of 20–24 past copies of itself, mostly the ones it still loses to",
+    true,
+    true,
+    "Tested and dropped",
+  ],
   [
     "Turn-based credit",
     "Measure time in game turns, not single commands",
+    true,
+    true,
     "up",
-    "up",
   ],
   [
-    "Smaller judge",
-    "Shrink the network that estimates who is winning",
-    "even",
+    "Separate judge",
+    "A smaller network that sees both sides of the board estimates who is winning",
+    true,
+    true,
+    "Merging it hurt",
+  ],
+  [
+    "Scoreboard inputs",
+    "Hand the network a running tally of cities, units, territory and tech for both sides",
+    true,
+    false,
+    "Not tested",
+  ],
+  [
+    "Bigger network",
+    "3–4 layers × 64 wide instead of the starter's 2 × 32",
+    true,
+    true,
     "even",
   ],
-  ["Bigger learning steps", "Raise the learning rate about 3×", "up", "even"],
   [
-    "Strategy hints",
-    "Write Polytopia know-how into the bot by hand",
-    "even",
-    "down",
-  ],
-  ["Bigger network", "More layers or wider layers", "even", "even"],
-  [
-    "Reward for progress",
-    "Pay the bot for score or economy along the way",
-    "down",
+    "Bigger learning steps",
+    "3–4× the learning rate, lowered gradually over the run",
+    true,
+    true,
     "even",
   ],
-  ["One shared network", "Merge the player and the judge", "even", "down"],
   [
-    "Playing old versions",
-    "Practise against past copies of itself",
-    "Lost every test",
-    "Never submitted",
+    "Reward for progress, faded out",
+    "Pay for score and economy early, then shrink the bonus toward zero",
+    true,
+    false,
+    "even",
   ],
 ];
+const mark = (on: boolean) => (on ? "✓" : "—");
 function TechniqueTable() {
   return (
     <Table
-      head={["Technique", "In plain words", "After 1 hour", "After 8 hours"]}
-      rows={techniques.map(([name, plain, early, late]) => [
+      head={[
+        "Technique",
+        "In plain words",
+        "Neon $8.70 (416)",
+        "Neon $2.90 (330)",
+        "Earlier tests at 8 h",
+      ]}
+      rows={techniques.map(([name, plain, best, runnerUp, earlier]) => [
         <strong>{name}</strong>,
         plain,
-        verdict(early),
-        verdict(late),
+        mark(best),
+        mark(runnerUp),
+        verdict(earlier),
       ])}
     />
   );
@@ -227,6 +253,44 @@ export default function AutoresearchPost() {
       </p>
       <CostMultiplier />
 
+      <section className="ar-outlier" aria-labelledby="neon-outlier">
+        <span className="ar-outlier-kicker">Outlier run</span>
+        <h3 id="neon-outlier">
+          How Gemini 4 Neon&rsquo;s $8.58 recipe pulled away
+        </h3>
+        <p>
+          Using roughly half as many samples as the starter, this recipe matched
+          the starter&rsquo;s 8-hour bot in 2 hours and finished at 416 Elo—72
+          points clear of any other submission and stronger than the
+          starter&rsquo;s 64-hour run. Major interventions that set it apart
+          from other models&rsquo; submissions:
+        </p>
+        <ul className="ar-outlier-list">
+          <li>
+            <strong>Cheap full-board context:</strong> Added a 6×6 coarse
+            spatial pyramid inside a 4×64 residual net, giving every tile
+            board-wide reach without self-attention&rsquo;s speed penalty.
+          </li>
+          <li>
+            <strong>Explicit scoreboard summaries:</strong> Computed 36
+            visible-board tallies and relative leads (cities, units, HP,
+            territory, tech, and estimated score).
+          </li>
+          <li>
+            <strong>Omniscient critic distilled into the policy:</strong> Paired
+            a separate training-only judge that sees both sides through the fog of
+            war with an auxiliary value head that trains the policy&rsquo;s own
+            trunk.
+          </li>
+          <li>
+            <strong>Pruned historical self-play:</strong> Kept a 20-checkpoint
+            opponent pool (25% of games) weighted toward past copies it still
+            lost to, evicting easy ones—whereas other models dropped historical
+            pools after short tests.
+          </li>
+        </ul>
+      </section>
+
       <h2 className="ar-config ar-c3" id="taste">
         What separates strong researchers from weak
         ones?
@@ -273,10 +337,15 @@ export default function AutoresearchPost() {
 
       <h3 id="techniques">What changes actually held up</h3>
       <p>
-        Retraining Polytopia recipes at both 1 hour and 8 hours separated
-        short-run tricks from durable gains: better game features held up at 8
-        hours, while higher learning rates and hand-coded strategy hints faded
-        or hurt late.
+        We retrained every Polytopia recipe for 8 hours. Gemini 4 Neon's $8.70
+        recipe was the strongest by a clear margin: 416 Elo, about 70 above the
+        best recipe from any other model. It stacked several changes at once, so
+        the table lists what went into it and into Neon's $2.90 recipe (330,
+        tied for second). The last column shows what earlier one-at-a-time
+        tests on Opus, Sol and Astra recipes found. Both Neon recipes practised
+        against past copies of themselves, which the earlier models had tried
+        and dropped, and both used turn-based credit, the only change in either
+        recipe that also held up in those tests.
       </p>
       <TechniqueTable />
 
