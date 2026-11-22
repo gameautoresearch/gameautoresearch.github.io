@@ -29,69 +29,60 @@ const verdict = (v: keyof typeof VERDICT | string) =>
   ) : (
     v
   );
-const techniques: [string, string, string, string, string][] = [
+const techniques: [string, string, string, string][] = [
   [
     "Opportunity maps",
     "Show the bot what it can do on each tile",
     "up",
     "up",
-    "Low: 2 recipes, 1 researcher",
   ],
   [
     "Turn-based credit",
     "Measure time in game turns, not single commands",
     "up",
     "up",
-    "Low: 2 recipes, 1 fair test",
   ],
   [
     "Smaller judge",
     "Shrink the network that estimates who is winning",
     "even",
     "even",
-    "Low: 1 recipe",
   ],
   [
     "Bigger learning steps",
     "Raise the learning rate about 3×",
     "up",
     "even",
-    "High at 1 hour: a controlled test",
   ],
   [
     "Strategy hints",
     "Write Polytopia know-how into the bot by hand",
     "even",
     "down",
-    "Medium: 8 recipes, no fair test",
   ],
   [
     "Bigger network",
     "More layers or wider layers",
     "even",
     "even",
-    "High: lost several fair tests",
   ],
   [
     "Reward for progress",
     "Pay the bot for score or economy along the way",
     "down",
     "even",
-    "Medium",
   ],
   [
     "One shared network",
     "Merge the player and the judge",
     "even",
     "down",
-    "High: lost badly in fair tests",
   ],
   [
     "Playing old versions",
     "Practise against past copies of itself",
     "Lost every test",
     "Never submitted",
-    "Medium: 4 tries",
   ],
 ];
 function TechniqueTable() {
@@ -102,14 +93,12 @@ function TechniqueTable() {
         "In plain words",
         "After 1 hour",
         "After 8 hours",
-        "How sure",
       ]}
-      rows={techniques.map(([name, plain, early, late, sure]) => [
+      rows={techniques.map(([name, plain, early, late]) => [
         <strong>{name}</strong>,
         plain,
         verdict(early),
         verdict(late),
-        sure,
       ])}
     />
   );
@@ -121,14 +110,13 @@ export default function AutoresearchPost() {
       <ResearchLoop />
       <p className="pt-lede">
         Can AI agents train strong domain-specific models? Agents have shown
-        superhuman skills writing deterministic code. But related fields, like
-        machine learning, pose different challenges: successful work requires
-        balancing limited compute and noisy training signals. We gave AI models
-        a GPU budget and tasked them with training efficient neural networks to
-        play games like Pokémon, Polytopia, and Generals.io. The agents
-        allocated their resources, implemented and tested ideas. We saw a wide
-        range in taste, efficiency, and outcomes as they competed to produce the
-        strongest final policies.
+        superhuman skills writing deterministic code. But related fields like
+        machine learning pose different challenges: dealing with limited compute
+        and noisy training signals. We gave AI models a GPU budget and tasked
+        them with training efficient neural networks to play games like Pokémon,
+        Polytopia, and Generals.io. The agents allocated their resources,
+        implemented and tested ideas. We saw a wide range in taste, efficiency,
+        and outcomes as they competed to produce the strongest final policies.
       </p>
       <Showcase />
       <p>
@@ -443,20 +431,6 @@ export default function AutoresearchPost() {
       <p>We thank Modal for providing compute credits for this research.</p>
 
       <hr />
-      <p
-        className="pb-notes"
-        style={{ fontSize: 13.5, color: "var(--secondary)" }}
-      >
-        Campaigns ran November 11–20, 2026 on single NVIDIA L40S GPUs.
-        Round-robin ratings use Bradley–Terry fits. The host grades both fresh
-        retrains and submitted networks on held-out games. Anthropic&rsquo;s
-        safety classifier interrupted several Claude sessions, so Claude ran at
-        medium effort on Hex, Generals, and the Polytopia budget sweep while
-        other models ran at high. Private evaluation seeds, maps, and grading
-        panels are not published; full session trajectories are available on
-        request.
-      </p>
-
       <h3 id="related">Related work</h3>
       <ul className="ar-credits">
         <li>

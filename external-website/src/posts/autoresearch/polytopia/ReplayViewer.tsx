@@ -105,7 +105,7 @@ class ReplayBoundary extends Component<{ children: ReactNode }, { failed: boolea
 // `still` freezes the board at that action index, paused (tools/og renders the link-preview image this way).
 // `start` begins playback that far into the game (0–1), `initialSpeed` sets the starting speed, and `compact` keeps
 // only the scoreboard, the board and the play controls (the post's opening showcase uses all three).
-type ViewerProps = { src: string; still?: number; start?: number; initialSpeed?: number; compact?: boolean };
+type ViewerProps = { src: string; names?: [string, string]; still?: number; start?: number; initialSpeed?: number; compact?: boolean };
 export default function ReplayViewer({ src, ...rest }: ViewerProps) {
   return (
     <ReplayBoundary>
@@ -114,7 +114,7 @@ export default function ReplayViewer({ src, ...rest }: ViewerProps) {
   );
 }
 
-function ReplayBoard({ url, still, start, initialSpeed, compact }: Omit<ViewerProps, "src"> & { url: string }) {
+function ReplayBoard({ url, names, still, start, initialSpeed, compact }: Omit<ViewerProps, "src"> & { url: string }) {
   const [data, setData] = useState<Replay | null>(null);
   const [pos, setPos] = useState(still ?? 0); // action index; the fraction is how far that action's animation has run
   // Plays on its own and loops, unless the reader prefers reduced motion. Play/Pause, the slider, the speed
@@ -409,7 +409,7 @@ function ReplayBoard({ url, still, start, initialSpeed, compact }: Omit<ViewerPr
           <div key={side} className="replay-side">
             <i style={{ background: PLAYER[side] }} />
             <div>
-              <strong>{data.names[side]}</strong>
+              <strong>{names?.[side - 1] ?? data.names[side]}</strong>
               <span>{score[side - 1].toLocaleString()} pts · {cityCount[side]} cities · {unitCount[side]} units</span>
             </div>
           </div>

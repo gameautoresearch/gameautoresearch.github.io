@@ -144,57 +144,50 @@ html.agent-view .ar-configs .pt-card { background-image: none; }
 .ar-credits { margin-top: 12px; padding-left: 18px; font-size: 14.5px; line-height: 1.55; }
 .ar-credits li + li { margin-top: 6px; }
 
-/* Opening showcase: compact two-column layout (selector + policy info on left, replay stage on right). */
-.sc { margin: 22px 0 8px; padding: 10px 12px; border: 1px solid var(--rule); border-radius: 4px; container-type: inline-size; }
-.sc-grid { display: grid; grid-template-columns: 214px minmax(0, 1fr); gap: 12px; align-items: stretch; }
-.sc-nav { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
-.sc-games { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0; border: 1px solid var(--k); border-radius: 2px; overflow: hidden; }
-.sc-games button { padding: 5px 4px; border: 0; border-right: 1px solid var(--k); background: #fff; color: var(--ink); font: inherit; font-size: 12px; font-weight: 600; cursor: pointer; text-align: center; }
-.sc-games button:last-child { border-right: 0; }
-.sc-games button:nth-child(1)[aria-selected="true"] { background: var(--c); color: #fff; }
-.sc-games button:nth-child(2)[aria-selected="true"] { background: var(--m); color: #fff; }
-.sc-games button:nth-child(3)[aria-selected="true"] { background: var(--y); color: #111; }
-.sc-matchups { display: flex; flex-direction: column; gap: 4px; }
-.sc-matchups button { display: block; width: 100%; padding: 5px 8px; border: 1px solid #e2e2de; border-radius: 2px; background: #fff; color: var(--secondary); font: inherit; font-size: 11.5px; line-height: 1.3; text-align: left; cursor: pointer; }
-.sc-matchups button strong { display: block; font-weight: 500; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.sc-matchups button span { display: block; font-size: 11px; color: var(--secondary); }
-.sc-matchups button:hover { border-color: #111; }
-.sc-matchups button[aria-selected="true"] { border-color: var(--k); background: #f7f7f4; }
-.sc-matchups button[aria-selected="true"] strong { font-weight: 600; }
-.sc-policies { margin-top: auto; padding-top: 8px; border-top: 1px solid var(--rule); display: flex; flex-direction: column; gap: 4px; }
-.sc-pol-head { font-size: 10px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--c-deep); }
-.sc-pol-row { display: flex; justify-content: space-between; align-items: baseline; gap: 6px; font-size: 11.5px; line-height: 1.3; }
-.sc-pol-row strong { font-weight: 600; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.sc-pol-row span { color: var(--secondary); font-size: 11px; white-space: nowrap; font-variant-numeric: tabular-nums; }
-.sc-note { margin-top: 3px; color: var(--secondary); font-size: 11px; line-height: 1.35; }
-.sc-main { min-width: 0; display: flex; flex-direction: column; }
-.sc-progress { flex: none; height: 2px; margin-bottom: 6px; background: var(--k); transform-origin: left; animation: sc-fill linear forwards; }
+/* Opening showcase: clean stacked layout (game tabs, full-width replay stage, matchup switcher). */
+.sc { margin: 36px 0 32px; container-type: inline-size; }
+.sc-head { position: relative; border-bottom: 1px solid var(--rule); }
+.sc-games { display: flex; gap: 24px; }
+.sc-games button { position: relative; z-index: 1; padding: 0 0 10px; margin-bottom: -1px; border: 0; border-bottom: 2px solid transparent; background: none; color: var(--secondary); font: inherit; font-size: 14px; font-weight: 500; cursor: pointer; transition: color 120ms ease; }
+.sc-games button:hover { color: var(--ink); }
+.sc-games button[aria-selected="true"] { color: var(--ink); font-weight: 600; }
+.sc-games button:nth-child(1)[aria-selected="true"] { border-bottom-color: var(--c); }
+.sc-games button:nth-child(2)[aria-selected="true"] { border-bottom-color: var(--m); }
+.sc-games button:nth-child(3)[aria-selected="true"] { border-bottom-color: var(--y); }
+.sc-progress { position: absolute; left: 0; right: 0; bottom: -1px; height: 1px; background: var(--k); opacity: 0.25; transform-origin: left; animation: sc-fill linear forwards; pointer-events: none; }
 .sc-progress.is-idle { visibility: hidden; animation: none; }
 @keyframes sc-fill { from { transform: scaleX(0); } to { transform: scaleX(1); } }
-/* Fixed stage height so the autoplaying tour never reflows the page: it must fit the tallest game (Polytopia, ~302px). */
-.sc-stage { height: 302px; display: flex; flex-direction: column; justify-content: center; overflow: hidden; }
+/* Fixed stage height matched to the 16:9 Pokémon field + bar so the autoplaying tour never reflows the page. */
+.sc-stage { height: clamp(290px, calc(56.25cqi + 40px), 428px); margin-top: 18px; display: flex; flex-direction: column; justify-content: center; overflow: hidden; }
 .sc-stage > * { flex: none; }
-/* The battle scales with its width (16:9 + 40px bar); cap it so it never exceeds the stage height. */
-.sc-stage .psr { width: 100%; max-width: 460px; margin: 0 auto; }
+.sc-stage .psr { width: 100%; margin: 0 auto; }
 .sc-stage .psr-log { display: none; }
-.sc-stage .replay-board { display: block; max-height: 215px; margin: 0 auto; }
-.sc-stage .gr-board { max-height: 215px; }
-.sc-stage .replay, .sc-stage .gr { padding: 4px 6px; border: 0; border-radius: 3px; background: #fafaf8; }
-.sc-stage .replay-hud, .sc-stage .gr-hud { margin-bottom: 4px; gap: 8px; }
-.sc-stage .replay-hud strong, .sc-stage .gr-side strong { font-size: 12px; line-height: 1.2; }
-.sc-stage .replay-hud span, .sc-stage .gr-side span { font-size: 11px; }
-.sc-stage .gr-controls, .sc-stage .replay-controls { margin-top: 6px; gap: 6px; font-size: 11.5px; }
-.sc-stage .gr-controls > button, .sc-stage .gr-speed button, .sc-stage .replay-controls button { padding: 2px 7px; font-size: 11.5px; }
-.sc-stage .gr-tick { min-width: 78px; font-size: 11px; }
-.sc-stage .replay-turn { min-width: 118px; font-size: 11px; }
-.sc-wait { display: grid; place-items: center; aspect-ratio: 16 / 9; border-radius: 4px; background: #f1f1ee; color: var(--secondary); font-size: 13px; }
-.sc-stage .sc-wait, .sc-stage .replay-loading, .sc-stage .gr-loading { flex: 1; min-height: 0; aspect-ratio: auto; }
+.sc-stage .replay, .sc-stage .gr { height: 100%; display: flex; flex-direction: column; justify-content: space-between; padding: 18px 22px 14px; border: 0; border-radius: 6px; background: #f8f8f6; }
+.sc-stage .replay-hud, .sc-stage .gr-hud { margin-bottom: 0; gap: 16px; }
+.sc-stage .replay-side strong, .sc-stage .gr-side strong { font-size: 13px; line-height: 1.25; }
+.sc-stage .replay-side span, .sc-stage .gr-side span { font-size: 11.5px; }
+.sc-stage .replay-board, .sc-stage .gr-board { flex: 1; min-height: 0; width: 100%; height: 100%; max-height: 296px; margin: 10px auto; object-fit: contain; }
+.sc-stage .gr-controls, .sc-stage .replay-controls { margin-top: 0; gap: 10px; font-size: 12px; }
+.sc-stage .gr-controls > button, .sc-stage .replay-controls button { min-width: 54px; padding: 3px 10px; border: 1px solid #e2e2de; border-radius: 4px; background: #fff; color: var(--ink); font-size: 12px; }
+.sc-stage .gr-controls > button:hover, .sc-stage .replay-controls button:hover { border-color: #111; }
+.sc-stage .gr-speed { gap: 2px; }
+.sc-stage .gr-speed button { padding: 3px 7px; border: 0; border-radius: 4px; background: transparent; color: var(--secondary); font-size: 12px; }
+.sc-stage .gr-speed button:hover { color: var(--ink); }
+.sc-stage .gr-speed button[aria-pressed="true"] { background: #e8e8e3; color: var(--ink); font-weight: 600; }
+.sc-stage .gr-tick { min-width: 82px; font-size: 11.5px; }
+.sc-stage .replay-turn { min-width: 124px; font-size: 11.5px; }
+.sc-wait { display: grid; place-items: center; aspect-ratio: 16 / 9; border-radius: 6px; background: #f8f8f6; color: var(--secondary); font-size: 13px; }
+.sc-stage .sc-wait, .sc-stage .replay-loading, .sc-stage .gr-loading { flex: 1; min-height: 0; aspect-ratio: auto; border-radius: 6px; background: #f8f8f6; }
+.sc-matchups { display: flex; flex-wrap: wrap; gap: 4px 6px; margin-top: 14px; }
+.sc-matchups button { padding: 5px 10px; border: 0; border-radius: 4px; background: transparent; color: var(--secondary); font: inherit; font-size: 12.5px; line-height: 1.3; cursor: pointer; transition: color 120ms ease, background-color 120ms ease; }
+.sc-matchups button:hover { color: var(--ink); background: #f5f5f3; }
+.sc-matchups button[aria-selected="true"] { background: #f0f0ec; color: var(--ink); font-weight: 600; }
 @container (max-width: 560px) {
-  .sc-grid { grid-template-columns: 1fr; gap: 8px; }
-  .sc-matchups { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); }
-  .sc-matchups button span { display: none; }
+  .sc { margin: 28px 0 24px; }
+  .sc-stage .replay, .sc-stage .gr { padding: 14px 14px 12px; }
   .sc-stage .replay-hud span, .sc-stage .gr-side span { display: none; }
   .sc-stage .replay-turn, .sc-stage .gr-tick { display: none; }
+  .sc-matchups button { font-size: 12px; padding: 4px 8px; }
 }
 
 /* Generals board player. */
