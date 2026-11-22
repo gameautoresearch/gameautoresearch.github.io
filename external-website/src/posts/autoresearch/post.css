@@ -102,16 +102,13 @@ html.agent-view .ar-quote footer { font-size: inherit; }
 
 /* Configuration headings: one per configuration of the task, above the h3 sections inside it. */
 .ar h2.ar-config { margin-top: 72px; padding-top: 18px; border-top: 3px solid var(--k); font-size: 22px; font-weight: 650; line-height: 1.25; letter-spacing: -0.01em; }
-.ar h2.ar-config small { display: block; margin-bottom: 4px; color: var(--secondary); font-size: 12px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; }
 .ar h2.ar-config + p { margin-top: 12px; }
 html.agent-view .ar h2.ar-config { margin-top: 2em; padding-top: 0; border-top: 0; font-size: inherit; }
-html.agent-view .ar h2.ar-config small { display: inline; font-size: inherit; letter-spacing: 0; text-transform: none; color: inherit; }
-html.agent-view .ar h2.ar-config small::after { content: ": "; }
 
 /* CMYK: each configuration owns one plate, on its heading rule, its label and its intro card. */
-.ar h2.ar-c1 { border-top-color: var(--c); } .ar h2.ar-c1 small { color: var(--c-deep); }
-.ar h2.ar-c2 { border-top-color: var(--m); } .ar h2.ar-c2 small { color: var(--m-deep); }
-.ar h2.ar-c3 { border-top-color: var(--y); } .ar h2.ar-c3 small { color: var(--y-deep); }
+.ar h2.ar-c1 { border-top-color: var(--c); }
+.ar h2.ar-c2 { border-top-color: var(--m); }
+.ar h2.ar-c3 { border-top-color: var(--y); }
 .ar-configs .pt-cards { grid-template-columns: 1fr; gap: 8px; }
 .ar-configs .pt-card { border-radius: 2px; border-width: 0 0 0 4px; border-style: solid; background-size: 6px 6px; padding: 12px 16px; }
 .ar-configs .pt-card p { color: #3d3d3d; }

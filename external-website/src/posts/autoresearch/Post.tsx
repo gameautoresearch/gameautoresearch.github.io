@@ -105,7 +105,7 @@ export default function AutoresearchPost() {
       </p>
 
       <h2 className="ar-config ar-c1" id="results">
-        <small>Results</small>Overall model scores
+        Top Line Results
       </h2>
       <p>
         Nineteen models ran the same two tasks, Polytopia from an empty file and
@@ -198,7 +198,7 @@ export default function AutoresearchPost() {
       </p>
 
       <h2 className="ar-config ar-c2" id="efficiency">
-        <small>Efficiency &amp; payback</small>How efficient are the recipes
+        How efficient are the recipes
         agents discover?
       </h2>
       <p>
@@ -228,7 +228,7 @@ export default function AutoresearchPost() {
       <CostMultiplier />
 
       <h2 className="ar-config ar-c3" id="taste">
-        <small>Research taste</small>What separates strong researchers from weak
+        What separates strong researchers from weak
         ones?
       </h2>
 
