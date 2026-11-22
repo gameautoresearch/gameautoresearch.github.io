@@ -4,6 +4,7 @@ import ResearchLoop from "./ResearchLoop";
 import TopScore from "./TopScore";
 import { ForecastLead, pokeSkill, polyForecastN } from "./Budget";
 import { CostMultiplier, costMult } from "./CostMultiplier";
+import NeonOutlierDiagrams from "./NeonOutlierDiagrams";
 import { ResearchRace } from "./Frontier13";
 import { SessionTimeline } from "./Timeline";
 import "../shared/post.css";
@@ -265,30 +266,7 @@ export default function AutoresearchPost() {
           starter&rsquo;s 64-hour run. Major interventions that set it apart
           from other models&rsquo; submissions:
         </p>
-        <ul className="ar-outlier-list">
-          <li>
-            <strong>Cheap full-board context:</strong> Added a 6×6 coarse
-            spatial pyramid inside a 4×64 residual net, giving every tile
-            board-wide reach without self-attention&rsquo;s speed penalty.
-          </li>
-          <li>
-            <strong>Explicit scoreboard summaries:</strong> Computed 36
-            visible-board tallies and relative leads (cities, units, HP,
-            territory, tech, and estimated score).
-          </li>
-          <li>
-            <strong>Omniscient critic distilled into the policy:</strong> Paired
-            a separate training-only judge that sees both sides through the fog of
-            war with an auxiliary value head that trains the policy&rsquo;s own
-            trunk.
-          </li>
-          <li>
-            <strong>Pruned historical self-play:</strong> Kept a 20-checkpoint
-            opponent pool (25% of games) weighted toward past copies it still
-            lost to, evicting easy ones—whereas other models dropped historical
-            pools after short tests.
-          </li>
-        </ul>
+        <NeonOutlierDiagrams />
       </section>
 
       <h2 className="ar-config ar-c3" id="taste">
