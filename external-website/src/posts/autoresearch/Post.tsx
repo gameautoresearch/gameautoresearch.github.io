@@ -211,11 +211,11 @@ export default function AutoresearchPost() {
       </p>
       <p>
         We measure a recipe by its <strong>compute multiplier</strong>: how much
-        less compute it needs to train a network of equivilent strength to a
+        less compute it needs to train a network of equivalent strength to a
         basic PPO recipe. We were curious about the "payoff" timelines of tokens
         and compute spent on improving this recipe. Most runs do not pay back
         within 8 hours of training. The best pays back dramatically, though. One
-        of {costMult.top.model} sessions trains in 8 hours a network that our
+        of {costMult.top.model}&rsquo;s sessions trains in 8 hours a network that our
         default recipe would need about {Math.round(costMult.top.starterHours)}{" "}
         hours to match ($
         {costMult.top.starterUsd}
@@ -235,7 +235,7 @@ export default function AutoresearchPost() {
       <h3 id="inside">Experimental discipline</h3>
       <p>
         Most models propose plausible changes and do experiments, but some
-        models are dramatically more effective at chosing good interventions and
+        models are dramatically more effective at choosing good interventions and
         interpreting results accurately.
       </p>
       <Figure
