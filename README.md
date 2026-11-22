@@ -2,7 +2,7 @@
 
 Autonomous reinforcement-learning research across seven games. All active game
 implementations live in **[`simulators/`](simulators/README.md)**, including Polytopia.
-Read the [research article](https://gameautoresearch.github.io/game-autoresearch-bench/)
+Read the [research article](https://gameautoresearch.github.io/)
 for the results, interactive figures, and match replays.
 
 New GPU-backed work defaults to **NVIDIA L40S**, unless explicitly overridden.

@@ -22,7 +22,7 @@ export default function ReplayPage({ id }: { id: string }) {
               <p className="replay-page-credit">
                 Played by <a href="https://github.com/smogon/pokemon-showdown-client">Pokémon Showdown</a>'s battle engine.
                 Sprites and sounds load from play.pokemonshowdown.com. See the replay viewer’s{" "}
-                <a href="https://github.com/gameautoresearch/game-autoresearch-bench/tree/main/external-website/src/showdown">source and license notices</a>. Keys: Space play/pause, ← → turns, M sound,
+                <a href="https://github.com/gameautoresearch/gameautoresearch.github.io/tree/main/external-website/src/showdown">source and license notices</a>. Keys: Space play/pause, ← → turns, M sound,
                 S switch sides.
               </p>
             </>

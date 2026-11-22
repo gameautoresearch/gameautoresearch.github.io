@@ -16,7 +16,7 @@ concurrency:
 
 jobs:
   build:
-    if: github.repository == 'gameautoresearch/game-autoresearch-bench'
+    if: github.repository == 'gameautoresearch/gameautoresearch.github.io'
     runs-on: ubuntu-latest
     permissions:
       contents: read
