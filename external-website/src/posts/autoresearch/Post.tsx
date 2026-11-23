@@ -135,20 +135,23 @@ export default function AutoresearchPost() {
         Top Line Results
       </h2>
       <p>
-        Nineteen models have comparable results on the same two tasks,
-        Polytopia from an empty file and Pokémon 3v3 from a working starter.
-        A group of six frontier models leads
-        the rest, with little between them, and the same models lead when all
-        eight research tasks across Polytopia, Pokémon, Hex, Generals and Clash
-        are pooled.
+        Ten models have results on the same four tasks: Polytopia from an
+        empty file, Pokémon 3v3 from a working starter, Polytopia recipes
+        written under five research budgets, and forecasting training runs.
+        Gemini 4 Neon leads, six models follow close together, and Claude
+        Opus 5.5, DeepSeek V4.1 Flash and Kimi K3.1 Pro trail. The other tabs
+        cover the nineteen models that ran the first two tasks and pool all
+        eight research tasks across Polytopia, Pokémon, Hex, Generals and
+        Clash.
       </p>
       <Figure
         n={1}
         wide
         caption={
           <>
-            Standardized model scores on the two shared tasks (50 = average),
-            with tabs for broader task pools.
+            Standardized model scores on four shared tasks (50 = average of
+            these ten models), with tabs for more models and broader task
+            pools.
           </>
         }
       >
@@ -156,10 +159,15 @@ export default function AutoresearchPost() {
       </Figure>
 
       <p>
-        The headline score uses only models that ran both tasks, so each
-        model is judged on the same evidence. We standardize each task across
-        the models and average the two: 50 is the average model, and 10 points
-        is one standard deviation. The pooled tabs fit one rating through all
+        The headline score uses only the models that ran all four tasks, so
+        each model is judged on the same evidence. We standardize each task
+        across those models and average the four: 50 is the average of the
+        ten, and 10 points is one standard deviation. The recipe task combines
+        five budget levels, each recipe retrained for 1 hour and for 8 hours,
+        and adjusts for how each budget level went across models, since three
+        models ran only the $8.70 level. The two-task tab applies the same
+        method to the nineteen models that ran Polytopia and Pokémon. The
+        pooled tabs fit one rating through all
         eight research tasks, standardized within each task. The whiskers there
         show how much a score moves when any one task is left out, and models
         with fewer tasks have less evidence behind them. The forecasting tab

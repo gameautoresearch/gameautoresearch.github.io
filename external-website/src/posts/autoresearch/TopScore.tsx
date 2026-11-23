@@ -8,7 +8,8 @@ import budgetRaw from "./budget.json";
 import { starterHoursFor } from "./CostMultiplier";
 
 // Composite model scores across all campaigns (reports/top-level-score-2026-11-20/build.py).
-// Default view ("two"): the models that ran both tasks (Polytopia empty file, Pokémon 3v3); each task is
+// Default view ("recipe", below): the ten models with Polytopia empty file, Pokémon 3v3, forecasting and the
+// Polytopia research-budget recipes. "two": the models that ran both tasks (Polytopia empty file, Pokémon 3v3); each task is
 // standardized across those models and the two are averaged; the whisker spans the two tasks taken alone.
 // Other views: each task's scores are standardized within its field, then one least-squares fit estimates
 // score = model strength + task offset (with a small ridge prior). Scaled to 50 = average entrant,
@@ -41,29 +42,67 @@ const CORE = DATA.pooled.filter((r) => r.tasks.length >= 3);
 const TASK_MAP = Object.fromEntries(DATA.tasks.map((t) => [t.id, t]));
 
 // "Recipe" view: the two shared tasks plus forecasting and the Polytopia research-budget campaign, restricted to
-// models with all four. The recipe task is each model's $8.70 session (one fixed budget level, so models with more
-// sessions aren't favoured) read off its 8 h training curve: Figure 2's training-compute multiplier (starter's training hours to reach the same Elo / the
-// recipe's 8 h; research spend not counted), standardized on a log scale since it is a ratio. Same method as "two" otherwise: each task
-// standardized (population SD) across just these models, averaged; the whisker spans the tasks taken alone.
-// 50 = average of this smaller field, so not comparable to the other views. `fill` adds the $8.70 sessions of GPT-6
-// Astra, GPT-6.1 Sol and Gemini 4 Carbon (campaign poly-budget-fill-20261122b, same scales); Figures 2 and 3 don't read it.
-type BudgetRecipe = { model: string; cell: string; curve: { hours: number; elo: number }[] };
+// models with all four. The recipe task uses every researched cell of that campaign ($2.90, $8.70, $23, and $8.70 with
+// a 2 h or 4 h limit; zero-shot is left out because it has no research). Each recipe is measured twice, both as a
+// training-compute multiplier (starter's training hours to reach the same Elo / the recipe's hours; research spend not
+// counted): the 1 h retrain on two seeds (multiplier1h) and the 8 h retrain read off its curve (Figure 2's yardstick).
+// A recipe that crashes in its own trainer counts as 0.5× on both (the 1 h yardstick's lowest rung, as in the bench's
+// build.py). For each measurement, log multiplier = model + cell is fit by least squares, so the models that only ran
+// the $8.70 cell (`fill`: GPT-6 Astra, GPT-6.1 Sol, Gemini 4 Carbon, campaign poly-budget-fill-20261122b, same
+// scales) are adjusted for how that cell went for everyone. The recipe score is exp(mean of the 1 h and 8 h model
+// effects): the multiplier on a typical cell. It is standardized on a log scale since it is a ratio. Same method as
+// "two" otherwise: each task standardized (population SD) across just these models, averaged; the whisker spans the
+// tasks taken alone. 50 = average of this smaller field, so not comparable to the other views. Figures 2 and 3 don't
+// read `fill`.
+type BudgetRecipe = {
+  model: string;
+  cell: string;
+  broken: boolean;
+  multiplier1h: number | null;
+  curve: { hours: number; elo: number }[];
+};
 const BUDGET = budgetRaw as unknown as { recipes: BudgetRecipe[]; fill?: BudgetRecipe[] };
 const budgetModel = (mo: string) => (mo === "Opus 5.5" ? "Claude Opus 5.5" : mo);
-const RECIPE_CELL = "$8.70";
-const RECIPE8: Record<string, number> = {};
-for (const r of [...BUDGET.recipes, ...(BUDGET.fill ?? [])]) {
-  if (r.cell !== RECIPE_CELL || !r.curve.length) continue;
-  const end = r.curve[r.curve.length - 1];
-  RECIPE8[budgetModel(r.model)] = starterHoursFor(end.elo).hours / end.hours;
+const CRASH_MULT = 0.5;
+type CellObs = { model: string; cell: string; y: number };
+// Two-way additive fit y = a[model] + b[cell], mean of b = 0, by alternating means (converges to least squares).
+function modelEffects(obs: CellObs[]): Record<string, number> {
+  const models = [...new Set(obs.map((o) => o.model))];
+  const cells = [...new Set(obs.map((o) => o.cell))];
+  const a: Record<string, number> = Object.fromEntries(models.map((m) => [m, 0]));
+  const b: Record<string, number> = Object.fromEntries(cells.map((c) => [c, 0]));
+  const mean = (v: number[]) => v.reduce((s, x) => s + x, 0) / v.length;
+  for (let it = 0; it < 500; it++) {
+    for (const c of cells) b[c] = mean(obs.filter((o) => o.cell === c).map((o) => o.y - a[o.model]));
+    const mb = mean(cells.map((c) => b[c]));
+    for (const c of cells) b[c] -= mb;
+    for (const m of models) a[m] = mean(obs.filter((o) => o.model === m).map((o) => o.y - b[o.cell]));
+  }
+  return a;
 }
+const obs1h: CellObs[] = [];
+const obs8h: CellObs[] = [];
+for (const r of [...BUDGET.recipes, ...(BUDGET.fill ?? [])]) {
+  if (r.cell === "zero-shot") continue;
+  const model = budgetModel(r.model);
+  const end = r.curve[r.curve.length - 1];
+  const m1 = r.broken || r.multiplier1h === null ? CRASH_MULT : r.multiplier1h;
+  const m8 = r.broken || !end ? CRASH_MULT : starterHoursFor(end.elo).hours / end.hours;
+  obs1h.push({ model, cell: r.cell, y: Math.log(m1) });
+  obs8h.push({ model, cell: r.cell, y: Math.log(m8) });
+}
+const eff1h = modelEffects(obs1h);
+const eff8h = modelEffects(obs8h);
+const RECIPE_ALL: Record<string, number> = Object.fromEntries(
+  Object.keys(eff8h).map((m) => [m, Math.exp((eff1h[m] + eff8h[m]) / 2)]),
+);
 TASK_MAP.recipe8 = {
   id: "recipe8",
-  name: "Polytopia, $8.70 recipe at 8 h",
+  name: "Polytopia recipes, five budget cells at 1 h and 8 h",
   game: "Polytopia",
-  unit: "× the starter's training compute (research not counted)",
-  sessions: 1,
-  scores: RECIPE8,
+  unit: "× the starter's training compute on a typical cell (research not counted)",
+  sessions: 5,
+  scores: RECIPE_ALL,
 };
 const RECIPE_TASKS = ["poly_empty", "poke", "forecast", "recipe8"];
 const RECIPE: Row[] = (() => {
@@ -105,7 +144,7 @@ const SHORT_TASK: Record<string, string> = {
   slowsim: "Generals slow sim",
   clash: "Clash",
   forecast: "Forecasting",
-  recipe8: "$8.70 recipe, 8 h",
+  recipe8: "Polytopia recipes",
 };
 
 function fmtTaskScore(id: string, v: number) {
@@ -129,7 +168,7 @@ export default function TopScore() {
   const agent = useAgentView();
   const ref = useRef<HTMLDivElement>(null);
   const W = useWidth(ref);
-  const [mode, setMode] = useState<Mode>("two");
+  const [mode, setMode] = useState<Mode>("recipe");
   const [tip, setTip] = useState<string | null>(null);
 
   const recipe = mode === "recipe";
@@ -151,9 +190,9 @@ export default function TopScore() {
   if (agent) {
     return (
       <Table
-        head={["#", "Model", "Two-task score (50 = avg)", "Range (each task alone)", "Tasks", "Per-task scores"]}
+        head={["#", "Model", "Four-task score (50 = avg of these models)", "Range (each task alone)", "Tasks", "Per-task scores"]}
         align={["r", "l", "r", "r", "r", "l"]}
-        rows={DATA.two.map((r, i) => [
+        rows={RECIPE.map((r, i) => [
           i + 1,
           r.model,
           r.score.toFixed(1),
@@ -177,11 +216,11 @@ export default function TopScore() {
   return (
     <div className="viz ar-top" ref={ref} onMouseLeave={() => setTip(null)}>
       <div className="ar-tabs ar-tabs-wrap" role="tablist" aria-label="Composite score view">
+        <button role="tab" aria-selected={recipe} onClick={() => { setMode("recipe"); setTip(null); }}>
+          Two tasks + forecasting + recipes ({RECIPE.length})
+        </button>
         <button role="tab" aria-selected={mode === "two"} onClick={() => { setMode("two"); setTip(null); }}>
           Two tasks ({DATA.two.length})
-        </button>
-        <button role="tab" aria-selected={recipe} onClick={() => { setMode("recipe"); setTip(null); }}>
-          Two tasks + forecasting + $8.70 recipe ({RECIPE.length})
         </button>
         <button role="tab" aria-selected={mode === "all"} onClick={() => { setMode("all"); setTip(null); }}>
           All research, pooled ({DATA.pooled.length})
@@ -194,7 +233,7 @@ export default function TopScore() {
         </button>
       </div>
       <div className="viz-legend">
-        <span><i className="ts-dot solid" />{recipe ? "Polytopia empty + Pokémon 3v3 + forecasting + $8.70 recipe at 8 h" : two ? "Polytopia empty + Pokémon 3v3" : "3+ tasks"}</span>
+        <span><i className="ts-dot solid" />{recipe ? "Polytopia empty + Pokémon 3v3 + forecasting + Polytopia recipes (5 budget cells, 1 h + 8 h)" : two ? "Polytopia empty + Pokémon 3v3" : "3+ tasks"}</span>
         {!two && mode !== "core" && <span><i className="ts-dot hollow" />1–2 tasks</span>}
         <span><i className="ts-whisk" />{two ? "Each task alone" : "Range dropping any one task"}</span>
       </div>
