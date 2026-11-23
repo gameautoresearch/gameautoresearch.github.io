@@ -172,12 +172,13 @@ function PyramidDiagram() {
 }
 
 function ScoreboardDiagram() {
-  const rows: { label: string; ours: number; theirs: number; delta: string }[] = [
-    { label: "Cities", ours: 5, theirs: 3, delta: "+2" },
-    { label: "Units", ours: 8, theirs: 5, delta: "+3" },
-    { label: "Tech", ours: 6, theirs: 4, delta: "+2" },
-    { label: "Score", ours: 7, theirs: 5, delta: "+620" },
-  ];
+  const rows: { label: string; ours: number; theirs: number; delta: string }[] =
+    [
+      { label: "Cities", ours: 5, theirs: 3, delta: "+2" },
+      { label: "Units", ours: 8, theirs: 5, delta: "+3" },
+      { label: "Tech", ours: 6, theirs: 4, delta: "+2" },
+      { label: "Score", ours: 7, theirs: 5, delta: "+620" },
+    ];
   const tokens: [number, number, string][] = [
     [1, 1, BLUE],
     [1, 3, BLUE],
@@ -267,16 +268,14 @@ function ScoreboardDiagram() {
           stroke={BLUE_MID}
           strokeWidth={1.1}
         />
-        <rect
-          x={0}
-          y={0}
-          width={145}
-          height={18}
-          rx={4}
-          fill={BLUE_TINT}
-        />
+        <rect x={0} y={0} width={145} height={18} rx={4} fill={BLUE_TINT} />
         <rect x={0} y={12} width={145} height={6} fill={BLUE_TINT} />
-        <text x={8} y={12.5} className="od-tiny" style={{ fill: BLUE, fontWeight: 600 }}>
+        <text
+          x={8}
+          y={12.5}
+          className="od-tiny"
+          style={{ fill: BLUE, fontWeight: 600 }}
+        >
           36 SUMMARY SCALARS
         </text>
         {rows.map((row, idx) => {
@@ -361,14 +360,36 @@ function CriticDistillDiagram() {
           patternTransform="rotate(45)"
         >
           <rect width="5" height="5" fill={FOG} />
-          <line x1="0" y1="0" x2="0" y2="5" stroke="#c8c8c2" strokeWidth="1.2" />
+          <line
+            x1="0"
+            y1="0"
+            x2="0"
+            y2="5"
+            stroke="#c8c8c2"
+            strokeWidth="1.2"
+          />
         </pattern>
       </defs>
 
       {/* Top row: Policy (fogged) */}
       <g transform="translate(14 14)">
-        <rect x={0} y={0} width={34} height={34} rx={3} fill="#fff" stroke={LINE} />
-        <rect x={17} y={0} width={17} height={34} rx={2} fill="url(#od-fog-hatch)" />
+        <rect
+          x={0}
+          y={0}
+          width={34}
+          height={34}
+          rx={3}
+          fill="#fff"
+          stroke={LINE}
+        />
+        <rect
+          x={17}
+          y={0}
+          width={17}
+          height={34}
+          rx={2}
+          fill="url(#od-fog-hatch)"
+        />
         <circle cx={9} cy={13} r={3} fill={BLUE} />
         <circle cx={11} cy={24} r={3} fill={BLUE} />
         <text x={25.5} y={20.5} className="od-lbl mid" style={{ fill: MUTED }}>
@@ -438,7 +459,15 @@ function CriticDistillDiagram() {
 
       {/* Bottom row: Omniscient Critic */}
       <g transform="translate(14 68)">
-        <rect x={0} y={0} width={34} height={34} rx={3} fill="#fff" stroke={BLUE_MID} />
+        <rect
+          x={0}
+          y={0}
+          width={34}
+          height={34}
+          rx={3}
+          fill="#fff"
+          stroke={BLUE_MID}
+        />
         <circle cx={9} cy={13} r={3} fill={BLUE} />
         <circle cx={11} cy={24} r={3} fill={BLUE} />
         <circle cx={24} cy={11} r={3} fill={OPP} />
@@ -491,7 +520,12 @@ function CriticDistillDiagram() {
         stroke={BLUE}
         strokeWidth={1.1}
       />
-      <text x={241} y={88} className="od-sub mid" style={{ fill: BLUE, fontWeight: 600 }}>
+      <text
+        x={241}
+        y={88}
+        className="od-sub mid"
+        style={{ fill: BLUE, fontWeight: 600 }}
+      >
         Value
       </text>
 
@@ -562,14 +596,7 @@ function PfspDiagram() {
       </defs>
 
       {/* Learner box */}
-      <rect
-        x={12}
-        y={39}
-        width={62}
-        height={36}
-        rx={4}
-        fill={BLUE}
-      />
+      <rect x={12} y={39} width={62} height={36} rx={4} fill={BLUE} />
       <text x={43} y={55} className="od-lbl mid" style={{ fill: "#fff" }}>
         Current
       </text>
@@ -585,7 +612,12 @@ function PfspDiagram() {
         fill="none"
         markerEnd="url(#od-ah-pfk)"
       />
-      <text x={93} y={24} className="od-tiny mid" style={{ fill: INK, fontWeight: 600 }}>
+      <text
+        x={93}
+        y={24}
+        className="od-tiny mid"
+        style={{ fill: INK, fontWeight: 600 }}
+      >
         75%
       </text>
       <rect
@@ -610,7 +642,12 @@ function PfspDiagram() {
         fill="none"
         markerEnd="url(#od-ah-pf)"
       />
-      <text x={93} y={88} className="od-tiny mid" style={{ fill: BLUE, fontWeight: 600 }}>
+      <text
+        x={93}
+        y={88}
+        className="od-tiny mid"
+        style={{ fill: BLUE, fontWeight: 600 }}
+      >
         25%
       </text>
 
@@ -625,7 +662,12 @@ function PfspDiagram() {
         stroke={BLUE_MID}
         strokeWidth={1.1}
       />
-      <text x={125} y={59} className="od-tiny" style={{ fill: BLUE, fontWeight: 600 }}>
+      <text
+        x={125}
+        y={59}
+        className="od-tiny"
+        style={{ fill: BLUE, fontWeight: 600 }}
+      >
         20-CHECKPOINT POOL
       </text>
 
@@ -650,7 +692,10 @@ function PfspDiagram() {
               x={14.5}
               y={13}
               className="od-tiny mid"
-              style={{ fill: evict ? "#a0a09a" : hard ? BLUE : INK, fontWeight: hard ? 700 : 600 }}
+              style={{
+                fill: evict ? "#a0a09a" : hard ? BLUE : INK,
+                fontWeight: hard ? 700 : 600,
+              }}
             >
               {p.id}
             </text>
@@ -689,25 +734,25 @@ const ITEMS = [
   {
     key: "pyramid",
     title: "Cheap full-board context",
-    text: "Added a 6×6 coarse spatial pyramid inside a 4×64 residual net, giving every tile board-wide reach without self-attention’s speed penalty.",
+    text: "Coarse spatial pyramid, giving every tile cheap board-wide awareness.",
     Diagram: PyramidDiagram,
   },
   {
     key: "scoreboard",
     title: "Explicit scoreboard summaries",
-    text: "Computed 36 visible-board tallies and relative leads (cities, units, HP, territory, tech, and estimated score).",
+    text: "Computed 36 visible-board tallies and relative leads (cities, units, HP, territory).",
     Diagram: ScoreboardDiagram,
   },
   {
     key: "critic",
     title: "Omniscient critic distilled into the policy",
-    text: "Paired a separate training-only judge that sees both sides through the fog of war with an auxiliary value head that trains the policy’s own trunk.",
+    text: "Train training-only judge that sees both sides through the fog of war via auxiliary value head.",
     Diagram: CriticDistillDiagram,
   },
   {
     key: "pfsp",
     title: "Pruned historical self-play",
-    text: "Kept a 20-checkpoint opponent pool (25% of games) weighted toward past copies it still lost to, evicting easy ones—whereas other models dropped historical pools after short tests.",
+    text: "Kept a checkpoint opponent pool of past copies it still lost to.",
     Diagram: PfspDiagram,
   },
 ] as const;
