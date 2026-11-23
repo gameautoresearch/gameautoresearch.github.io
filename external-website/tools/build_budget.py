@@ -15,6 +15,11 @@ run past the yardstick's last point. That page is fitted separately (the compute
 each run is moved onto the recipe-curves scale by its mean difference where the two fits share snapshots.
 
     python3 tools/build_budget.py --bench ~/repos/game-autoresearch-bench [--astra-long data.json]
+
+`fill` holds the $8.70 recipes of the fill campaign (poly-budget-fill-20261122b: GPT-6 Astra, GPT-6.1 Sol, Gemini 4
+Carbon; reports/polytopia/research-budget-fill-2026-11-22 and recipe-curves-fill-2026-11-22, same scales). It is kept
+apart from `recipes` so Figures 2 and 3 are unchanged; only Figure 1's recipe tab reads it. `--fill-only` rewrites
+just that key of the existing budget.json.
 """
 import argparse
 import json
@@ -33,13 +38,47 @@ def starter_hours(yard, elo):
     return None
 
 
+def fill_recipes(reports, yard, early):
+    """The fill campaign's recipes with an 8 h curve, in the `recipes` row format."""
+    fb, fc = reports / "polytopia/research-budget-fill-2026-11-22/data.json", reports / "polytopia/recipe-curves-fill-2026-11-22/data.json"
+    if not (fb.exists() and fc.exists()):
+        return []
+    budget = {r["name"]: r for r in json.loads(fb.read_text())["recipes"]}
+    out = []
+    for r in json.loads(fc.read_text())["recipes"]:
+        if not r["curve"]:
+            continue
+        b = budget[r["entrant"]]
+        pts = [dict(hours=round(p["hours"], 1), elo=round(p["elo"])) for p in r["curve"] if p["hours"] >= early]
+        for p in pts:
+            eq = starter_hours(yard, p["elo"])
+            p["starterHours"] = None if eq is None else round(eq, 2)
+        out.append(dict(
+            key="fill-" + r["entrant"], model=r["model_label"], cell=CELL[r["cell"]], budgetUsd=r["research_usd"],
+            spentUsd=r["spent_usd"], researchHours=b["research_hours"], broken=bool(r["broken"]),
+            multiplier1h=r["multiplier_1h"], seedMultipliers=[round(s["hours"], 2) for s in b.get("seeds", []) if s.get("hours")],
+            finals1h=[round(f["elo"]) for f in r["finals"]], curve=pts,
+            early=[dict(hours=round(p["hours"], 3), elo=round(p["elo"])) for p in r["curve"] if p["hours"] < early],
+            long=[], lo8=round(r["curve"][-1]["lo"]), hi8=round(r["curve"][-1]["hi"])))
+    return out
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--bench", required=True, type=Path)
     ap.add_argument("--astra-long", type=Path, help="the astra-long page's data.json")
+    ap.add_argument("--fill-only", action="store_true", help="rewrite only the `fill` key of the existing budget.json")
     args = ap.parse_args()
     reports = args.bench.expanduser() / "reports"
     load = lambda p: json.loads((reports / p).read_text())
+    if args.fill_only:
+        spend = load("polytopia/recipe-curves-2026-11-18/spend-frontier/data.json")
+        yard = [(p["hours"], p["elo"]) for p in spend["starter"] if 0.45 <= p["hours"] <= 14]
+        data = json.loads(OUT.read_text())
+        data["fill"] = fill_recipes(reports, yard, 0.45)
+        OUT.write_text(json.dumps(data, separators=(",", ":")) + "\n")
+        print(f"fill: {len(data['fill'])} recipes ({', '.join(r['model'] for r in data['fill'])}) -> {OUT}")
+        return
 
     budget = load("polytopia/research-budget-2026-11-18/data.json")
     curves = load("polytopia/recipe-curves-2026-11-18/data.json")
@@ -122,7 +161,7 @@ def main():
     data = dict(
         usdPerGpuHour=spend["usd_per_gpu_hour"],
         games=dict(budget=budget["games"], curves=curves["games"]),
-        starter=starter, starterEarly=starter_early, recipes=recipes, longAsOf=asof_long,
+        starter=starter, starterEarly=starter_early, recipes=recipes, fill=fill_recipes(reports, yard, EARLY), longAsOf=asof_long,
         # An untrained network: the random player's rating on the same fit, where every cost curve starts.
         zero=dict(elo=round(spend["zero"]["elo"]), lo=round(spend["zero"]["lo"]), hi=round(spend["zero"]["hi"]), games=spend["zero"]["games"]),
         polyForecast=dict(

@@ -45,14 +45,14 @@ const TASK_MAP = Object.fromEntries(DATA.tasks.map((t) => [t.id, t]));
 // sessions aren't favoured) read off its 8 h training curve: Figure 2's training-compute multiplier (starter's training hours to reach the same Elo / the
 // recipe's 8 h; research spend not counted), standardized on a log scale since it is a ratio. Same method as "two" otherwise: each task
 // standardized (population SD) across just these models, averaged; the whisker spans the tasks taken alone.
-// 50 = average of this smaller field, so not comparable to the other views.
-const BUDGET = budgetRaw as unknown as {
-  recipes: { model: string; cell: string; curve: { hours: number; elo: number }[] }[];
-};
+// 50 = average of this smaller field, so not comparable to the other views. `fill` adds the $8.70 sessions of GPT-6
+// Astra, GPT-6.1 Sol and Gemini 4 Carbon (campaign poly-budget-fill-20261122b, same scales); Figures 2 and 3 don't read it.
+type BudgetRecipe = { model: string; cell: string; curve: { hours: number; elo: number }[] };
+const BUDGET = budgetRaw as unknown as { recipes: BudgetRecipe[]; fill?: BudgetRecipe[] };
 const budgetModel = (mo: string) => (mo === "Opus 5.5" ? "Claude Opus 5.5" : mo);
 const RECIPE_CELL = "$8.70";
 const RECIPE8: Record<string, number> = {};
-for (const r of BUDGET.recipes) {
+for (const r of [...BUDGET.recipes, ...(BUDGET.fill ?? [])]) {
   if (r.cell !== RECIPE_CELL || !r.curve.length) continue;
   const end = r.curve[r.curve.length - 1];
   RECIPE8[budgetModel(r.model)] = starterHoursFor(end.elo).hours / end.hours;

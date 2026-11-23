@@ -135,9 +135,9 @@ export default function AutoresearchPost() {
         Top Line Results
       </h2>
       <p>
-        Fourteen models have comparable results on the same two tasks,
-        Polytopia from an empty file and Pokémon 3v3 from a working starter;
-        five more are rerunning Polytopia. A group of six frontier models leads
+        Nineteen models have comparable results on the same two tasks,
+        Polytopia from an empty file and Pokémon 3v3 from a working starter.
+        A group of six frontier models leads
         the rest, with little between them, and the same models lead when all
         eight research tasks across Polytopia, Pokémon, Hex, Generals and Clash
         are pooled.
