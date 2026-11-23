@@ -220,9 +220,10 @@ export default function AutoresearchPost() {
         <ResearchRace />
       </Figure>
       <p>
-        GPT-6 Astra&rsquo;s best in-session network edged out our tuned starter
-        trained for 200 million samples. Its fresh retrain ranked first among
-        submissions and stayed below the tuned starter.
+        The best in-session networks of GPT-6.2 Sol and GPT-6 Astra edged out
+        our tuned starter trained for 200 million samples. Astra&rsquo;s fresh
+        retrain ranked first among submissions and stayed below the tuned
+        starter.
       </p>
 
       <h2 className="ar-config ar-c2" id="efficiency">

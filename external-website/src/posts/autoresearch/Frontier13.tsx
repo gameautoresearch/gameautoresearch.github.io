@@ -3,11 +3,13 @@ import { useAgentView } from "../../view";
 import { modelStyle } from "./colors";
 import raw from "./polytopia13.json";
 
-// Polytopia from an empty starter, 13 models at 5 GPU-hours (campaigns polytopia-empty15-20261118 and
-// polytopia-frontier6-20261118; readout reports/polytopia/frontier6-2026-11-19.md on branch polytopia-frontier6-cloud).
-// One Bradley–Terry fit over every network the 13 counted sessions sealed, their fresh 15-minute finals, the PPO
-// starter (15 min = 0) and the ladder references. polytopia13.json is derived from that readout's elo.json:
-// nets are [GPU-hours when sealed, Elo, run name, formally submitted].
+// Polytopia from an empty starter, 20 models at 5 GPU-hours: the 13 of campaigns polytopia-empty15-20261118 and
+// polytopia-frontier6-20261118 (readout reports/polytopia/frontier6-2026-11-19.md), Inkling 2 Small
+// (poly-timeline-20261120), GPT-6.2 Sol (poly-empty-sol62-20261120) and the five recipe-variant sessions of
+// poly-empty-recipe-fill-20261122. One pooled Bradley–Terry fit (poly-fill-pooled-20261122, 865 entrants, about
+// 2.5 million games) over every network the counted sessions sealed, their fresh 15-minute finals, earlier model
+// releases, the PPO starter (15 min = 0) and the ladder references. polytopia13.json (the name is kept) is derived
+// from that fit's elo.json: nets are [GPU-hours when sealed, Elo, run name, formally submitted].
 
 type Net = [number, number, string, number];
 type Model = {
@@ -124,7 +126,7 @@ export function ResearchRace() {
         })}
       </div>
       <div className="ar-cost-plot">
-        <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label="Best network so far against research GPU-hours, 13 models"
+        <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label={`Best network so far against research GPU-hours, ${MODELS.length} models`}
           onPointerMove={move} onPointerDown={move} onPointerLeave={() => setHit(null)} style={{ touchAction: "pan-y" }}>
           {yTicks.map((t) => (
             <g key={t}>
@@ -181,7 +183,7 @@ export function EloLeaderboard() {
   const agent = useAgentView();
   const [by, setBy] = useState<"best" | "final">("best");
   const rows = useMemo(() => [...MODELS].sort((a, b) => b[by].elo - a[by].elo), [by]);
-  const lo = -1500, hi = 320, pct = (v: number) => ((Math.max(lo, Math.min(hi, v)) - lo) / (hi - lo)) * 100;
+  const lo = -1600, hi = 320, pct = (v: number) => ((Math.max(lo, Math.min(hi, v)) - lo) / (hi - lo)) * 100;
   if (agent) {
     return <ol>{rows.map((x) => <li key={x.key}>{x.label}: best network {fmtWin(x.best.elo)} vs 15-min starter ({signed(x.best.elo)} Elo), fresh 15-min final {fmtWin(x.final.elo)} ({signed(x.final.elo)} Elo)</li>)}</ol>;
   }

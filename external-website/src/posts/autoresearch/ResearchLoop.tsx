@@ -6,7 +6,7 @@ import raw from "./polytopia13.json";
 
 // One session per scene, looping through a quote, a series of runs and a match.
 // Neon opens with its reaction to a new Polytopia practice record.
-//  - Polytopia: the 13-model empty-starter run (polytopia13.json, reports/polytopia/frontier6-2026-11-19.md). Curves
+//  - Polytopia: the empty-starter run (polytopia13.json, 20 models in one pooled fit; see Frontier13.tsx). Curves
 //    are the Elo of the networks the model sealed, in order; the long run ends at its best network.
 //  - Pokémon 3v3: GPT-6.1 Sol a2 and GPT-6 Luna a1 of reports/pokemon/poke3v3-gpt6-2026-11-15 (timelines.json).
 //    Curves are each training run's private lift over the starter; the long run is the best one.
