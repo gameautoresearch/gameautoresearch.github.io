@@ -153,120 +153,75 @@ function Bill({ x, y, op = 1, sc = 1, seal }: { x: number; y: number; op?: numbe
   );
 }
 
-// Modal's tilted-prism "M" mark in miniature, used beside the GPU caption.
-function ModalMark({ x, y, active }: { x: number; y: number; active: boolean }) {
-  const deep = active ? "#2f9e5c" : "#6b9e79";
-  const bright = active ? "#74e85c" : "#9bd4a8";
-  return (
-    <g transform={`translate(${x} ${y})`}>
-      <polygon points="0.4,7.3 1.2,0.8 3.2,0.8 2.4,7.3" fill={deep} />
-      <polygon points="3.2,0.8 4.9,4.3 6.6,0.8 6.6,3.2 4.9,6.2 3.2,3.2" fill={bright} />
-      <polygon points="6.6,0.8 8.6,0.8 7.8,7.3 5.8,7.3" fill={deep} />
-    </g>
-  );
-}
-
-// Visual representation of the passively cooled NVIDIA L40S PCIe datacenter card rented from Modal:
-// dual-slot I/O bracket on the left, golden PCIe x16 edge fingers underneath, dark anodized shroud with the
-// signature champagne-gold accent stripe, exposed passive heatsink fins, 16-pin power socket, and live activity LED.
+// Minimal line-art NVIDIA L40S PCIe card beside the budget stack: I/O bracket on the left, notched PCIe edge
+// connector underneath, clean shroud with L40S label, passive heatsink lines, and a status dot that lights up
+// while training runs are active.
 function GpuCard({ x, y, active, t, compact }: { x: number; y: number; active: boolean; t: number; compact: boolean }) {
-  const pulse = active ? 0.55 + 0.45 * Math.sin(t / 130) : 0;
-  const wave = (t / 480) % 1;
-  const pins = Array.from({ length: 16 }, (_, i) => 33 + i * 2.7);
-  const fins = Array.from({ length: 9 }, (_, i) => 20.4 + i * 2.15);
+  const wave = (t / 520) % 1;
+  const fins = [20.5, 24.5, 28.5, 32.5, 36.5];
+  const pins = [36, 43, 50, 57, 64, 71];
+  const ink = "#5c5c57";
   return (
     <g transform={`translate(${x} ${y})`}>
-      {/* Soft ground shadow & subtle active Modal-green glow */}
-      <ellipse cx={64} cy={53.2} rx={51} ry={2.2} fill="#111" opacity={0.07} />
-      {active && (
-        <rect x={8} y={5} width={110} height={39} rx={4} fill="#7fee64" opacity={0.07 + pulse * 0.07} />
-      )}
-
-      {/* Dual-slot brushed-steel PCIe I/O bracket */}
+      {/* Minimal PCIe I/O bracket */}
       <path
-        d="M0.5 3.5 H8.5 V49.2 H7.5 V52.2 H5.3 V49.2 H4.5 V6.1 H0.5 Z"
-        fill="#dce0e6"
-        stroke="#787f8a"
-        strokeWidth={0.8}
+        d="M1 4 H8.5 V48 H5.2 V6.6 H1 Z"
+        fill="#fff"
+        stroke={ink}
+        strokeWidth={1.05}
         strokeLinejoin="round"
       />
-      {[12, 19, 26, 33].map((vy) => (
-        <rect key={vy} x={5.7} y={vy} width={1.5} height={4.2} rx={0.4} fill="#5b616c" />
-      ))}
 
-      {/* PCB bottom edge + notched golden PCIe x16 contact fingers */}
-      <rect x={10} y={42.5} width={103} height={4.6} rx={0.8} fill="#1f3128" stroke="#15221b" strokeWidth={0.7} />
-      {/* Retention hook */}
-      <path d="M80 47 H86.5 L88 49.6 L85 50.6 H80 Z" fill="#1f3128" stroke="#15221b" strokeWidth={0.65} strokeLinejoin="round" />
-      {/* Short PCIe key segment */}
-      <rect x={17.5} y={46.6} width={10.5} height={5.2} rx={1} fill="#d4aa49" stroke="#967426" strokeWidth={0.65} />
-      {[20, 22.7, 25.4].map((px) => (
-        <line key={px} x1={px} y1={47.5} x2={px} y2={51.1} stroke="#f5df96" strokeWidth={0.85} />
-      ))}
-      {/* Long PCIe x16 segment */}
-      <rect x={30.5} y={46.6} width={46.5} height={5.2} rx={1} fill="#d4aa49" stroke="#967426" strokeWidth={0.65} />
+      {/* Notched PCIe x16 edge connector */}
+      <rect x={18} y={43} width={10} height={5.5} rx={1} fill="#fff" stroke={ink} strokeWidth={1} />
+      <rect x={31} y={43} width={46} height={5.5} rx={1} fill="#fff" stroke={ink} strokeWidth={1} />
       {pins.map((px) => (
-        <line key={px} x1={px} y1={47.5} x2={px} y2={51.1} stroke="#f5df96" strokeWidth={0.85} />
+        <line key={px} x1={px} y1={44.5} x2={px} y2={48.2} stroke="#b6b6b0" strokeWidth={0.85} />
       ))}
 
-      {/* 16-pin PCIe auxiliary power socket on the rear edge */}
-      <rect x={116.5} y={17} width={4.2} height={11} rx={1} fill="#1b1d22" stroke="#454b55" strokeWidth={0.7} />
-      <line x1={118.6} y1={19.5} x2={118.6} y2={25.5} stroke="#5e6572" strokeWidth={0.8} strokeDasharray="1.3 1.2" />
-
-      {/* Main matte charcoal anodized shroud */}
-      <path
-        d="M8.5 8.2 Q8.5 6 10.7 6 H113.5 L117.5 10 V41.2 Q117.5 43.4 115.3 43.4 H10.7 Q8.5 43.4 8.5 41.2 Z"
-        fill="url(#rl-gpu-shroud)"
-        stroke="#1b1d22"
-        strokeWidth={0.95}
+      {/* Main line-art shroud */}
+      <rect
+        x={8.5}
+        y={7}
+        width={107}
+        height={36}
+        rx={2.5}
+        fill={active ? "#f6fbf7" : "#fafaf8"}
+        stroke={ink}
+        strokeWidth={1.05}
       />
-      {/* Top chamfer highlight */}
-      <line x1={11} y1={7.2} x2={112.5} y2={7.2} stroke="#5f6673" strokeWidth={0.7} opacity={0.55} />
+      <line x1={8.5} y1={13.5} x2={115.5} y2={13.5} stroke="#ddddda" strokeWidth={0.9} />
 
-      {/* Signature NVIDIA L40S champagne-gold accent stripe */}
-      <path
-        d="M9.4 11.4 H69.5 L74.2 15.8 H116.6"
-        fill="none"
-        stroke="url(#rl-gpu-gold)"
-        strokeWidth={2}
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-
-      {/* Recessed passive-cooling heatsink fin bay */}
-      <rect x={76} y={18.6} width={37.5} height={21.4} rx={1.6} fill="#15171c" stroke="#3e434d" strokeWidth={0.75} />
+      {/* Passive heatsink lines */}
+      <rect x={70} y={17.5} width={40} height={21.5} rx={1.5} fill="#fff" stroke="#cfcfc9" strokeWidth={0.9} />
       {fins.map((fy, i) => {
-        // Subtle airflow shimmer gliding down the fin stack while the card is under load
         const dist = Math.abs(((i / fins.length) - wave + 1) % 1 - 0.5);
-        const lit = active ? Math.max(0, 1 - dist * 4.5) : 0;
+        const lit = active ? Math.max(0, 1 - dist * 4) : 0;
         return (
           <line
             key={fy}
-            x1={77.8}
+            x1={73.5}
             y1={fy}
-            x2={111.7}
+            x2={106.5}
             y2={fy}
-            stroke={lit > 0.15 ? "#72d88f" : "#676e7a"}
-            strokeWidth={0.95}
-            opacity={lit > 0.15 ? 0.55 + lit * 0.45 : 0.72}
+            stroke={lit > 0.2 ? "#2f9e5c" : "#c4c4be"}
+            strokeWidth={1}
+            opacity={lit > 0.2 ? 0.45 + lit * 0.55 : 0.9}
           />
         );
       })}
 
-      {/* Shroud typography: NVIDIA L40S 48GB */}
-      <text x={15} y={21.8} className="rl-gpu-brand">NVIDIA</text>
-      <text x={14.5} y={34.5} className="rl-gpu-model">L40S</text>
-      <text x={50.5} y={34.2} className="rl-gpu-spec">48GB</text>
+      {/* Shroud label */}
+      <text x={16} y={32} className="rl-gpu-model">L40S</text>
 
-      {/* Live status LED (Modal green when training, muted grey when idle) */}
-      {active && <circle cx={108.5} cy={11.4} r={4.2} fill="#7fee64" opacity={0.22 + pulse * 0.25} />}
+      {/* Status LED */}
       <circle
-        cx={108.5}
-        cy={11.4}
-        r={2}
-        fill={active ? "#7fee64" : "#4b515c"}
-        stroke={active ? "#2f9e5c" : "#2e3239"}
-        strokeWidth={0.75}
+        cx={108}
+        cy={10.3}
+        r={1.9}
+        fill={active ? "#2f9e5c" : "#fff"}
+        stroke={active ? "#2f9e5c" : "#a8a8a2"}
+        strokeWidth={1}
       />
 
       {/* Subtle compute pulses bridging from the GPU into the training runs column (wide layout only) */}
@@ -275,11 +230,11 @@ function GpuCard({ x, y, active, t, compact }: { x: number; y: number; active: b
         return (
           <circle
             key={i}
-            cx={124 + f * 12}
+            cx={122 + f * 12}
             cy={29}
-            r={1.55}
+            r={1.5}
             fill="#2f9e5c"
-            opacity={Math.sin(f * Math.PI) * 0.85}
+            opacity={Math.sin(f * Math.PI) * 0.8}
           />
         );
       })}
@@ -315,15 +270,12 @@ function CashPile({ left, spending, x, cy, t, compact }: { left: number; spendin
     <g>
       <rect x={px} y={y} width={BILL_W} height={BILL_H} rx={2.6} fill="#f7faf8" stroke="#d8e6dd" strokeDasharray="3 2.5" />
       {bills}
-      <GpuCard x={x + 92} y={174} active={spending} t={t} compact={compact} />
+      <GpuCard x={x + 92} y={175} active={spending} t={t} compact={compact} />
       {flying}
       <text x={px + BILL_W / 2} y={labelY} className="rl-small" textAnchor="middle">
         budget <tspan className="rl-amount">${(BUDGET_USD * left).toFixed(2)}</tspan>
       </text>
-      <ModalMark x={x + 109} y={labelY - 7.5} active={spending} />
-      <text x={x + 121} y={labelY} className="rl-small">
-        rented on <tspan className="rl-modal">Modal</tspan>
-      </text>
+      <text x={x + 152} y={labelY} className="rl-small" textAnchor="middle">NVIDIA L40S</text>
     </g>
   );
 }
@@ -1017,20 +969,8 @@ export default function ResearchLoop() {
     : { agent: "translate(8 0)", runs: "translate(240 0)", game: "translate(456 0)" };
   return (
     <div className="rl" ref={ref}>
-      <svg viewBox={vb} role="img" aria-label={`${labelOf(s)} researching ${GAME_NAME[s.game]} on an NVIDIA L40S GPU rented from Modal: “${s.quote}” ${s.result}.`}
+      <svg viewBox={vb} role="img" aria-label={`${labelOf(s)} researching ${GAME_NAME[s.game]} on an NVIDIA L40S GPU: “${s.quote}” ${s.result}.`}
         onClick={() => go((scene + 1) % SCENES.length)}>
-        <defs>
-          <linearGradient id="rl-gpu-shroud" x1="0" y1="0" x2="1" y2="1">
-            <stop offset="0%" stopColor="#3b4049" />
-            <stop offset="52%" stopColor="#272a31" />
-            <stop offset="100%" stopColor="#1e2026" />
-          </linearGradient>
-          <linearGradient id="rl-gpu-gold" x1="0" y1="0" x2="1" y2="0">
-            <stop offset="0%" stopColor="#b99242" />
-            <stop offset="48%" stopColor="#e5c77c" />
-            <stop offset="100%" stopColor="#c59e4f" />
-          </linearGradient>
-        </defs>
         <g transform={place.agent}><Agent s={s} t={t} color={color} compact={narrow} out={out} /></g>
         <g transform={place.runs}><Runs s={s} t={t} out={out} refOp={refOp} /></g>
         <g transform={place.game}><Match s={s} t={t} out={out} boardOp={boardOp} /></g>
