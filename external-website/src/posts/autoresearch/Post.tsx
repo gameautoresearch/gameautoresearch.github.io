@@ -199,19 +199,19 @@ export default function AutoresearchPost() {
         Can agents save money by spending more on research?
       </h2>
       <p>
-        We were curious about the "payoff" timelines of tokens and compute spent
-        improving the <strong>starter recipe</strong>, the basic PPO setup every
+        We were curious about the payoff of tokens and compute invested in
+        improving the <strong>starter recipe</strong>, the basic RL setup every
         agent began from. We measure a recipe by its{" "}
         <strong>compute multiplier</strong>: how much <i>less</i> compute it
         needs to train a network as strong as one from the starter recipe. Most
-        runs do not pay back within 8 hours of training. The best pays back
-        dramatically, though. One of {costMult.top.model}&rsquo;s sessions
+        runs do not recoup their investment within 8 hours of training. Some pay
+        back dramatically, though. One of {costMult.top.model}&rsquo;s sessions
         trains in 8 hours a network that the starter recipe would need about{" "}
         {Math.round(costMult.top.starterHours)} hours to match ($
         {costMult.top.starterUsd}
         ), so it needs{" "}
         <strong>about {costMult.top.x.toFixed(0)}× less total compute</strong>.
-        The next bes a {costMult.second.model} run that spent &rsquo;s $
+        The next, a {costMult.second.model} run that spent &rsquo;s $
         {costMult.second.spent.toFixed(2)} on research, reaches{" "}
         {costMult.second.x.toFixed(1)}× savings after 8 hours of training.
       </p>
