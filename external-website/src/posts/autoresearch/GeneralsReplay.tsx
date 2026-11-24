@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { CMYK } from "./colors";
 
 // Every joint action in the public demos was replayed independently to the exact final state. Frame 0 lists
@@ -22,8 +22,9 @@ function decodeOrder(id: number, width: number, actionWidth: number) {
   return { from: row * width + col, to: (row + [-1, 1, 0, 0][dir]) * width + col + [0, 0, -1, 1][dir] };
 }
 
-export default function GeneralsReplay({ src, names, start = 0, initialSpeed = 1 }: {
+export default function GeneralsReplay({ src, names, start = 0, initialSpeed = 1, renderSide }: {
   src: string; names?: [string, string]; start?: number; initialSpeed?: number;
+  renderSide?: (side: 0 | 1, meta: string) => ReactNode;
 }) {
   const [rec, setRec] = useState<Recording | null>(null);
   const [pos, setPos] = useState(0);
@@ -77,7 +78,21 @@ export default function GeneralsReplay({ src, names, start = 0, initialSpeed = 1
     return () => cancelAnimationFrame(raf);
   }, [playing, rec, speed]);
 
-  if (!rec || !boards.length) return <div className="gr gr-loading">Loading game…</div>;
+  if (!rec || !boards.length) {
+    if (renderSide) {
+      return (
+        <div className="gr gr-flanked">
+          <div className="sc-row">
+            {renderSide(0, "Loading…")}
+            <div className="sc-center sc-wait">Loading game…</div>
+            {renderSide(1, "Loading…")}
+          </div>
+          <div className="gr-controls sc-controls-stub" aria-hidden="true" />
+        </div>
+      );
+    }
+    return <div className="gr gr-loading">Loading game…</div>;
+  }
   const { width: w, height: h } = rec, last = rec.frames.length - 1;
   const t = Math.min(last, Math.floor(pos)), cells = boards[t], f = rec.frames[t];
   const label = names ?? rec.players;
@@ -106,26 +121,41 @@ export default function GeneralsReplay({ src, names, start = 0, initialSpeed = 1
   }
   const winner = rec.outcome.winner === null ? "Nobody" : label[rec.outcome.winner];
 
+  const sideMeta = (p: 0 | 1) => `${f.scores[p].army.toLocaleString()} army · ${f.scores[p].land} land`;
+  const boardSvg = (
+    <svg viewBox={`0 0 ${W} ${H}`} className="gr-board" role="img" aria-label={`Generals: ${label[0]} vs ${label[1]}, tick ${t}`}>
+      {tiles}
+      {moves.map((m, j) => (
+        <rect key={j} x={(m.to % w) * C + 1} y={Math.floor(m.to / w) * C + 1} width={C - 2} height={C - 2} rx={3}
+          fill="none" stroke="#111" strokeWidth={2} />
+      ))}
+    </svg>
+  );
+
   return (
-    <div className="gr">
-      <div className="gr-hud">
-        {[0, 1].map((p) => (
-          <div key={p} className="gr-side">
-            <i style={{ background: SEAT_COLORS[p] }} />
-            <div>
-              <strong>{label[p]}</strong>
-              <span>{f.scores[p].army.toLocaleString()} army · {f.scores[p].land} land</span>
-            </div>
+    <div className={`gr${renderSide ? " gr-flanked" : ""}`}>
+      {renderSide ? (
+        <div className="sc-row">
+          {renderSide(0, sideMeta(0))}
+          <div className="sc-center">{boardSvg}</div>
+          {renderSide(1, sideMeta(1))}
+        </div>
+      ) : (
+        <>
+          <div className="gr-hud">
+            {[0, 1].map((p) => (
+              <div key={p} className="gr-side">
+                <i style={{ background: SEAT_COLORS[p] }} />
+                <div>
+                  <strong>{label[p]}</strong>
+                  <span>{sideMeta(p as 0 | 1)}</span>
+                </div>
+              </div>
+            ))}
           </div>
-        ))}
-      </div>
-      <svg viewBox={`0 0 ${W} ${H}`} className="gr-board" role="img" aria-label={`Generals: ${label[0]} vs ${label[1]}, tick ${t}`}>
-        {tiles}
-        {moves.map((m, j) => (
-          <rect key={j} x={(m.to % w) * C + 1} y={Math.floor(m.to / w) * C + 1} width={C - 2} height={C - 2} rx={3}
-            fill="none" stroke="#111" strokeWidth={2} />
-        ))}
-      </svg>
+          {boardSvg}
+        </>
+      )}
       <div className="gr-controls">
         <button type="button" onClick={() => { if (pos >= last) setPos(0); setPlaying(!playing); }}>{playing ? "Pause" : "Play"}</button>
         <input type="range" min={0} max={last} step="any" value={pos} aria-label="Tick"

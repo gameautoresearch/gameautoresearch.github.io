@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useRef, useState } from "react";
+import { lazy, Suspense, useEffect, useRef, useState, type ReactNode } from "react";
 import { useAgentView } from "../../view";
 import ReplayViewer from "./polytopia/ReplayViewer";
 import GeneralsReplay from "./GeneralsReplay";
@@ -46,65 +46,65 @@ const CARDS = {
     tag: "a1 · L40S",
     stats: [
       { label: "Params", value: "338K" },
-      { label: "Train GPU", value: "0.93 h" },
-      { label: "Run cost", value: "$2.70" },
+      { label: "GPU", value: "0.93 h" },
+      { label: "Cost", value: "$2.70" },
     ],
-    arch: "96w MLP · damage, STAB & Tera logit prior",
-    train: "PPO (2 ep, γ=.997) + HP-potential shaping",
+    arch: "96w MLP · damage, STAB & Tera prior",
+    train: "PPO (2 ep, γ=.997) + HP shaping",
   },
   pokeAstraA1: {
     name: "GPT-6 Astra",
     tag: "a1 · L40S",
     stats: [
       { label: "Params", value: "477K" },
-      { label: "Train GPU", value: "0.93 h" },
-      { label: "Run cost", value: "$2.70" },
+      { label: "GPU", value: "0.93 h" },
+      { label: "Cost", value: "$2.70" },
     ],
-    arch: "128w MLP · stat-stage combat interactions",
-    train: "PPO (3 ep, γ=.995) + HP-potential shaping",
+    arch: "128w MLP · stat-stage combat head",
+    train: "PPO (3 ep, γ=.995) + HP shaping",
   },
   pokeInklingB2: {
     name: "Inkling 2 Small",
     tag: "b2 · L40S",
     stats: [
       { label: "Params", value: "526K" },
-      { label: "Train GPU", value: "0.93 h" },
-      { label: "Run cost", value: "$2.70" },
+      { label: "GPU", value: "0.93 h" },
+      { label: "Cost", value: "$2.70" },
     ],
     arch: "2× wider starter MLP (128w, 16d emb)",
-    train: "Pure self-play PPO, 2× entropy (0.02)",
+    train: "Self-play PPO, 2× entropy (0.02)",
   },
   pokeDeepSeekA2: {
     name: "DeepSeek V4 Pro",
     tag: "a2 · L40S",
     stats: [
       { label: "Params", value: "814K" },
-      { label: "Train GPU", value: "0.93 h" },
-      { label: "Run cost", value: "$2.70" },
+      { label: "GPU", value: "0.93 h" },
+      { label: "Cost", value: "$2.70" },
     ],
-    arch: "2-layer SiLU MLP encoders (160w, 20d emb)",
-    train: "PPO + 0.5× visible team-HP shaping",
+    arch: "2-layer SiLU MLPs (160w, 20d emb)",
+    train: "PPO + 0.5× team-HP shaping",
   },
   pokeSolA2: {
     name: "GPT-6.1 Sol",
     tag: "a2 · L40S",
     stats: [
       { label: "Params", value: "421K" },
-      { label: "Train GPU", value: "0.92 h" },
-      { label: "Run cost", value: "$2.67" },
+      { label: "GPU", value: "0.92 h" },
+      { label: "Cost", value: "$2.67" },
     ],
-    arch: "128w MLP · built-in 18×18 type-chart prior",
-    train: "PPO + lagged & heuristic opponent mix",
+    arch: "128w MLP · 18×18 type-chart prior",
+    train: "PPO + lagged & heuristic opp mix",
   },
   pokeGlmA3: {
     name: "GLM-5.3",
     tag: "a3 · L40S",
     stats: [
       { label: "Params", value: "903K" },
-      { label: "Train GPU", value: "0.93 h" },
-      { label: "Run cost", value: "$2.70" },
+      { label: "GPU", value: "0.93 h" },
+      { label: "Cost", value: "$2.70" },
     ],
-    arch: "320w side-aware own/foe cross-attention",
+    arch: "320w side-aware cross-attention",
     train: "Plain self-play PPO, unshaped",
   },
   polyOpus: {
@@ -112,96 +112,96 @@ const CARDS = {
     tag: "recipe · L40S",
     stats: [
       { label: "Params", value: "192K" },
-      { label: "Train GPU", value: "2.0 h" },
-      { label: "Run cost", value: "$5.72" },
+      { label: "GPU", value: "2.0 h" },
+      { label: "Cost", value: "$5.72" },
     ],
-    arch: "2×32 ResNet + autoregressive action heads",
-    train: "2-ep PPO, LR 6e-4→6e-5 + score-diff bonus",
+    arch: "2×32 ResNet + autoregressive heads",
+    train: "2-ep PPO, LR decay + score bonus",
   },
   polyLuna: {
     name: "GPT-6 Luna",
     tag: "starter · L40S",
     stats: [
       { label: "Params", value: "192K" },
-      { label: "Train GPU", value: "2.0 h" },
-      { label: "Run cost", value: "$5.71" },
+      { label: "GPU", value: "2.0 h" },
+      { label: "Cost", value: "$5.71" },
     ],
-    arch: "2×32 ResNet + autoregressive action heads",
-    train: "Unmodified starter self-play PPO (LR 3e-4)",
+    arch: "2×32 ResNet + autoregressive heads",
+    train: "Unmodified starter PPO (LR 3e-4)",
   },
   polyAstra: {
     name: "GPT-6 Astra",
     tag: "refined · L40S",
     stats: [
       { label: "Params", value: "390K" },
-      { label: "Train GPU", value: "2.7 h" },
-      { label: "Run cost", value: "$10.36" },
+      { label: "GPU", value: "2.7 h" },
+      { label: "Cost", value: "$10.36" },
     ],
-    arch: "3×48 context-v3 ResNet (global→tile inject)",
-    train: "Score-potential shaping + low-LR refine",
+    arch: "3×48 context-v3 ResNet (global→tile)",
+    train: "Score shaping + low-LR refine",
   },
   polyStarter: {
     name: "Starter",
     tag: "200M · L40S",
     stats: [
       { label: "Params", value: "192K" },
-      { label: "Train GPU", value: "~0.7 h" },
-      { label: "Run cost", value: "~$2.00" },
+      { label: "GPU", value: "~0.7 h" },
+      { label: "Cost", value: "~$2.00" },
     ],
-    arch: "2×32 ResNet + autoregressive action heads",
-    train: "Plain self-play PPO to 200M samples",
+    arch: "2×32 ResNet + autoregressive heads",
+    train: "Plain self-play PPO (200M samples)",
   },
   polySol: {
     name: "GPT-6.1 Sol",
     tag: "recipe · L40S",
     stats: [
       { label: "Params", value: "192K" },
-      { label: "Train GPU", value: "2.0 h" },
-      { label: "Run cost", value: "$5.71" },
+      { label: "GPU", value: "2.0 h" },
+      { label: "Cost", value: "$5.71" },
     ],
-    arch: "2×32 ResNet + autoregressive action heads",
-    train: "Self-play PPO, γ=1.0 + 0.1 dev reward",
+    arch: "2×32 ResNet + autoregressive heads",
+    train: "Self-play PPO, γ=1.0 + dev reward",
   },
   genOpus: {
     name: "Claude Opus 5.5",
     tag: "main7 · L40S",
     stats: [
-      { label: "Sim speed", value: "~14.6k/s" },
-      { label: "Train GPU", value: "2.7 h" },
-      { label: "Run cost", value: "$7.73" },
+      { label: "Speed", value: "~14.6k/s" },
+      { label: "GPU", value: "2.7 h" },
+      { label: "Cost", value: "$7.73" },
     ],
-    arch: "Rebuilt batched JAX sim + jitted GPU PPO",
+    arch: "Rebuilt batched JAX sim + jitted PPO",
     train: "7 chained runs, anchored self-play",
   },
   genSol: {
     name: "GPT-6.1 Sol",
     tag: "final1 · L40S",
     stats: [
-      { label: "Sim speed", value: "~5.4k/s" },
-      { label: "Train GPU", value: "3.3 h" },
-      { label: "Run cost", value: "$11.23" },
+      { label: "Speed", value: "~5.4k/s" },
+      { label: "GPU", value: "3.3 h" },
+      { label: "Cost", value: "$11.23" },
     ],
-    arch: "Rebuilt batched JAX sim (37M joint ticks)",
-    train: "Chained PPO + shaping, pool & symmetries",
+    arch: "Rebuilt batched JAX sim (37M ticks)",
+    train: "PPO + shaping, pool & symmetries",
   },
   genDeepSeek: {
     name: "DeepSeek V4 Pro",
     tag: "train6 · L40S",
     stats: [
-      { label: "Sim speed", value: "~565/s" },
-      { label: "Train GPU", value: "2.3 h" },
-      { label: "Run cost", value: "$6.57" },
+      { label: "Speed", value: "~565/s" },
+      { label: "GPU", value: "2.3 h" },
+      { label: "Cost", value: "$6.57" },
     ],
     arch: "8×96 CNN on supplied Python sim",
-    train: "PPO + castle-ownership rewards (~5M ticks)",
+    train: "PPO + castle rewards (~5M ticks)",
   },
   genKimi: {
     name: "Kimi K3.1 Pro",
     tag: "ppo7 · L40S",
     stats: [
-      { label: "Sim speed", value: "~630/s" },
-      { label: "Train GPU", value: "2.4 h" },
-      { label: "Run cost", value: "$7.11" },
+      { label: "Speed", value: "~630/s" },
+      { label: "GPU", value: "2.4 h" },
+      { label: "Cost", value: "$7.11" },
     ],
     arch: "5×64 ResNet on supplied Python sim",
     train: "PPO + reward tuning (~5M ticks)",
@@ -279,25 +279,7 @@ const GAMES: { id: Game; label: string }[] = [
   { id: "generals", label: "Generals" },
 ];
 
-function Pokemon({ item }: { item: Item }) {
-  const file = usePokemonReplay(item.id);
-  const wait = <div className="sc-wait">{file === "error" ? "This battle could not load." : "Loading battle…"}</div>;
-  return (
-    <Suspense fallback={wait}>
-      {file && file !== "error" && file.id === item.id
-        ? <BattleReplay key={item.id} log={file.log} startTurn={item.start} initialSpeed="fast" />
-        : wait}
-    </Suspense>
-  );
-}
-
-function Stage({ item }: { item: Item }) {
-  if (item.game === "pokemon") return <Pokemon item={item} />;
-  if (item.game === "polytopia") return <ReplayViewer key={item.id} src={`${import.meta.env.BASE_URL}polytopia/${item.id}.json`} names={item.players} start={item.start} initialSpeed={4} compact />;
-  return <GeneralsReplay key={item.id} src={`${import.meta.env.BASE_URL}generals/${item.id}.json`} names={item.players} start={item.start} initialSpeed={2} />;
-}
-
-function Card({ card, accent }: { card: PolicyCard; accent: string }) {
+function SideCard({ card, accent, live }: { card: PolicyCard; accent: string; live: string }) {
   return (
     <div className="sc-card" style={{ borderTopColor: accent }}>
       <div className="sc-card-head">
@@ -305,7 +287,7 @@ function Card({ card, accent }: { card: PolicyCard; accent: string }) {
           <i style={{ background: accent }} aria-hidden="true" />
           <strong>{card.name}</strong>
         </span>
-        <span className="sc-card-tag">{card.tag}</span>
+        <span className="sc-card-live">{live}</span>
       </div>
       <div className="sc-card-stats">
         {card.stats.map((s) => (
@@ -326,6 +308,58 @@ function Card({ card, accent }: { card: PolicyCard; accent: string }) {
         </div>
       </dl>
     </div>
+  );
+}
+
+function Pokemon({ item, renderSide }: { item: Item; renderSide: (side: 0 | 1, live: string) => ReactNode }) {
+  const file = usePokemonReplay(item.id);
+  const wait = (
+    <div className="psr psr-flanked">
+      <div className="sc-row">
+        {renderSide(0, "3/3 Pokémon left")}
+        <div className="sc-center sc-wait">{file === "error" ? "This battle could not load." : "Loading battle…"}</div>
+        {renderSide(1, "3/3 Pokémon left")}
+      </div>
+      <div className="psr-bar sc-controls-stub" aria-hidden="true" />
+    </div>
+  );
+  return (
+    <Suspense fallback={wait}>
+      {file && file !== "error" && file.id === item.id
+        ? <BattleReplay key={item.id} log={file.log} startTurn={item.start} initialSpeed="fast" cropSidebars renderSide={renderSide} />
+        : wait}
+    </Suspense>
+  );
+}
+
+function Stage({ item }: { item: Item }) {
+  const accents = SIDE_COLORS[item.game];
+  const renderSide = (side: 0 | 1, live: string) => (
+    <SideCard card={item.cards[side]} accent={accents[side]} live={live} />
+  );
+  if (item.game === "pokemon") return <Pokemon item={item} renderSide={renderSide} />;
+  if (item.game === "polytopia") {
+    return (
+      <ReplayViewer
+        key={item.id}
+        src={`${import.meta.env.BASE_URL}polytopia/${item.id}.json`}
+        names={item.players}
+        start={item.start}
+        initialSpeed={4}
+        compact
+        renderSide={renderSide}
+      />
+    );
+  }
+  return (
+    <GeneralsReplay
+      key={item.id}
+      src={`${import.meta.env.BASE_URL}generals/${item.id}.json`}
+      names={item.players}
+      start={item.start}
+      initialSpeed={2}
+      renderSide={renderSide}
+    />
   );
 }
 
@@ -368,7 +402,6 @@ export default function Showcase() {
 
   const takeOver = () => setTouring(false);
   const sameGame = ITEMS.map((g, j) => ({ g, j })).filter(({ g }) => g.game === item.game);
-  const accents = SIDE_COLORS[item.game];
 
   return (
     <div className="sc" ref={root} onPointerDownCapture={takeOver} onKeyDownCapture={takeOver}>
@@ -399,11 +432,6 @@ export default function Showcase() {
 
       <div className="sc-stage">
         <Stage item={item} />
-      </div>
-
-      <div className="sc-cards" aria-label="Trained network details">
-        <Card card={item.cards[0]} accent={accents[0]} />
-        <Card card={item.cards[1]} accent={accents[1]} />
       </div>
 
       <div className="sc-matchups" role="tablist" aria-label="Matchup">

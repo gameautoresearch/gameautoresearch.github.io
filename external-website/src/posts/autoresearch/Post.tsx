@@ -1,6 +1,7 @@
-import { Cards, Figure, Table } from "../shared/text";
+import { Figure, Table } from "../shared/text";
 import Showcase from "./Showcase";
 import ResearchLoop from "./ResearchLoop";
+import SubmissionFormats from "./SubmissionFormats";
 import TopScore from "./TopScore";
 import { ForecastLead, pokeSkill, polyForecastN } from "./Budget";
 import { CostMultiplier, costMult } from "./CostMultiplier";
@@ -154,7 +155,7 @@ export default function AutoresearchPost() {
       </Figure>
 
       <h2 className="ar-config" id="setup">
-        How we designed the benchmark
+        Benchmark Design
       </h2>
       <p>
         We wanted agents manage the process like a researcher. Which idea is
@@ -164,36 +165,11 @@ export default function AutoresearchPost() {
         and configs, and a command-line tool to launch experiments on an NVIDIA
         L40S and read logs.
       </p>
-      <p>Across our tasks, we used two submission formats:</p>
+      <p>
+        Across our tasks, we landed on two submission formats for autoresearch:
+      </p>
 
-      <div className="ar-configs">
-        <Cards
-          items={[
-            {
-              title: "Submit a trained model",
-              body: (
-                <>
-                  The agent submits model weights directly. Research and
-                  training share one compute budget, so the agent must weigh
-                  spending compute on tests and research against saving it for
-                  the final training run.
-                </>
-              ),
-            },
-            {
-              title: "Submit a training recipe",
-              body: (
-                <>
-                  The agent submits training code and settings, and we retrain
-                  the recipe from scratch. Because the compute for the final run
-                  is fixed, the agent&rsquo;s session budget goes purely to
-                  research.
-                </>
-              ),
-            },
-          ]}
-        />
-      </div>
+      <SubmissionFormats />
       <Figure
         n={2}
         wide
@@ -248,11 +224,11 @@ export default function AutoresearchPost() {
           How Gemini 4 Neon&rsquo;s $8.58 recipe pulled away
         </h3>
         <p>
-          Using roughly half as many samples as the starter, this recipe matched
-          the starter&rsquo;s 8-hour bot in 2 hours and finished at 416 Elo—72
-          points clear of any other submission and stronger than the
-          starter&rsquo;s 64-hour run. Major interventions that set it apart
-          from other models&rsquo; submissions:
+          This recipe matched the starter recipe with only half the budget, and
+          at full 8hrs of training finished at 72 elo points higher of any other
+          submission - stronger than the starter&rsquo;s 64-hour training run.
+          Major interventions that set it apart from other models&rsquo;
+          submissions:
         </p>
         <NeonOutlierDiagrams />
       </section>

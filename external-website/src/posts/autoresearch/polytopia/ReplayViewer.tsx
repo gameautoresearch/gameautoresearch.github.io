@@ -105,7 +105,15 @@ class ReplayBoundary extends Component<{ children: ReactNode }, { failed: boolea
 // `still` freezes the board at that action index, paused (tools/og renders the link-preview image this way).
 // `start` begins playback that far into the game (0–1), `initialSpeed` sets the starting speed, and `compact` keeps
 // only the scoreboard, the board and the play controls (the post's opening showcase uses all three).
-type ViewerProps = { src: string; names?: [string, string]; still?: number; start?: number; initialSpeed?: number; compact?: boolean };
+type ViewerProps = {
+  src: string;
+  names?: [string, string];
+  still?: number;
+  start?: number;
+  initialSpeed?: number;
+  compact?: boolean;
+  renderSide?: (side: 0 | 1, meta: string) => ReactNode;
+};
 export default function ReplayViewer({ src, ...rest }: ViewerProps) {
   return (
     <ReplayBoundary>
@@ -114,7 +122,7 @@ export default function ReplayViewer({ src, ...rest }: ViewerProps) {
   );
 }
 
-function ReplayBoard({ url, names, still, start, initialSpeed, compact }: Omit<ViewerProps, "src"> & { url: string }) {
+function ReplayBoard({ url, names, still, start, initialSpeed, compact, renderSide }: Omit<ViewerProps, "src"> & { url: string }) {
   const [data, setData] = useState<Replay | null>(null);
   const [pos, setPos] = useState(still ?? 0); // action index; the fraction is how far that action's animation has run
   // Plays on its own and loops, unless the reader prefers reduced motion. Play/Pause, the slider, the speed
@@ -224,7 +232,21 @@ function ReplayBoard({ url, names, still, start, initialSpeed, compact }: Omit<V
     return { n, W, H, at, order, diamond, ground, states: buildStates(data), turnStart, strip };
   }, [data]);
 
-  if (!data || !geom) return <div className="replay replay-loading">Loading replay…</div>;
+  if (!data || !geom) {
+    if (renderSide) {
+      return (
+        <div className="replay replay-compact replay-flanked">
+          <div className="sc-row">
+            {renderSide(0, "Loading…")}
+            <div className="sc-center sc-wait">Loading replay…</div>
+            {renderSide(1, "Loading…")}
+          </div>
+          <div className="replay-controls sc-controls-stub" aria-hidden="true" />
+        </div>
+      );
+    }
+    return <div className="replay replay-loading">Loading replay…</div>;
+  }
 
   const { n, W, H, at, order, diamond, ground, states, turnStart, strip } = geom;
   const last = data.actions.length;
@@ -402,30 +424,45 @@ function ReplayBoard({ url, names, still, start, initialSpeed, compact }: Omit<V
     ].filter(Boolean).join(" · ");
   })();
 
-  return (
-    <div className={`replay${compact ? " replay-compact" : ""}`} ref={root}>
-      <div className="replay-hud">
-        {[1, 2].map((side) => (
-          <div key={side} className="replay-side">
-            <i style={{ background: PLAYER[side] }} />
-            <div>
-              <strong>{names?.[side - 1] ?? data.names[side]}</strong>
-              <span>{score[side - 1].toLocaleString()} pts · {cityCount[side]} cities · {unitCount[side]} units</span>
-            </div>
-          </div>
-        ))}
-      </div>
+  const sideMeta = (side: 1 | 2) =>
+    `${score[side - 1].toLocaleString()} pts · ${cityCount[side]} cities · ${unitCount[side]} units`;
+  const boardSvg = (
+    <svg viewBox={`0 0 ${W} ${H}`} className="replay-board" onMouseLeave={() => setHover(null)}>
+      <g dangerouslySetInnerHTML={{ __html: ground }} />
+      <g>{draw(surface)}</g>
+      <g>{draw(pieces)}</g>
+      <g pointerEvents="none">{draw(effects)}</g>
+      {hover !== null && <polygon points={diamond(hover)} fill="#fff" fillOpacity={0.22} stroke="#fff" strokeWidth={2.5} pointerEvents="none" />}
+      <g fill="transparent">
+        {order.map((t) => <polygon key={t} points={diamond(t)} onMouseEnter={() => setHover(t)} />)}
+      </g>
+    </svg>
+  );
 
-      <svg viewBox={`0 0 ${W} ${H}`} className="replay-board" onMouseLeave={() => setHover(null)}>
-        <g dangerouslySetInnerHTML={{ __html: ground }} />
-        <g>{draw(surface)}</g>
-        <g>{draw(pieces)}</g>
-        <g pointerEvents="none">{draw(effects)}</g>
-        {hover !== null && <polygon points={diamond(hover)} fill="#fff" fillOpacity={0.22} stroke="#fff" strokeWidth={2.5} pointerEvents="none" />}
-        <g fill="transparent">
-          {order.map((t) => <polygon key={t} points={diamond(t)} onMouseEnter={() => setHover(t)} />)}
-        </g>
-      </svg>
+  return (
+    <div className={`replay${compact ? " replay-compact" : ""}${renderSide ? " replay-flanked" : ""}`} ref={root}>
+      {renderSide ? (
+        <div className="sc-row">
+          {renderSide(0, sideMeta(1))}
+          <div className="sc-center">{boardSvg}</div>
+          {renderSide(1, sideMeta(2))}
+        </div>
+      ) : (
+        <>
+          <div className="replay-hud">
+            {[1, 2].map((side) => (
+              <div key={side} className="replay-side">
+                <i style={{ background: PLAYER[side] }} />
+                <div>
+                  <strong>{names?.[side - 1] ?? data.names[side]}</strong>
+                  <span>{sideMeta(side as 1 | 2)}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+          {boardSvg}
+        </>
+      )}
 
       {!compact && <p className="replay-caption" aria-live="polite">
         {hoverInfo || moment?.text || (MOMENTS.length ? "Press play, drag the slider, or jump to a moment below." : "Press play or drag the slider. Hover a tile to inspect it.")}

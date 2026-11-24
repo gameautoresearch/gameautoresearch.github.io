@@ -3,7 +3,7 @@
 // (muted) while it is on screen, fills its container's width and pauses when it leaves, unless the viewer paused it.
 //
 // Keys, while the replay has focus: Space or K play/pause, ← → (or J L) turns, M sound, S switch sides.
-import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import { Scrubber } from "./Scrubber";
 import { summarizeReplay } from "./replay";
 import { useShowdownBattle, type Speed } from "./useShowdownBattle";
@@ -19,6 +19,10 @@ export interface BattleReplayProps {
   startTurn?: number;
   /** Starting playback speed (default normal). */
   initialSpeed?: Speed;
+  /** Crop Showdown's 100px trainer sidebars and focus on the 440×360 center arena. */
+  cropSidebars?: boolean;
+  /** Optional left/right side cards rendered flanking the arena (0 = p1, 1 = p2). */
+  renderSide?: (side: 0 | 1, meta: string) => ReactNode;
   className?: string;
 }
 
@@ -33,7 +37,7 @@ const Icon = {
   soundOn: <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z" fill="currentColor" /><path d="M15.5 9a4 4 0 0 1 0 6M18 6.5a7.5 7.5 0 0 1 0 11" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" /></svg>,
 };
 
-export default function BattleReplay({ log, autoplay = true, startTurn, initialSpeed, className }: BattleReplayProps) {
+export default function BattleReplay({ log, autoplay = true, startTurn, initialSpeed, cropSidebars = false, renderSide, className }: BattleReplayProps) {
   const summary = useMemo(() => summarizeReplay(log), [log]);
   const end = summary.turns + 1; // the scrubber's last stop: the end of the battle, after the final turn
   const stage = useRef<HTMLDivElement>(null);
@@ -43,6 +47,7 @@ export default function BattleReplay({ log, autoplay = true, startTurn, initialS
   const userPaused = useRef(false);
   const b = useShowdownBattle(log, { enabled: near });
   const { state } = b;
+  const arenaWidth = cropSidebars ? 440 : 640;
 
   // Load when within a screen of the viewport; play while at least half the field is visible.
   useEffect(() => {
@@ -66,16 +71,16 @@ export default function BattleReplay({ log, autoplay = true, startTurn, initialS
     else if (!visible && state.playing) b.pause();
   }, [visible, state.status, autoplay]);
 
-  // The field is laid out at Showdown's 640 × 360 and scaled to fill the available width.
+  // The field is laid out at Showdown's 640 × 360 (or cropped 440 × 360 center arena) and scaled to fill width.
   useEffect(() => {
     const el = stage.current;
     if (!el) return;
-    const fit = () => setScale(el.clientWidth / 640);
+    const fit = () => setScale(el.clientWidth / arenaWidth);
     fit();
     const ro = typeof ResizeObserver !== "undefined" ? new ResizeObserver(fit) : null;
     ro?.observe(el);
     return () => ro?.disconnect();
-  }, []);
+  }, [arenaWidth]);
 
   const toggle = () => {
     if (state.playing) { userPaused.current = true; b.pause(); }
@@ -102,17 +107,35 @@ export default function BattleReplay({ log, autoplay = true, startTurn, initialS
     title: `Turn ${k.turn}: ${k.pokemon} (${summary.players[k.side]}) fainted`,
   }));
   const playLabel = state.finished ? "Watch again" : state.playing ? "Pause" : "Play";
+  const leftCount = (side: "p1" | "p2") => {
+    const fainted = summary.knockouts.filter((k) => k.side === side && (state.finished ? true : k.turn < position)).length;
+    return `${Math.max(0, 3 - fainted)}/3 Pokémon left`;
+  };
+  const stageEl = (
+    <div className="psr-stage" ref={stage} style={{ height: Math.round(360 * scale) }} onClick={toggle}>
+      <div
+        className="psr-scale ps-battle"
+        style={{ transform: cropSidebars ? `scale(${scale}) translateX(-100px)` : `scale(${scale})` }}
+      >
+        <div className="battle" ref={b.frameRef} />
+      </div>
+      {state.status !== "ready" && (
+        <div className="psr-note">{state.status === "error" ? "The battle viewer could not load." : "Loading battle…"}</div>
+      )}
+    </div>
+  );
 
   return (
-    <div className={`psr ${className ?? ""}`} onKeyDown={onKeyDown}>
-      <div className="psr-stage" ref={stage} style={{ height: Math.round(360 * scale) }} onClick={toggle}>
-        <div className="psr-scale ps-battle" style={{ transform: `scale(${scale})` }}>
-          <div className="battle" ref={b.frameRef} />
+    <div className={`psr${cropSidebars ? " psr-crop" : ""}${renderSide ? " psr-flanked" : ""} ${className ?? ""}`} onKeyDown={onKeyDown}>
+      {renderSide ? (
+        <div className="sc-row">
+          {renderSide(0, leftCount("p1"))}
+          <div className="sc-center sc-center-poke">{stageEl}</div>
+          {renderSide(1, leftCount("p2"))}
         </div>
-        {state.status !== "ready" && (
-          <div className="psr-note">{state.status === "error" ? "The battle viewer could not load." : "Loading battle…"}</div>
-        )}
-      </div>
+      ) : (
+        stageEl
+      )}
       <div className="psr-bar">
         <button type="button" className="psr-ic psr-play" aria-label={playLabel} title={`${playLabel} (Space)`}
           onClick={toggle} disabled={state.status !== "ready"}>

@@ -8,6 +8,8 @@
 .psr .battle { position: absolute; top: 0; left: 0; width: 640px; height: 360px; margin: 0; border: 0; }
 /* Showdown's own overlay buttons (one can turn sound on) are replaced by the bar. */
 .psr .battle .playbutton, .psr .battle .replayDownloadButton { display: none !important; }
+/* Cropped showcase mode: hide Showdown's trainer sidebars so external policy cards flank the 440×360 arena. */
+.psr-crop .battle .leftbar, .psr-crop .battle .rightbar { display: none !important; }
 .psr-note { position: absolute; inset: 0; display: grid; place-items: center; color: #555; font-size: 13px; }
 
 /* Bar: every control is 32px tall and centred on one line. */
