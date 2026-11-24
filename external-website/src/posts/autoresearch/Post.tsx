@@ -251,18 +251,7 @@ export default function AutoresearchPost() {
         ran <strong>five short A/B tests</strong> (mostly pairs of 12-minute
         runs for ~$0.60 each).
       </p>
-      <Figure
-        n={3}
-        wide
-        caption={
-          <>
-            How Gemini 4 Neon spent $8.58 of its $8.70 Polytopia research
-            budget: five short A/B tests, $0.04 of CPU debugging, and a 1-hour
-            final validation. Arrows show each branch&rsquo;s practice win-rate
-            uplift over the previous best; the kept branch is bolded.
-          </>
-        }
-      >
+      <Figure n={3} wide caption={<></>}>
         <NeonDiscipline />
       </Figure>
       <Figure
