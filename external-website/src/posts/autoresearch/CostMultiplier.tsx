@@ -76,7 +76,8 @@ const point = (r: Recipe, hours: number, elo: number, final: boolean): Pt => {
     xTrainLo: at8 ? starterHoursFor(r.lo8!).hours / hours : null, xTrainHi: at8 ? starterHoursFor(r.hi8!).hours / hours : null };
 };
 const recipes = DATA.recipes.filter((r) => r.curve.length);
-const curves = recipes.map((r) => ({ r, pts: r.curve.map((p) => point(r, p.hours, p.elo, false)), finals: r.finals1h.map((e) => point(r, 1, e, true)) }));
+// The fresh 1 h finals (finals1h) are left off the plot: they only added noise (owner request, 2026-11-23).
+const curves = recipes.map((r) => ({ r, pts: r.curve.map((p) => point(r, p.hours, p.elo, false)) }));
 const at8 = curves.map((c) => c.pts[c.pts.length - 1]).sort((a, b) => b.x - a.x);
 export const TOP8 = at8[0];
 export const costMult = {
@@ -190,7 +191,7 @@ export function CostMultiplier() {
   }
   const H = sideBySide ? 22 + 36 + bars.length * 38 : Math.round(Math.max(300, Math.min(400, W * 0.52)));
   const m = { l: compact ? 38 : 46, r: compact ? 12 : 88, t: 22, b: 36 };
-  const all = curves.flatMap((c) => [...c.pts, ...c.finals]);
+  const all = curves.flatMap((c) => c.pts);
   const cx = (q: Pt) => q.cost, vy = (q: Pt) => q.x;
   const COST_MAX = Math.ceil(Math.max(...all.map(cx)) / 5) * 5;
   const L0 = Math.log2(0.0625), L1 = Math.log2(16);
@@ -201,9 +202,10 @@ export function CostMultiplier() {
   for (let x = 0; x <= COST_MAX; x += W < 380 ? 10 : 5) xTicks.push(x);
   const models = [...bars.map((b) => b.r.model), ...recipes.map((r) => r.model)].filter((mo, i, a) => a.indexOf(mo) === i);
   const top = TOP8;
-  const rank = (r: Recipe) => (r.key === hit?.key ? 2 : r === top.r ? 1 : 0);
+  // Hovering a point brings forward every recipe from that model; the hovered recipe is drawn heaviest.
+  const rank = (r: Recipe) => (r.key === hit?.key ? 3 : r.model === hit?.model ? 2 : r === top.r ? 1 : 0);
   const hits: Hit[] = all.map((q) => ({
-    cx: sx(cx(q)), cy: sy(vy(q)), key: q.r.key, model: q.r.model, title: `${q.r.model}, ${q.r.cell}${q.final ? " (fresh 1 h final)" : ""}`,
+    cx: sx(cx(q)), cy: sy(vy(q)), key: q.r.key, model: q.r.model, title: `${q.r.model}, ${q.r.cell}`,
     lines: [
       `${hrs(q.hours)} trained: as strong as the starter after ${q.extrap ? "about " : ""}${hrs(q.sh)}${q.extrap ? ` (extrapolated past its ${hrs(TOP.hours)} run)` : ""}`,
       `${q.extrap ? "≈" : ""}${fx(q.x)} less compute than the starter, research included`,
@@ -233,7 +235,6 @@ export function CostMultiplier() {
           );
         })}
         <span><i style={{ background: CMYK.k }} />Starter (1×)</span>
-        <span><i className="sq" />1 h finals</span>
       </div>
       <div className="ar-cost-pair">
         <figure className="pt-figure ar-cost-fig">
@@ -260,13 +261,13 @@ export function CostMultiplier() {
                 <text x={m.l} y={m.t - 9} className="viz-axis">
                   {compact ? "compute multiplier (log scale)" : "compute multiplier: starter's cost ÷ recipe's total cost (log scale)"}
                 </text>
-                {[...curves].sort((a, b) => rank(a.r) - rank(b.r)).map(({ r, pts, finals }) => {
+                {[...curves].sort((a, b) => rank(a.r) - rank(b.r)).map(({ r, pts }) => {
                   const st = modelStyle(r.model), focus = hit?.key === r.key, hi = r === top.r;
+                  const lit = hit ? r.model === hit.model : hi;
                   return (
                     <g key={r.key}>
-                      <path d={path(pts)} fill="none" stroke={st.color} strokeWidth={focus ? 2.8 : hi ? 2.4 : 1.4} strokeLinejoin="round" opacity={hi ? 1 : 0.25} />
-                      {pts.map((p) => <circle key={p.hours} cx={sx(cx(p))} cy={sy(vy(p))} r={focus ? 4 : 2.6} fill={p.extrap ? "#fff" : st.color} stroke={p.extrap ? st.color : "#fff"} strokeWidth={p.extrap ? 1.6 : 1} opacity={hi ? 1 : 0.35} />)}
-                      {finals.map((p, i) => { const s = focus ? 4.5 : 3.5; return <rect key={i} x={sx(cx(p)) - s} y={sy(vy(p)) - s} width={2 * s} height={2 * s} rx={1.2} fill={st.color} stroke={CMYK.k} strokeWidth={1} opacity={hi ? 0.9 : 0.35} />; })}
+                      <path d={path(pts)} fill="none" stroke={st.color} strokeWidth={focus ? 2.8 : lit ? 2.2 : 1.4} strokeLinejoin="round" opacity={lit ? 1 : hit ? 0.15 : 0.25} />
+                      {pts.map((p) => <circle key={p.hours} cx={sx(cx(p))} cy={sy(vy(p))} r={focus ? 4 : 2.6} fill={p.extrap ? "#fff" : st.color} stroke={p.extrap ? st.color : "#fff"} strokeWidth={p.extrap ? 1.6 : 1} opacity={lit ? 1 : hit ? 0.2 : 0.35} />)}
                     </g>
                   );
                 })}

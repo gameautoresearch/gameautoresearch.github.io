@@ -1,0 +1,216 @@
+{
+ "source": "reports/generals/slowsim-expansion-2026-11-24.md (Generals expansion, November 24, 2026)",
+ "task": "Generals, empty starter with an editable slow simulator, network variant, 3 L40S-hours of research per model, Terminus-2 high effort",
+ "tournament": "19 networks (Gemini 4 Carbon held out), 171 pairings, 43,776 games, 4,608 per network on 128 maps in both seats; Bradley-Terry Elo centered at 1000, 95% whole-map bootstrap intervals",
+ "rows": [
+  {
+   "rank": 1,
+   "model": "Claude Fable 5.2",
+   "cohort": "new",
+   "elo": 1395.1,
+   "lo": 1371.6,
+   "hi": 1418.9,
+   "h2h": 86.01,
+   "panel": 92.58,
+   "submissions": 6
+  },
+  {
+   "rank": 2,
+   "model": "GPT-6.2 Sol",
+   "cohort": "previous",
+   "elo": 1329.0,
+   "lo": 1314.5,
+   "hi": 1345.4,
+   "h2h": 81.22,
+   "panel": 92.9,
+   "submissions": 6
+  },
+  {
+   "rank": 3,
+   "model": "Claude Opus 5.5",
+   "cohort": "new",
+   "elo": 1299.3,
+   "lo": 1278.0,
+   "hi": 1320.6,
+   "h2h": 78.85,
+   "panel": 90.76,
+   "submissions": 8
+  },
+  {
+   "rank": 4,
+   "model": "GPT-6.2 Astra",
+   "cohort": "new",
+   "elo": 1298.1,
+   "lo": 1281.6,
+   "hi": 1315.5,
+   "h2h": 78.75,
+   "panel": 93.16,
+   "submissions": 4
+  },
+  {
+   "rank": 5,
+   "model": "Gemini 4 Neon",
+   "cohort": "previous",
+   "elo": 1255.4,
+   "lo": 1232.0,
+   "hi": 1278.7,
+   "h2h": 75.14,
+   "panel": 89.45,
+   "submissions": 6
+  },
+  {
+   "rank": 6,
+   "model": "Tencent Hy4",
+   "cohort": "previous",
+   "elo": 1233.0,
+   "lo": 1214.1,
+   "hi": 1251.6,
+   "h2h": 73.16,
+   "panel": 86.91,
+   "submissions": 4
+  },
+  {
+   "rank": 7,
+   "model": "GPT-6 Astra",
+   "cohort": "new",
+   "elo": 1128.0,
+   "lo": 1109.5,
+   "hi": 1146.8,
+   "h2h": 63.3,
+   "panel": 88.48,
+   "submissions": 7
+  },
+  {
+   "rank": 8,
+   "model": "Meta Muse Wonder",
+   "cohort": "new",
+   "elo": 1126.8,
+   "lo": 1112.2,
+   "hi": 1142.7,
+   "h2h": 63.18,
+   "panel": 87.83,
+   "submissions": 5
+  },
+  {
+   "rank": 9,
+   "model": "Kimi K3",
+   "cohort": "new",
+   "elo": 1040.3,
+   "lo": 1027.0,
+   "hi": 1054.1,
+   "h2h": 54.58,
+   "panel": 88.41,
+   "submissions": 1
+  },
+  {
+   "rank": 10,
+   "model": "GPT-6.1 Sol",
+   "cohort": "new",
+   "elo": 997.6,
+   "lo": 976.3,
+   "hi": 1017.7,
+   "h2h": 50.25,
+   "panel": 73.37,
+   "submissions": 4
+  },
+  {
+   "rank": 11,
+   "model": "Gemini 4 Hydrogen",
+   "cohort": "new",
+   "elo": 931.1,
+   "lo": 915.7,
+   "hi": 948.9,
+   "h2h": 43.47,
+   "panel": 78.71,
+   "submissions": 5
+  },
+  {
+   "rank": 12,
+   "model": "GPT-6.1 Terra",
+   "cohort": "new",
+   "elo": 834.1,
+   "lo": 822.7,
+   "hi": 846.5,
+   "h2h": 33.65,
+   "panel": 56.18,
+   "submissions": 6
+  },
+  {
+   "rank": 13,
+   "model": "DeepSeek V4.1 Flash",
+   "cohort": "previous",
+   "elo": 775.3,
+   "lo": 763.1,
+   "hi": 787.5,
+   "h2h": 27.93,
+   "panel": 46.48,
+   "submissions": 5
+  },
+  {
+   "rank": 14,
+   "model": "GLM-5.3",
+   "cohort": "previous",
+   "elo": 762.7,
+   "lo": 750.1,
+   "hi": 775.1,
+   "h2h": 26.74,
+   "panel": 43.1,
+   "submissions": 6
+  },
+  {
+   "rank": 15,
+   "model": "Kimi K3.1 Pro",
+   "cohort": "new",
+   "elo": 741.5,
+   "lo": 728.9,
+   "hi": 754.4,
+   "h2h": 24.77,
+   "panel": 38.35,
+   "submissions": 3
+  },
+  {
+   "rank": 16,
+   "model": "Inkling 2 Small",
+   "cohort": "previous",
+   "elo": 734.2,
+   "lo": 721.5,
+   "hi": 746.2,
+   "h2h": 24.11,
+   "panel": 37.04,
+   "submissions": 3
+  },
+  {
+   "rank": 17,
+   "model": "DeepSeek V4 Flash",
+   "cohort": "new",
+   "elo": 713.0,
+   "lo": 699.1,
+   "hi": 727.1,
+   "h2h": 22.22,
+   "panel": 37.11,
+   "submissions": 4
+  },
+  {
+   "rank": 18,
+   "model": "DeepSeek V4 Pro",
+   "cohort": "new",
+   "elo": 706.8,
+   "lo": 690.8,
+   "hi": 722.0,
+   "h2h": 21.68,
+   "panel": 26.04,
+   "submissions": 1
+  },
+  {
+   "rank": 19,
+   "model": "GPT-6 Luna",
+   "cohort": "previous",
+   "elo": 698.7,
+   "lo": 682.4,
+   "hi": 714.5,
+   "h2h": 20.99,
+   "panel": 29.43,
+   "submissions": 3
+  }
+ ]
+}

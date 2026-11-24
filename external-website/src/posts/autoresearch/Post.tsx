@@ -7,8 +7,8 @@ import { ForecastLead, pokeSkill, polyForecastN } from "./Budget";
 import { CostMultiplier, costMult } from "./CostMultiplier";
 import NeonOutlierDiagrams from "./NeonOutlierDiagrams";
 import NeonDiscipline from "./NeonDiscipline";
+import RecipeTimelines from "./RecipeTimelines";
 import { ResearchRace } from "./Frontier13";
-import { SessionTimeline } from "./Timeline";
 import modalWordmark from "./modal-wordmark.svg";
 import "../shared/post.css";
 import "./post.css";
@@ -138,18 +138,20 @@ export default function AutoresearchPost() {
         Overall Ranking
       </h2>
       <p>
-        We graded 10 models accross 4 training tasks: Polytopia from an empty
+        We graded 10 models across 5 training tasks: Polytopia from an empty
         file, Pokémon 3v3 from a working starter, Polytopia recipes written
-        under five research budgets, and forecasting training run results based
-        on previous data.
+        under five research budgets, forecasting training run results based on
+        previous data, and a Generals network trained from an empty starter and
+        ranked in a 19-network tournament.
       </p>
       <Figure
         n={1}
         wide
         caption={
           <>
-            Overall model scores on four tasks with normalized scores, ±1 std
-            dev
+            Overall model scores on five tasks with normalized scores, ±1
+            standard error across tasks. Gemini 4 Carbon was not in the Generals
+            tournament; its score averages its four other tasks.
           </>
         }
       >
@@ -177,8 +179,10 @@ export default function AutoresearchPost() {
         wide
         caption={
           <>
-            Best network trained over time on Polytopia from an empty file, with
-            diamonds showing each final 15-minute retrain.
+            Best network found so far across a 5 GPU-hour auto-research session
+            on Polytopia from an empty file. Win rate is measured against our
+            15-minute trained baseline; the upper dashed line is the same
+            baseline trained for 36 minutes.
           </>
         }
       >
@@ -192,31 +196,23 @@ export default function AutoresearchPost() {
       </p>
 
       <h2 className="ar-config ar-c2" id="efficiency">
-        How efficient are the recipes agents discover?
+        Can agents save money by spending more on research?
       </h2>
       <p>
-        GPU experiments helped on average compared with the one-cent condition.
-        Among agents with enough budget to run experiments, the spread between
-        recipes at the same budget was much bigger than the difference between
-        budget levels. Most $8.70 sessions spent their budget in about two
-        hours, so giving them a longer deadline mostly gave us another attempt
-        at the same spend.
-      </p>
-      <p>
-        We measure a recipe by its <strong>compute multiplier</strong>: how much
-        less compute it needs to train a network of equivalent strength to a
-        basic PPO recipe. We were curious about the "payoff" timelines of tokens
-        and compute spent on improving this recipe. Most runs do not pay back
-        within 8 hours of training. The best pays back dramatically, though. One
-        of {costMult.top.model}&rsquo;s sessions trains in 8 hours a network
-        that our default recipe would need about{" "}
+        We were curious about the "payoff" timelines of tokens and compute spent
+        on improving this recipe. We measure a recipe by its{" "}
+        <strong>compute multiplier</strong>: how much <i>less</i> compute it
+        needs to train a network of equivalent strength to the basic PPO recipe.
+        Most runs do not pay back within 8 hours of training. The best pays back
+        dramatically, though. One of {costMult.top.model}&rsquo;s sessions
+        trains in 8 hours a network that our default recipe would need about{" "}
         {Math.round(costMult.top.starterHours)} hours to match ($
         {costMult.top.starterUsd}
         ), so it needs{" "}
         <strong>about {costMult.top.x.toFixed(0)}× less total compute</strong>.
         The next best, {costMult.second.model}
         &rsquo;s ${costMult.second.spent.toFixed(2)} session, reaches{" "}
-        {costMult.second.x.toFixed(1)}× savings.
+        {costMult.second.x.toFixed(1)}× savings after 8 hours of training.
       </p>
       <CostMultiplier />
 
@@ -254,28 +250,35 @@ export default function AutoresearchPost() {
       <Figure n={3} wide caption={<></>}>
         <NeonDiscipline />
       </Figure>
+      <p>
+        Other models spent the same $8.70 Polytopia budget very differently.
+        Where Gemini 4 Neon ran 11 experiments across 4.4 hours&mdash;short
+        probes (5&ndash;13 min) followed by a 1-hour validation&mdash;GPT-6.2
+        Astra, GPT-6.2 Sol and Kimi K3.1 Pro each put the whole budget into
+        three ~1-hour runs and finished in about two hours, while Claude Fable
+        5.2, Claude Opus 5.5 and DeepSeek V4.1 Flash sat in between with
+        4&ndash;6 runs.
+      </p>
       <Figure
         n={4}
         wide
         caption={
           <>
-            Pokémon 3v3 training runs over real session time, colored from
-            weaker (magenta) to stronger (cyan) than the starter.
+            How all seven models in the $8.70 Polytopia recipe task spent their
+            budget (~3 GPU-hours across up to two L40S GPUs, 7-hour limit).
+            Hover any run to see what it tested and what it cost; right columns
+            show completed GPU training runs and 8-hour retrain Elo (starter =
+            290).
           </>
         }
       >
-        <SessionTimeline />
+        <RecipeTimelines />
       </Figure>
 
       <h3 id="tools">Would agents fix a slow simulator?</h3>
       <p>
-        Fast simulation is usually part of the workspace we give agents. In a
-        separate Generals test we supplied a plain Python simulator that played
-        one game at a time and gave no hints about its speed. We checked that it
-        matched the fast host engine on 120,000 game ticks. Practice, grading
-        and the tournament still ran on the host engine, so agents could rebuild
-        their training simulator without changing the game their policies were
-        judged on.
+        Fast simulation is usually part of the workspace we give agents. In some
+        tests, we supplied an accurate but single-threaded Python simulator.
       </p>
       <p>
         All four agents noticed the bottleneck. Claude Opus 5.5 and GPT-6.1 Sol
@@ -287,47 +290,24 @@ export default function AutoresearchPost() {
         so the tournament shows how the whole strategy worked within the budget.
       </p>
 
-      <h3 id="techniques">What changes actually held up</h3>
-      <p>
-        We retrained every Polytopia recipe for 8 hours. One of Gemini 4 Neon's
-        recipes was the strongest by a clear margin: 416 Elo, about 70 above the
-        best recipe from any other model. It stacked several changes at once, so
-        the table lists what went into it and into Neon's $2.90 recipe (330,
-        tied for second). The last column shows what earlier one-at-a-time tests
-        on Opus, Sol and Astra recipes found. Both Neon recipes practised
-        against past copies of themselves, which the earlier models had tried
-        and dropped, and both used turn-based credit, the only change in either
-        recipe that also held up in those tests.
-      </p>
-      <TechniqueTable />
-
       <h3 id="forecast">Predicting which run will win</h3>
       <p>
-        Forecasting lets us examine a decision researchers make before they buy
-        compute. We included both fresh finals and individual research runs, and
-        showed forecasters only evidence available at launch. The simpler
-        benchmark predicts from run length and prior practice scores. We fit it
-        on other sessions and resampled whole sessions when estimating
-        uncertainty, because runs from the same researcher session share
-        history.
+        Forecasting is a cheap microcosm of researchers ability: making accurate
+        predictions before buying compute. We sampled several historical
+        research runs, then showed forcasting agents only evidence from up until
+        it launched, like the training recipe and results from prior runs.
       </p>
       <p>
-        Good research also requires predicting which experiments will pay off—a
-        place where current models are still weak. Given {pokeSkill.items}{" "}
-        anonymized Pokémon runs cut off at launch, all {pokeSkill.aboveBlind} of{" "}
-        {pokeSkill.n} models beat a blind guess, but only{" "}
-        {pokeSkill.above.length} ({pokeSkill.above.join(" and ")}) reliably beat
-        a simple ridge regression on run length and practice history. Given
-        1-hour evidence for four Polytopia recipes, all {polyForecastN} models
-        ranked the eventual 8-hour winner last.
+        Given {pokeSkill.items} anonymized Pokémon runs cut off at launch, only{" "}
+        ({pokeSkill.above.join(" and ")}) reliably beat a simple ridge
+        regression on run length and practice history.
       </p>
       <Figure
         n={5}
         caption={
           <>
             Forecast skill across {pokeSkill.items} Pokémon runs (0 = blind
-            guess, 1 = perfect) compared with a ridge regression baseline
-            (dotted line).
+            guess, 1 = perfect) compared with a simple baseline.
           </>
         }
       >

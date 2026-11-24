@@ -24,20 +24,99 @@ const fmtWin = (elo: number) => {
   return p < 0.5 ? "<1%" : p > 99.5 ? ">99%" : `${Math.round(p)}%`;
 };
 const REFS = [
-  { name: "200M starter (80%)", elo: DATA.refs["starter-200m"] },
-  { name: "15-min starter (50%)", elo: 0 },
-  { name: "20M starter (22%)", elo: DATA.refs["starter-20m"] },
-  { name: "Untrained (<1%)", elo: DATA.refs["random"] },
+  {
+    id: "tuned",
+    label: "Tuned PPO baseline (36 min, 80%)",
+    shortLabel: "Tuned PPO baseline (36 min)",
+    elo: DATA.refs["starter-200m"],
+    align: "left" as const,
+  },
+  {
+    id: "base15",
+    label: "15-min PPO baseline (50% = even)",
+    shortLabel: "15-min PPO baseline (even)",
+    elo: 0,
+    align: "right" as const,
+  },
 ];
 const signed = (v: number) => (v > 0 ? `+${v}` : v < 0 ? `−${-v}` : "0");
 const gpuText = (h: number) => (h < 1 ? `${Math.round(h * 60)} min` : `${h.toFixed(2)} GPU-h`);
 
-function bestSoFar(m: Model) {
-  const steps: [number, number][] = [];
+// Label every model that reaches >10% win rate and runs for most of the session (>=3h) directly on the right margin
+// (12 models), giving a strict 1-to-1 match between colored curves and right-margin labels. The remaining 8 models
+// (7 clustered under 6%, plus GPT-6.2 Astra which broke its env at 1.1h) stay quiet grey and light up in color on hover.
+const LABELED_KEYS = new Set(
+  MODELS.filter((model) => winPct(model.best.elo) >= 10 && model.gpu >= 3.0).map((model) => model.key),
+);
+const TOP_KEYS = new Set(
+  [...MODELS]
+    .filter((model) => LABELED_KEYS.has(model.key))
+    .sort((a, b) => b.best.elo - a.best.elo)
+    .slice(0, 4)
+    .map((model) => model.key),
+);
+
+function curveColor(label: string) {
+  const c = modelStyle(label).color;
+  return c === "#bdbdbd" || c === "#b5b5b5" ? "#7d7d77" : c;
+}
+
+function labelTextColor(label: string) {
+  const c = curveColor(label);
+  if (c === "#d4a000") return "#967000";
+  if (c === "#7f9ae0") return "#5470bd";
+  if (c === "#f08cc0") return "#c75091";
+  return c;
+}
+
+type Step = { x: number; y: number; elo: number; run: string; submitted: number };
+
+function frontierSteps(m: Model): Step[] {
+  const steps: Step[] = [];
   let best = -Infinity;
-  for (const [x, y] of m.nets) if (y > best) { best = y; steps.push([x, y]); }
-  steps.push([m.gpu, best]);
+  for (const [x, elo, run, submitted] of m.nets) {
+    if (elo > best) {
+      best = elo;
+      steps.push({ x, y: winPct(elo), elo, run, submitted });
+    }
+  }
   return steps;
+}
+
+function distSqToSegment(px: number, py: number, x1: number, y1: number, x2: number, y2: number) {
+  const dx = x2 - x1;
+  const dy = y2 - y1;
+  const lenSq = dx * dx + dy * dy;
+  if (lenSq === 0) return { d2: (px - x1) ** 2 + (py - y1) ** 2, qx: x1, qy: y1 };
+  const t = Math.max(0, Math.min(1, ((px - x1) * dx + (py - y1) * dy) / lenSq));
+  const qx = x1 + t * dx;
+  const qy = y1 + t * dy;
+  return { d2: (px - qx) ** 2 + (py - qy) ** 2, qx, qy };
+}
+
+function layoutLabels(items: { key: string; targetY: number }[], minGap: number, minY: number, maxY: number) {
+  const out = items.map((item) => ({ ...item, y: item.targetY })).sort((a, b) => a.targetY - b.targetY);
+  if (!out.length) return new Map<string, number>();
+  // Center the cluster around its natural centroid when spacing forces expansion.
+  for (let pass = 0; pass < 8; pass++) {
+    for (let i = 1; i < out.length; i++) {
+      const overlap = out[i - 1].y + minGap - out[i].y;
+      if (overlap > 0) {
+        out[i - 1].y -= overlap / 2;
+        out[i].y += overlap / 2;
+      }
+    }
+    if (out[0].y < minY) {
+      const shift = minY - out[0].y;
+      for (const item of out) item.y += shift;
+    }
+    const last = out[out.length - 1];
+    if (last.y > maxY) {
+      const shift = last.y - maxY;
+      for (const item of out) item.y -= shift;
+    }
+  }
+  return new Map(out.map((item) => [item.key, item.y]));
 }
 
 export function useWidth(ref: React.RefObject<HTMLElement>) {
@@ -54,124 +133,395 @@ export function useWidth(ref: React.RefObject<HTMLElement>) {
   return w;
 }
 
-type Hit = { cx: number; cy: number; key: string; title: string; lines: string[] };
+type HoverState = {
+  key: string;
+  cx: number;
+  cy: number;
+  step: Step | null;
+};
+
+const MODEL_STEPS = new Map(MODELS.map((model) => [model.key, frontierSteps(model)]));
+const MODEL_BY_KEY = new Map(MODELS.map((model) => [model.key, model]));
 
 export function ResearchRace() {
   const agent = useAgentView();
   const plotId = useId();
   const ref = useRef<HTMLDivElement>(null);
-  const W = useWidth(ref), narrow = W < 560;
-  const [log, setLog] = useState(true);
-  const [hit, setHit] = useState<Hit | null>(null);
-  const H = Math.round(Math.max(340, Math.min(500, W * 0.55)) * 1.2);
-  const m = { l: 46, r: narrow ? 12 : 118, t: 22, b: 40 };
-  // Y is win % vs the 15-min starter on a log axis, 0.01% to 100%. yMin is the Elo at the bottom edge.
-  const [pLo, pHi] = [0.01, 100], yMin = -400 * Math.log10(100 / pLo - 1);
-  const xLo = 0.04, xHi = 5.1;
-  const sx = (h: number) => {
-    const t = log ? (Math.log10(Math.max(h, xLo)) - Math.log10(xLo)) / (Math.log10(xHi) - Math.log10(xLo)) : h / 5;
-    return m.l + t * (W - m.l - m.r);
-  };
-  // Values below the shown range run off the bottom of the plot (clipped), rather than piling up on its edge.
-  const syP = (p: number) => m.t + ((Math.log10(pHi) - Math.log10(p)) / (Math.log10(pHi) - Math.log10(pLo))) * (H - m.t - m.b);
-  const sy = (e: number) => syP(Math.max(winPct(e), 1e-9));
-  const xTicks = log ? [0.05, 0.1, 0.25, 0.5, 1, 2, 5] : [0, 1, 2, 3, 4, 5];
-  const yTicks = [0.01, 0.1, 1, 10, 100];
+  const W = useWidth(ref);
+  const narrow = W < 540;
+  const [hover, setHover] = useState<HoverState | null>(null);
 
   if (agent) {
     return (
       <ul>
-        {MODELS.map((x) => <li key={x.key}>{x.label}: {x.nets.length} networks, best {fmtWin(x.best.elo)} vs 15-min starter ({signed(x.best.elo)} Elo, {x.best.run} at {gpuText(x.best.gpu)}), fresh 15-min final {fmtWin(x.final.elo)} ({signed(x.final.elo)} Elo).</li>)}
+        {MODELS.map((x) => (
+          <li key={x.key}>
+            {x.label}: {x.nets.length} networks, best {fmtWin(x.best.elo)} vs 15-min PPO baseline (
+            {signed(x.best.elo)} Elo, {x.best.run} at {gpuText(x.best.gpu)}), fresh 15-min retrain{" "}
+            {fmtWin(x.final.elo)} ({signed(x.final.elo)} Elo).
+          </li>
+        ))}
       </ul>
     );
   }
 
-  const top = MODELS.reduce((best, model) => model.best.elo > best.best.elo ? model : best);
-  const highlighted = hit?.key ?? top.key;
-  const rank = (model: Model) => Number(model.key === highlighted);
-  const hits: Hit[] = MODELS.flatMap((model) => [
-    ...model.nets.filter(([, elo]) => elo >= yMin).map(([hours, elo, run, submitted]) => ({
-      cx: sx(hours), cy: sy(elo), key: model.key, title: `${model.label} · ${run}`,
-      lines: [`${fmtWin(elo)} vs 15-min starter (${signed(elo)} Elo)`,
-        `After ${gpuText(hours)} of research${submitted ? " · submitted" : ""}`],
-    })),
-    ...(model.final.elo >= yMin ? [{
-      cx: sx(model.gpu), cy: sy(model.final.elo), key: model.key, title: `${model.label} · fresh 15-min final`,
-      lines: [`${fmtWin(model.final.elo)} vs 15-min starter (${signed(model.final.elo)} Elo)`],
-    }] : []),
-  ]);
-  const move = (ev: React.PointerEvent<SVGSVGElement>) => {
-    const box = ev.currentTarget.getBoundingClientRect(), k = W / box.width;
-    const px = (ev.clientX - box.left) * k, py = (ev.clientY - box.top) * k;
-    let near: Hit | null = null, d = 14 * 14;
-    for (const point of hits) {
-      const distance = (point.cx - px) ** 2 + (point.cy - py) ** 2;
-      if (distance < d) { d = distance; near = point; }
+  const H = narrow ? 320 : 428;
+  const m = { l: 42, r: narrow ? 14 : 162, t: 26, b: 40 };
+  const plotW = W - m.l - m.r;
+  const plotH = H - m.t - m.b;
+  const xMax = 5;
+  const sx = (h: number) => m.l + (Math.min(xMax, Math.max(0, h)) / xMax) * plotW;
+  const sy = (p: number) => m.t + ((100 - Math.min(100, Math.max(0, p))) / 100) * plotH;
+  const xTicks = [0, 1, 2, 3, 4, 5];
+  const yTicks = [0, 25, 50, 75, 100];
+
+  const stepPath = (model: Model) => {
+    const steps = MODEL_STEPS.get(model.key) ?? [];
+    if (!steps.length) return "";
+    let d = `M${sx(0).toFixed(1)},${sy(0).toFixed(1)}`;
+    for (const s of steps) {
+      d += `H${sx(s.x).toFixed(1)}V${sy(s.y).toFixed(1)}`;
     }
-    setHit(near);
+    d += `H${sx(model.gpu).toFixed(1)}`;
+    return d;
   };
-  const path = (pts: [number, number][]) => pts.map(([x, y], i) => `${i ? "L" : "M"}${sx(x).toFixed(1)},${sy(y).toFixed(1)}`).join("");
-  const tipLeft = hit ? Math.max(0, hit.cx + 12 + 250 > W ? hit.cx - 262 : hit.cx + 12) : 0;
+
+  const labeledModels = MODELS.filter((model) => LABELED_KEYS.has(model.key)).sort(
+    (a, b) => b.best.elo - a.best.elo,
+  );
+  const topModels = labeledModels.filter((model) => TOP_KEYS.has(model.key));
+  const labelYMap = layoutLabels(
+    labeledModels.map((model) => ({ key: model.key, targetY: sy(winPct(model.best.elo)) })),
+    16,
+    m.t + 6,
+    sy(10),
+  );
+
+  const move = (ev: React.PointerEvent<SVGSVGElement>) => {
+    const box = ev.currentTarget.getBoundingClientRect();
+    const k = W / box.width;
+    const px = (ev.clientX - box.left) * k;
+    const py = (ev.clientY - box.top) * k;
+    if (px < m.l - 8 || px > W - m.r + 8 || py < m.t - 8 || py > H - m.b + 8) {
+      setHover(null);
+      return;
+    }
+
+    let bestDist = 16 * 16;
+    let found: HoverState | null = null;
+    for (const model of MODELS) {
+      const steps = MODEL_STEPS.get(model.key) ?? [];
+      if (!steps.length) continue;
+      let curX = sx(0);
+      let curY = sy(0);
+      let curStep: Step | null = null;
+
+      for (const s of steps) {
+        const nx = sx(s.x);
+        const ny = sy(s.y);
+        // Horizontal segment leading to this jump
+        const hSeg = distSqToSegment(px, py, curX, curY, nx, curY);
+        if (hSeg.d2 < bestDist) {
+          bestDist = hSeg.d2;
+          found = { key: model.key, cx: hSeg.qx, cy: hSeg.qy, step: curStep ?? s };
+        }
+        // Vertical jump up to this step
+        const vSeg = distSqToSegment(px, py, nx, curY, nx, ny);
+        if (vSeg.d2 < bestDist) {
+          bestDist = vSeg.d2;
+          found = { key: model.key, cx: vSeg.qx, cy: vSeg.qy, step: s };
+        }
+        curX = nx;
+        curY = ny;
+        curStep = s;
+      }
+
+      // Final horizontal plateau from last breakthrough to session end
+      const endX = sx(model.gpu);
+      const lastSeg = distSqToSegment(px, py, curX, curY, endX, curY);
+      if (lastSeg.d2 < bestDist) {
+        bestDist = lastSeg.d2;
+        found = { key: model.key, cx: lastSeg.qx, cy: lastSeg.qy, step: curStep };
+      }
+    }
+    setHover(found);
+  };
+
+  const hoverFromLabel = (model: Model) => {
+    const steps = MODEL_STEPS.get(model.key) ?? [];
+    const last = steps[steps.length - 1] ?? null;
+    setHover({
+      key: model.key,
+      cx: sx(model.gpu),
+      cy: sy(winPct(model.best.elo)),
+      step: last,
+    });
+  };
+
+  const activeKey = hover?.key ?? null;
+  const activeModel = activeKey ? MODEL_BY_KEY.get(activeKey) ?? null : null;
+  const isColored = (model: Model) => LABELED_KEYS.has(model.key);
+  const drawOrder = [...MODELS].sort((a, b) => {
+    const ra = a.key === activeKey ? 3 : TOP_KEYS.has(a.key) ? 2 : isColored(a) ? 1 : 0;
+    const rb = b.key === activeKey ? 3 : TOP_KEYS.has(b.key) ? 2 : isColored(b) ? 1 : 0;
+    return ra - rb || a.best.elo - b.best.elo;
+  });
+
+  const tipW = narrow ? 215 : 245;
+  const tipLeft = hover
+    ? Math.max(4, Math.min(W - tipW - 4, hover.cx + 14 + tipW > W - 4 ? hover.cx - tipW - 14 : hover.cx + 14))
+    : 0;
+  const tipBelow = hover ? hover.cy < 116 : false;
+
+  const otherCount = MODELS.length - labeledModels.length;
 
   return (
-    <div className="viz" ref={ref}>
-      <div className="ar-tabs ar-tabs-wrap" role="tablist" aria-label="Time axis">
-        <button role="tab" aria-selected={log} onClick={() => { setLog(true); setHit(null); }}>Log time</button>
-        <button role="tab" aria-selected={!log} onClick={() => { setLog(false); setHit(null); }}>Linear time</button>
-      </div>
-      <div className="viz-legend">
-        {MODELS.map(({ key, label }) => {
-          const st = modelStyle(label);
-          return <span key={key}><i style={{ background: st.color }} />{label}</span>;
-        })}
-      </div>
+    <div className="viz fr" ref={ref}>
+      {narrow && (
+        <div className="viz-legend fr-compact-key">
+          {topModels.map((model) => (
+            <span key={model.key}>
+              <i style={{ background: curveColor(model.label) }} />
+              {model.label}
+            </span>
+          ))}
+          <span className="fr-compact-others">
+            <i style={{ background: "#c8c8c2" }} />
+            +{MODELS.length - topModels.length} models
+          </span>
+        </div>
+      )}
       <div className="ar-cost-plot">
-        <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label={`Best network so far against research GPU-hours, ${MODELS.length} models`}
-          onPointerMove={move} onPointerDown={move} onPointerLeave={() => setHit(null)} style={{ touchAction: "pan-y" }}>
+        <svg
+          viewBox={`0 0 ${W} ${H}`}
+          role="img"
+          aria-label={`Best network win rate against research GPU-hours, ${MODELS.length} models`}
+          onPointerMove={move}
+          onPointerDown={move}
+          onPointerLeave={() => setHover(null)}
+          style={{ touchAction: "pan-y" }}
+        >
+          {/* Horizontal grid + Y-axis ticks */}
           {yTicks.map((t) => (
             <g key={t}>
-              <line x1={m.l} x2={W - m.r} y1={syP(t)} y2={syP(t)} className="viz-grid" />
-              <text x={m.l - 8} y={syP(t)} className="viz-axis" textAnchor="end" dominantBaseline="middle">{t}%</text>
+              <line
+                x1={m.l}
+                x2={W - m.r}
+                y1={sy(t)}
+                y2={sy(t)}
+                className={t === 0 ? "viz-zero" : "viz-grid"}
+              />
+              <text x={m.l - 8} y={sy(t)} className="viz-axis" textAnchor="end" dominantBaseline="middle">
+                {t}%
+              </text>
             </g>
           ))}
+
+          {/* Vertical grid + X-axis ticks */}
           {xTicks.map((t) => (
             <g key={t}>
               <line x1={sx(t)} x2={sx(t)} y1={m.t} y2={H - m.b} className="viz-grid" />
-              <text x={sx(t)} y={H - m.b + 16} className="viz-axis" textAnchor="middle">{t >= 1 || t === 0 ? `${t}h` : `${Math.round(t * 60)}m`}</text>
+              <text x={sx(t)} y={H - m.b + 16} className="viz-axis" textAnchor="middle">
+                {t}h
+              </text>
             </g>
           ))}
-          <text x={m.l} y={m.t - 9} className="viz-axis">Win % vs the 15-minute PPO starter (log scale)</text>
-          <text x={W - m.r} y={H - 4} className="viz-axis" textAnchor="end">research GPU-hours spent</text>
-          {REFS.map((r) => (
-            <g key={r.name}>
-              <line x1={m.l} x2={W - m.r} y1={sy(r.elo)} y2={sy(r.elo)} className="viz-ref" />
-              {!narrow && <text x={W - m.r + 6} y={sy(r.elo)} className="fr-ref" dominantBaseline="middle">{r.name}</text>}
-            </g>
-          ))}
-          <clipPath id={plotId}><rect x={m.l - 6} y={m.t - 6} width={W - m.l - m.r + 12} height={H - m.t - m.b + 12} /></clipPath>
+
+          {/* Axis titles */}
+          <text x={m.l} y={m.t - 10} className="viz-axis">
+            Win % vs. 15-minute PPO baseline
+          </text>
+          <text x={W - m.r} y={H - 4} className="viz-axis" textAnchor="end">
+            research budget spent (GPU-hours)
+          </text>
+
+          {/* PPO baseline reference lines */}
+          {REFS.map((r) => {
+            const ry = sy(winPct(r.elo));
+            const isLeft = r.align === "left";
+            return (
+              <g key={r.id}>
+                <line x1={m.l} x2={W - m.r} y1={ry} y2={ry} className="fr-ref-line" />
+                <text
+                  x={isLeft ? m.l + 6 : W - m.r - 6}
+                  y={isLeft ? ry - 6 : ry + 13}
+                  textAnchor={isLeft ? "start" : "end"}
+                  className="fr-ref-lbl"
+                >
+                  {narrow ? r.shortLabel : r.label}
+                </text>
+              </g>
+            );
+          })}
+
+          {/* Frontier step curves */}
+          <clipPath id={plotId}>
+            <rect x={m.l - 4} y={m.t - 4} width={plotW + 8} height={plotH + 8} />
+          </clipPath>
           <g clipPath={`url(#${plotId})`}>
-            {[...MODELS].sort((a, b) => rank(a) - rank(b)).map((model) => {
-              const st = modelStyle(model.label), isTop = model.key === top.key, focus = model.key === hit?.key;
+            {drawOrder.map((model) => {
+              const isTop = TOP_KEYS.has(model.key);
+              const colored = isColored(model);
+              const isFocus = model.key === activeKey;
+              const dimmed = activeKey !== null && !isFocus;
+              const col = curveColor(model.label);
+              const stroke = isFocus || colored ? col : "#c2c2bc";
+              const isSol61 = model.key === "sol";
+              const strokeWidth = isFocus ? 2.6 : isTop ? 2.0 : colored ? 1.55 : 1.1;
+              const baseOpacity = isTop ? 0.95 : isSol61 ? 0.65 : colored ? 0.8 : 0.45;
+              const opacity = isFocus ? 1 : dimmed ? (colored ? 0.14 : 0.08) : baseOpacity;
+              const steps = MODEL_STEPS.get(model.key) ?? [];
+              const endX = sx(model.gpu);
+              const endY = sy(winPct(model.best.elo));
+
               return (
                 <g key={model.key}>
-                  <path d={path(bestSoFar(model))} fill="none" stroke={st.color} strokeWidth={focus ? 2.6 : isTop ? 2.4 : 1.4} strokeLinejoin="round" opacity={isTop ? 1 : 0.28} />
-                  {model.nets.map(([hours, elo, , submitted], i) => elo >= yMin && (
-                    <circle key={i} cx={sx(hours)} cy={sy(elo)} r={submitted ? 3.5 : 2.8} fill={st.color}
-                      stroke="#fff" strokeWidth={1} opacity={isTop ? 1 : 0.35} />
-                  ))}
-                  {model.final.elo >= yMin && (
-                    <path d={`M${sx(model.gpu)},${sy(model.final.elo) - 5}l5,5l-5,5l-5,-5z`} fill={st.color}
-                      stroke="#fff" strokeWidth={1.2} opacity={isTop ? 1 : 0.35} />
+                  <path
+                    d={stepPath(model)}
+                    fill="none"
+                    stroke={stroke}
+                    strokeWidth={strokeWidth}
+                    strokeLinejoin="miter"
+                    opacity={opacity}
+                  />
+                  {/* Mark early-stopped colored curves subtly so it's clear where their session ended */}
+                  {colored && model.gpu < 4.75 && (
+                    <circle
+                      cx={endX}
+                      cy={endY}
+                      r={isFocus ? 3.5 : 2.3}
+                      fill={col}
+                      stroke="#fff"
+                      strokeWidth={1}
+                      opacity={opacity}
+                    />
                   )}
+                  {/* On hover only, show the hovered model's breakthrough steps cleanly */}
+                  {isFocus &&
+                    steps.map((s, idx) => (
+                      <circle
+                        key={idx}
+                        cx={sx(s.x)}
+                        cy={sy(s.y)}
+                        r={hover?.step === s ? 4 : 2.6}
+                        fill={col}
+                        stroke="#fff"
+                        strokeWidth={1.2}
+                      />
+                    ))}
                 </g>
               );
             })}
           </g>
+
+          {/* Direct right-margin labels for all 12 models above 10% (plus quiet tail note) */}
+          {!narrow && (
+            <g className="fr-direct-labels">
+              {labeledModels.map((model) => {
+                const col = curveColor(model.label);
+                const textCol = labelTextColor(model.label);
+                const isTop = TOP_KEYS.has(model.key);
+                const endX = sx(model.gpu);
+                const endY = sy(winPct(model.best.elo));
+                const ly = labelYMap.get(model.key) ?? endY;
+                const isFocus = activeKey === model.key;
+                const dimmed = activeKey !== null && !isFocus;
+                const rightEdge = W - m.r;
+                const labelX = rightEdge + 12;
+                const elbowX = rightEdge + 5;
+                const stoppedEarly = model.gpu < 4.75;
+                return (
+                  <g
+                    key={model.key}
+                    className="fr-direct-item"
+                    opacity={dimmed ? 0.2 : 1}
+                    onPointerEnter={() => hoverFromLabel(model)}
+                    onPointerLeave={() => setHover(null)}
+                  >
+                    {stoppedEarly && (
+                      <line
+                        x1={endX + 3}
+                        x2={rightEdge}
+                        y1={endY}
+                        y2={endY}
+                        stroke={col}
+                        strokeWidth={1}
+                        strokeDasharray="1.5 3"
+                        opacity={isFocus ? 0.8 : 0.4}
+                      />
+                    )}
+                    <path
+                      d={`M${(stoppedEarly ? rightEdge : endX + 2).toFixed(1)},${endY.toFixed(1)}L${elbowX.toFixed(1)},${ly.toFixed(1)}L${(labelX - 3).toFixed(1)},${ly.toFixed(1)}`}
+                      fill="none"
+                      stroke={col}
+                      strokeWidth={isFocus ? 1.5 : 1}
+                      opacity={isFocus ? 0.95 : 0.65}
+                    />
+                    <text x={labelX} y={ly} dominantBaseline="middle" className="fr-lbl">
+                      <tspan style={{ fill: textCol, fontWeight: isFocus ? 700 : isTop ? 600 : 500 }}>
+                        {model.label}
+                      </tspan>
+                      <tspan className="fr-lbl-pct" dx={4}>
+                        {fmtWin(model.best.elo)}
+                      </tspan>
+                    </text>
+                  </g>
+                );
+              })}
+
+              {/* Quiet right-margin summary for the remaining unlabeled models */}
+              <g opacity={activeKey && LABELED_KEYS.has(activeKey) ? 0.2 : 1}>
+                <text x={W - m.r + 12} y={sy(2.5) - 5} className="fr-pack-lbl" dominantBaseline="middle">
+                  {otherCount} other models
+                </text>
+                <text x={W - m.r + 12} y={sy(2.5) + 8} className="fr-pack-sub" dominantBaseline="middle">
+                  Hover any line to inspect
+                </text>
+              </g>
+            </g>
+          )}
         </svg>
-        {hit && (
-          <div className="viz-tip" style={hit.cy < 110 ? { left: tipLeft, top: hit.cy + 14, transform: "none" } : { left: tipLeft, top: hit.cy - 10 }} role="status">
-            <strong>{hit.title}</strong>
-            {hit.lines.map((line) => <span key={line}>{line}</span>)}
+
+        {hover && activeModel && (
+          <div
+            className="viz-tip"
+            style={
+              tipBelow
+                ? { left: tipLeft, top: hover.cy + 14, transform: "none" }
+                : { left: tipLeft, top: hover.cy - 12 }
+            }
+            role="status"
+          >
+            <strong className="fr-tip-head">
+              <i style={{ background: curveColor(activeModel.label) }} />
+              {activeModel.label}
+            </strong>
+            {hover.step && hover.step.elo !== activeModel.best.elo ? (
+              <>
+                <span>
+                  Best so far: <b>{fmtWin(hover.step.elo)}</b> ({signed(hover.step.elo)} Elo) ·{" "}
+                  {hover.step.run} at {gpuText(hover.step.x)}
+                </span>
+                <span>
+                  Session peak: {fmtWin(activeModel.best.elo)} at {gpuText(activeModel.best.gpu)} ·
+                  15-min retrain: {fmtWin(activeModel.final.elo)}
+                </span>
+              </>
+            ) : (
+              <>
+                <span>
+                  Best network: <b>{fmtWin(activeModel.best.elo)}</b> ({signed(activeModel.best.elo)}{" "}
+                  Elo) · {activeModel.best.run} at {gpuText(activeModel.best.gpu)}
+                </span>
+                <span>
+                  Fresh 15-min retrain: {fmtWin(activeModel.final.elo)} (
+                  {signed(activeModel.final.elo)} Elo)
+                </span>
+              </>
+            )}
+            {activeModel.gpu < 4.0 && (
+              <em>Ended at {gpuText(activeModel.gpu)} of 5h budget</em>
+            )}
           </div>
         )}
       </div>

@@ -5,13 +5,16 @@ import { modelStyle } from "./colors";
 import { useWidth } from "./Frontier13";
 import raw from "./top-scores.json";
 import budgetRaw from "./budget.json";
+import generalsRaw from "./generals-tournament.json";
 import { starterHoursFor } from "./CostMultiplier";
 
 // Overall model score (Figure 1): the ten models with all four shared tasks (Polytopia empty file, Pokémon 3v3,
-// forecasting and the Polytopia research-budget recipes). Task scores come from top-scores.json
-// (reports/top-level-score-2026-11-20/build.py) and budget.json. Each task is standardized across these models
-// (50 = their average, 10 points = 1 SD) and the four are averaged; the whisker is ±1 standard error of that average
-// across tasks (sample SD of the four task scores / √4).
+// forecasting and the Polytopia research-budget recipes), plus the Generals tournament for every one of them that
+// played it (all but Gemini 4 Carbon, which was held out of that campaign). Task scores come from top-scores.json
+// (reports/top-level-score-2026-11-20/build.py), budget.json and generals-tournament.json
+// (reports/generals/slowsim-expansion-2026-11-24.md). Each task is standardized against the frozen scale below
+// (50 = the reference models' average, 10 points = 1 SD) and a model's tasks are averaged; the whisker is ±1 standard
+// error of that average across its tasks (sample SD of its task scores / √n).
 
 type Task = {
   id: string;
@@ -26,8 +29,8 @@ type Row = {
   score: number;
   lo: number;
   hi: number;
-  // Each task's standardized score, in RECIPE_TASKS order.
-  each: number[];
+  // Each task's standardized score, in SCORE_TASKS order; null where the model didn't run that task.
+  each: (number | null)[];
 };
 
 const DATA = raw as unknown as { tasks: Task[] };
@@ -95,21 +98,26 @@ for (const r of [...BUDGET.recipes, ...(BUDGET.fill ?? [])]) {
   obs8h.push({ model, cell: r.cell, y: Math.log(m8) });
 }
 
+// Required for a place in the ranking.
 const RECIPE_TASKS = ["poly_empty", "poke", "forecast", "recipe8"];
+// Averaged in when the model has it.
+const OPTIONAL_TASKS = ["generals_t"];
+const SCORE_TASKS = [...RECIPE_TASKS, ...OPTIONAL_TASKS];
 // Value that gets standardized: the recipe multiplier on a log scale (it is a ratio), the others as reported.
 const taskValue = (id: string, v: number) =>
   id === "recipe8" ? Math.log(v) : v;
 
-// Frozen scale, v1 (2026-11-23). Scores are measured against fixed constants from a reference group, so adding a model
-// later doesn't move anyone else: 50 = the average of the ten reference models below, 10 points = their standard
-// deviation on that task. Two things are frozen:
+// Frozen scale. Scores are measured against fixed constants from a reference group, so adding a model later doesn't
+// move anyone else: 50 = the average of the ten reference models below, 10 points = their standard deviation on that
+// task. Two things are frozen:
 //   CELL_OFFSETS: how each recipe budget cell went (log multiplier, 1 h and 8 h), from the least-squares fit above over
 //     the reference models. A model's recipe effect is the mean over the cells it ran of (its log multiplier - offset).
-//   NORMS: each task's mean and population SD across the reference models (recipe task on a log scale).
-// Both are what the live fit gave on 2026-11-23, so the reference models' scores are unchanged. Models added later
-// score against the same constants and may land outside 35–65. To re-norm, compute new constants with
-// computeReference() and bump the version in the caption and post; don't edit these silently.
-const SCALE_VERSION = "v1 (Nov 2026)";
+//   NORMS: each task's mean and population SD across the reference models (recipe task on a log scale; Generals over
+//     the nine reference models in its tournament).
+// Both are what the live fit gave on 2026-11-23 (Generals: 2026-11-24). Models added later score against the same
+// constants and may land outside 35–65. Generals Elo is relative to its 19-network field (centered at 1000), so adding
+// entrants to that tournament re-fits everyone's Elo and needs new constants. To re-norm, compute new constants with
+// computeReference(); don't edit these silently.
 const REFERENCE_MODELS = [
   "Gemini 4 Neon",
   "Claude Fable 5.2",
@@ -143,6 +151,7 @@ const NORMS: Record<string, { mean: number; sd: number }> = {
   poke: { mean: 67.76, sd: 7.682994207989 },
   forecast: { mean: 0.2868, sd: 0.061315250958 },
   recipe8: { mean: -0.08217861795, sd: 0.239269587071 },
+  generals_t: { mean: 1135.477777777778, sd: 230.104400352815 },
 };
 
 // Recompute the frozen constants from the data: the cell fit and task norms over the reference models only.
@@ -156,8 +165,10 @@ export function computeReference() {
   const raw = (id: string, m: string) =>
     id === "recipe8" ? recipe[m] : TASK_MAP[id].scores[m];
   const norms = Object.fromEntries(
-    RECIPE_TASKS.map((id) => {
-      const v = REFERENCE_MODELS.map((m) => taskValue(id, raw(id, m)));
+    SCORE_TASKS.map((id) => {
+      const v = REFERENCE_MODELS.filter((m) => raw(id, m) !== undefined).map(
+        (m) => taskValue(id, raw(id, m)),
+      );
       const mu = mean(v);
       return [
         id,
@@ -195,6 +206,21 @@ TASK_MAP.recipe8 = {
   scores: RECIPE_ALL,
 };
 
+// Generals: tournament Elo among the 19 networks of the Generals expansion (empty starter with an editable slow
+// simulator, network variant, 3 L40S-hours of research each; 4,608 games per network). Elo rather than the private
+// panel points, which bunch the top six within 89–93.
+const GENERALS = generalsRaw as unknown as {
+  rows: { model: string; elo: number }[];
+};
+TASK_MAP.generals_t = {
+  id: "generals_t",
+  name: "Generals, 19-network tournament",
+  game: "Generals",
+  unit: "tournament Elo (field centered at 1000)",
+  sessions: 1,
+  scores: Object.fromEntries(GENERALS.rows.map((r) => [r.model, r.elo])),
+};
+
 // Dev-only: warn if the reference data no longer reproduces the frozen constants (e.g. a reference model's run was
 // redone). Then decide deliberately whether to re-norm.
 if (import.meta.env?.DEV) {
@@ -206,7 +232,7 @@ if (import.meta.env?.DEV) {
         .filter((c) => off(now.cells[k][c], CELL_OFFSETS[k][c] ?? NaN))
         .map((c) => `cell ${k} ${c}`),
     ),
-    ...RECIPE_TASKS.filter(
+    ...SCORE_TASKS.filter(
       (id) =>
         off(now.norms[id].mean, NORMS[id].mean) ||
         off(now.norms[id].sd, NORMS[id].sd),
@@ -214,7 +240,7 @@ if (import.meta.env?.DEV) {
   ];
   if (drift.length)
     console.warn(
-      `TopScore: reference data no longer matches frozen scale ${SCALE_VERSION}:`,
+      "TopScore: reference data no longer matches the frozen scale:",
       drift,
       now,
     );
@@ -223,14 +249,19 @@ if (import.meta.env?.DEV) {
 // One task value on the frozen scale.
 const standardize = (id: string, raw: number) => 50 + (10 * (taskValue(id, raw) - NORMS[id].mean)) / NORMS[id].sd;
 
-// Every model with all four tasks, scored against the frozen scale.
+// Every model with all four required tasks, scored against the frozen scale; optional tasks join its average when
+// it ran them.
 export const RECIPE: Row[] = Object.keys(TASK_MAP.poly_empty.scores)
   .filter((mo) => RECIPE_TASKS.every((id) => TASK_MAP[id].scores[mo] !== undefined))
   .map((mo) => {
-    const each = RECIPE_TASKS.map((id) => standardize(id, TASK_MAP[id].scores[mo]));
-    const n = each.length;
-    const score = mean(each);
-    const se = Math.sqrt(each.reduce((a, b) => a + (b - score) ** 2, 0) / (n - 1) / n);
+    const each = SCORE_TASKS.map((id) => {
+      const v = TASK_MAP[id].scores[mo];
+      return v === undefined ? null : standardize(id, v);
+    });
+    const have = each.filter((v): v is number => v !== null);
+    const n = have.length;
+    const score = mean(have);
+    const se = Math.sqrt(have.reduce((a, b) => a + (b - score) ** 2, 0) / (n - 1) / n);
     return { model: mo, score, lo: score - se, hi: score + se, each };
   })
   .sort((a, b) => b.score - a.score);
@@ -240,11 +271,12 @@ const SHORT_TASK: Record<string, string> = {
   poke: "Pokémon 3v3",
   forecast: "Forecasting",
   recipe8: "Polytopia recipes",
+  generals_t: "Generals",
 };
 // Per-task cells in display order: the two Polytopia tasks sit side by side under one shared "Polytopia" head, so the
-// columns can stay narrow and leave the width to the dot plot. Indexes into RECIPE_TASKS / Row.each.
-const CELL_ORDER = ["poly_empty", "recipe8", "poke", "forecast"].map((id) =>
-  RECIPE_TASKS.indexOf(id),
+// columns can stay narrow and leave the width to the dot plot. Indexes into SCORE_TASKS / Row.each.
+const CELL_ORDER = ["poly_empty", "recipe8", "poke", "forecast", "generals_t"].map(
+  (id) => SCORE_TASKS.indexOf(id),
 );
 // Two-line column heads; the Polytopia pair shares a spanning first line (drawn separately).
 const TASK_HEAD: Record<string, [string, string]> = {
@@ -252,11 +284,13 @@ const TASK_HEAD: Record<string, [string, string]> = {
   recipe8: ["", "recipes"],
   poke: ["Pokémon", "3v3"],
   forecast: ["Fore-", "casting"],
+  generals_t: ["Generals", "tourney"],
 };
 
 function fmtTaskScore(id: string, v: number) {
   if (id === "recipe8") return `${v.toFixed(2)}×`;
   if (id === "forecast") return `+${v.toFixed(2)}`;
+  if (id === "generals_t") return `${v.toFixed(0)} Elo`;
   return v.toFixed(1);
 }
 
@@ -288,26 +322,28 @@ export default function TopScore() {
         head={[
           "#",
           "Model",
-          `Overall score (50 = avg of the ten reference models, scale ${SCALE_VERSION})`,
+          "Overall score (50 = avg of the ten reference models, +10 = +1 SD)",
           "±1 standard error across tasks",
-          ...RECIPE_TASKS.map((id) => `${SHORT_TASK[id]} (standardized; raw)`),
+          ...SCORE_TASKS.map((id) => `${SHORT_TASK[id]} (standardized; raw)`),
         ]}
-        align={["r", "l", "r", "r", "r", "r", "r", "r"]}
+        align={["r", "l", "r", "r", ...SCORE_TASKS.map(() => "r" as const)]}
         rows={rows.map((r, i) => [
           i + 1,
           r.model,
           r.score.toFixed(1),
           `${r.lo.toFixed(1)}–${r.hi.toFixed(1)}`,
-          ...RECIPE_TASKS.map(
-            (id, k) =>
-              `${r.each[k].toFixed(0)} (${fmtTaskScore(id, TASK_MAP[id].scores[r.model])})`,
-          ),
+          ...SCORE_TASKS.map((id, k) => {
+            const v = r.each[k];
+            return v === null
+              ? "not run"
+              : `${v.toFixed(0)} (${fmtTaskScore(id, TASK_MAP[id].scores[r.model])})`;
+          }),
         ])}
       />
     );
   }
 
-  // Wide: rank · name · dot plot · score · four per-task cells. Narrow: name above each dot, per-task cells dropped.
+  // Wide: rank · name · dot plot · score · five per-task cells. Narrow: name above each dot, per-task cells dropped.
   const narrow = W < 560;
   const LO = 35,
     HI = 65;
@@ -317,7 +353,7 @@ export default function TopScore() {
     cellsGap = 14;
   const cellsW = narrow
     ? 0
-    : RECIPE_TASKS.length * cellW + (RECIPE_TASKS.length - 1) * cellGap;
+    : SCORE_TASKS.length * cellW + (SCORE_TASKS.length - 1) * cellGap;
   const scoreW = 40;
   const nameW = narrow ? 0 : 144;
   const m = {
@@ -342,7 +378,7 @@ export default function TopScore() {
       <svg
         viewBox={`0 0 ${W} ${H}`}
         role="img"
-        aria-label="Overall model scores across four research tasks"
+        aria-label="Overall model scores across five research tasks"
       >
         {/* Column heads */}
         <text
@@ -374,7 +410,7 @@ export default function TopScore() {
         )}
         {!narrow &&
           CELL_ORDER.map((j, k) => {
-            const id = RECIPE_TASKS[j];
+            const id = SCORE_TASKS[j];
             const cx = cellX(k) + cellW / 2;
             return (
               <text
@@ -418,7 +454,7 @@ export default function TopScore() {
         >
           {narrow
             ? "score (50 = average, +10 = +1 SD)"
-            : `overall score (50 = average of the ten reference models, +10 = +1 SD; scale ${SCALE_VERSION})`}
+            : "overall score (50 = average of the ten reference models, +10 = +1 SD)"}
         </text>
         {rows.map((r, i) => {
           const top = m.t + i * rowH;
@@ -491,7 +527,7 @@ export default function TopScore() {
                         width={cellW}
                         height={rowH - 8}
                         rx={2}
-                        fill={cellFill(v)}
+                        fill={v === null ? "none" : cellFill(v)}
                       />
                       <text
                         x={cellX(k) + cellW / 2}
@@ -500,8 +536,9 @@ export default function TopScore() {
                         textAnchor="middle"
                         dominantBaseline="middle"
                       >
-                        {v.toFixed(0)}
+                        {v === null ? "—" : v.toFixed(0)}
                       </text>
+                      {v === null && <title>Not in the Generals tournament</title>}
                     </g>
                   );
                 })}
