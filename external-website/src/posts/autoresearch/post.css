@@ -619,6 +619,7 @@ html.agent-view .ar-outlier-kicker { color: inherit; }
 .ar-rt-model { font-weight: 600; }
 .ar-rt-runs { font-size: 13px; font-weight: 700; }
 .ar-rt-elo { font-size: 12.5px; font-weight: 500; fill: #3d3d3d; }
+.ar-rt-noop .ar-rt-model, .ar-rt-noop .ar-rt-runs, .ar-rt-noop .ar-rt-elo { fill: var(--secondary); }
 .ar-rt-elo.is-top { fill: #2f55c4; font-weight: 700; }
 .ar-rt-inline-num { font-weight: 600; fill: var(--ink); }
 .ar-rt-bar { cursor: pointer; }

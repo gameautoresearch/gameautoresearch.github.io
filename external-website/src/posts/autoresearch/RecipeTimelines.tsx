@@ -51,6 +51,12 @@ function fmtMin(min: number) {
   return min < 2 ? `${min.toFixed(1)} min` : `${Math.round(min)} min`;
 }
 
+// No-op reference: the unmodified starter recipe retrained for 8 h, with no research at all.
+const STARTER = DATA.starterElo8;
+// Rows are ordered by final (8 h) Elo; the starter row sits at its rank among them.
+const SESSIONS = [...DATA.sessions].sort((a, b) => b.elo8 - a.elo8);
+const STARTER_IDX = SESSIONS.filter((s) => s.elo8 > STARTER).length;
+
 type Tip = {
   id: string;
   cx: number;
@@ -73,7 +79,7 @@ export default function RecipeTimelines() {
       <Table
         head={["Model", "GPU runs", "Run lengths (min)", "CPU debug", "Practice evals", "Wall time", "GPU spend", "8 h Elo"]}
         align={["l", "r", "l", "r", "r", "r", "r", "r"]}
-        rows={DATA.sessions.map((s) => [
+        rows={[...SESSIONS.slice(0, STARTER_IDX), null, ...SESSIONS.slice(STARTER_IDX)].map((s) => s ? [
           s.model,
           s.runs.length,
           s.runs.map((r) => `${Math.round(r.min)}m`).join(", "),
@@ -82,7 +88,7 @@ export default function RecipeTimelines() {
           `${s.wallH.toFixed(1)} h`,
           `$${s.spentUsd.toFixed(2)}`,
           s.elo8,
-        ])}
+        ] : ["Starter recipe, no research (no-op)", 0, "—", "—", "—", "—", "$0.00", STARTER])}
       />
     );
   }
@@ -99,7 +105,9 @@ export default function RecipeTimelines() {
     ? { l: 8, r: 8, t: 8, b: 34 }
     : { l: 134, r: rightGap + runsW + eloW, t: 28, b: 36 };
   const rowH = narrow ? 64 : 46;
-  const H = m.t + m.b + DATA.sessions.length * rowH;
+  const starterRowH = narrow ? 40 : 34;
+  const H = m.t + m.b + SESSIONS.length * rowH + starterRowH;
+  const rowTop = (i: number) => m.t + i * rowH + (i >= STARTER_IDX ? starterRowH : 0);
 
   const plotR = W - m.r;
   const sx = (h: number) => m.l + (Math.min(h, T) / T) * (plotR - m.l);
@@ -165,8 +173,8 @@ export default function RecipeTimelines() {
             real session time (7 h limit · $8.70 GPU budget)
           </text>
 
-          {DATA.sessions.map((s, i) => {
-            const top = m.t + i * rowH;
+          {SESSIONS.map((s, i) => {
+            const top = rowTop(i);
             const barTop = narrow ? top + 22 : top + 7;
             const slotH = 10;
             const slotGap = 2.5;
@@ -177,7 +185,7 @@ export default function RecipeTimelines() {
 
             return (
               <g key={s.key}>
-                {i > 0 && (
+                {i > 0 && i !== STARTER_IDX && (
                   <line x1={0} x2={W} y1={top} y2={top} stroke="#efefec" strokeWidth={1} />
                 )}
 
@@ -371,6 +379,36 @@ export default function RecipeTimelines() {
               </g>
             );
           })}
+
+          {/* No-op reference row: the starter recipe trained 8 h with no experimentation */}
+          {(() => {
+            const top = m.t + STARTER_IDX * rowH;
+            const midY = narrow ? top + 14 : top + starterRowH / 2;
+            const note = "No experiments: the starter recipe as given, trained 8 h";
+            return (
+              <g className="ar-rt-noop">
+                {[top, top + starterRowH].map((y) => (
+                  <line key={y} x1={0} x2={W} y1={y} y2={y} stroke="#d8d8d3" strokeWidth={1} strokeDasharray="3 3" />
+                ))}
+                {narrow ? (
+                  <>
+                    <text x={m.l} y={midY} className="viz-label ar-rt-model">Starter recipe</text>
+                    <text x={W - m.r} y={midY} className="viz-axis" textAnchor="end">
+                      <tspan className="ar-rt-inline-num">{STARTER} Elo</tspan>
+                    </text>
+                    <text x={m.l} y={top + 30} className="viz-axis">{note}</text>
+                  </>
+                ) : (
+                  <>
+                    <text x={0} y={midY} className="viz-label ar-rt-model" dominantBaseline="middle">Starter recipe</text>
+                    <text x={sx(0) + 6} y={midY} className="viz-axis" dominantBaseline="middle">{note}</text>
+                    <text x={runsX} y={midY} className="viz-value ar-rt-runs" textAnchor="end" dominantBaseline="middle">0</text>
+                    <text x={eloX} y={midY} className="viz-value ar-rt-elo" textAnchor="end" dominantBaseline="middle">{STARTER}</text>
+                  </>
+                )}
+              </g>
+            );
+          })()}
         </svg>
 
         {tip && (

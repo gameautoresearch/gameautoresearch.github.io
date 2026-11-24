@@ -235,8 +235,6 @@ export default function AutoresearchPost() {
       <h2 className="ar-config ar-c3" id="taste">
         What do strong researchers do differently?
       </h2>
-
-      <h3 id="inside">Experimental discipline</h3>
       <p>
         Most models propose plausible changes and do experiments, but some
         models are dramatically more effective at choosing good interventions
@@ -266,10 +264,8 @@ export default function AutoresearchPost() {
         caption={
           <>
             How all seven models in the $8.70 Polytopia recipe task spent their
-            budget (~3 GPU-hours across up to two L40S GPUs, 7-hour limit).
-            Hover any run to see what it tested and what it cost; right columns
-            show completed GPU training runs and 8-hour retrain Elo (starter =
-            290).
+            budget. Right columns show completed GPU training runs and 8-hour
+            retrain Elo.
           </>
         }
       >
