@@ -243,7 +243,8 @@ function GpuCard({ x, y, active, t, compact }: { x: number; y: number; active: b
 }
 
 function CashPile({ left, spending, x, cy, t, compact }: { left: number; spending: boolean; x: number; cy: number; t: number; compact: boolean }) {
-  const exact = left * BILLS, stackDy = 2.4, y = cy - BILL_H / 2;
+  // The pile sits a few px above the card centre so the spent bill drops into the GPU at a steeper angle.
+  const exact = left * BILLS, stackDy = 2.4, y = cy - BILL_H / 2 - 4;
   const px = x + 1;
   const full = spending ? Math.floor(exact + 1e-6) : Math.round(exact), frac = spending ? exact - full : 0;
   const bills: JSX.Element[] = [];

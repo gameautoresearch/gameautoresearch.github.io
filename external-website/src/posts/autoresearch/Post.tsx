@@ -211,7 +211,7 @@ export default function AutoresearchPost() {
         {costMult.top.starterUsd}
         ), so it needs{" "}
         <strong>about {costMult.top.x.toFixed(0)}× less total compute</strong>.
-        The next, a {costMult.second.model} run that spent &rsquo;s $
+        The next, a {costMult.second.model} run that spent $
         {costMult.second.spent.toFixed(2)} on research, reaches{" "}
         {costMult.second.x.toFixed(1)}× savings after 8 hours of training.
       </p>
