@@ -179,7 +179,7 @@ export default function AutoresearchPost() {
         wide
         caption={
           <>
-            5 Hour auto-research session on Polytopia 15 minute training recipe
+            5-hour auto-research session on Polytopia 15 minute training recipe
             from an empty file. Measured via win rate against the 15-minute
             trained baseline recipe.
           </>
@@ -317,10 +317,10 @@ export default function AutoresearchPost() {
       <p>
         In a world of cheap software, writing code is only the first step.
         Specialized models are coming into reach for almost any niche task, from
-        a image classifiers to motor controls. We built this benchmark to
-        measure how well agents can do that training under a compute budget. We
-        view thisability to train small usefull models as an indicator of
-        recursive self-improvement capabilities.
+        image classifiers to motor controls. We built this benchmark to measure
+        how well agents can do that training under a compute budget. We view
+        this ability to train small useful models as an indicator of recursive
+        self-improvement capabilities.
       </p>
       <p>
         At game studios like Curio, rules can change daily during production and
