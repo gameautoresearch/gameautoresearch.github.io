@@ -463,7 +463,17 @@ export default function TopScore() {
           return (
             <g key={r.model}>
               {narrow ? (
-                <text x={m.l} y={y - 13} className="viz-label">
+                <text
+                  x={m.l}
+                  y={y - 13}
+                  className="viz-label"
+                  style={{
+                    paintOrder: "stroke",
+                    stroke: "#fff",
+                    strokeWidth: 3.5,
+                    strokeLinejoin: "round",
+                  }}
+                >
                   <tspan className="viz-axis">{i + 1}</tspan>
                   <tspan dx={6}>{r.model}</tspan>
                 </text>

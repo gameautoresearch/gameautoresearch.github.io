@@ -734,25 +734,25 @@ const ITEMS = [
   {
     key: "pyramid",
     title: "Cheap full-board context",
-    text: "Coarse spatial pyramid, giving every tile cheap board-wide awareness.",
+    text: "A coarse spatial pyramid gives every tile board-wide awareness at little cost.",
     Diagram: PyramidDiagram,
   },
   {
     key: "scoreboard",
     title: "Explicit scoreboard summaries",
-    text: "Computed 36 visible-board tallies and relative leads (cities, units, HP, territory).",
+    text: "Tallies of the visible board (cities, units, HP, territory) and each side's relative lead, fed in as direct inputs.",
     Diagram: ScoreboardDiagram,
   },
   {
     key: "critic",
     title: "Omniscient critic distilled into the policy",
-    text: "Train training-only judge that sees both sides through the fog of war via auxiliary value head.",
+    text: "A training-only critic sees both sides through the fog of war; an auxiliary value head distills its judgment into the policy.",
     Diagram: CriticDistillDiagram,
   },
   {
     key: "pfsp",
     title: "Pruned historical self-play",
-    text: "Kept a checkpoint opponent pool of past copies it still lost to.",
+    text: "A pool of past checkpoints, pruned to the ones the learner still struggles against.",
     Diagram: PfspDiagram,
   },
 ] as const;

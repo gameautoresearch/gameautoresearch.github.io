@@ -674,7 +674,7 @@ export function ForecastLead() {
           return (
             <g key={mo.model}>
               {narrow
-                ? <text x={m.l} y={y - 13} className="viz-label">{mo.model}</text>
+                ? <text x={m.l + 6} y={y - 13} className="viz-label" style={{ paintOrder: "stroke", stroke: "#fff", strokeWidth: 3.5, strokeLinejoin: "round" }}>{mo.model}</text>
                 : <text x={m.l - 12} y={y} className="viz-label" textAnchor="end" dominantBaseline="middle">{mo.model}</text>}
               <line x1={sx(mo.skillCi[0])} x2={sx(mo.skillCi[1])} y1={y} y2={y} stroke={c} strokeOpacity={0.35} strokeWidth={4} strokeLinecap="round" />
               <circle cx={sx(mo.skill)} cy={y} r={5.5} fill={c} stroke="#fff" strokeWidth={1.5} />

@@ -1,9 +1,9 @@
-import { Figure, Table } from "../shared/text";
+import { Figure } from "../shared/text";
 import Showcase from "./Showcase";
 import ResearchLoop from "./ResearchLoop";
 import SubmissionFormats from "./SubmissionFormats";
 import TopScore from "./TopScore";
-import { ForecastLead, pokeSkill, polyForecastN } from "./Budget";
+import { ForecastLead, pokeSkill } from "./Budget";
 import { CostMultiplier, costMult } from "./CostMultiplier";
 import NeonOutlierDiagrams from "./NeonOutlierDiagrams";
 import NeonDiscipline from "./NeonDiscipline";
@@ -18,96 +18,6 @@ import "./post.css";
 // The Polytopia results are from the frontier6 and research-budget readouts under reports/polytopia/.
 // The slow-simulator and forecast designs are documented in reports/generals/slowsim-2026-11-20.md
 // and reports/forecast-skill-2026-11-19/PLAN.md.
-
-// What went into Gemini 4 Neon's $8.70 Polytopia recipe, the strongest 8 h retrain in budget.json (416 Elo),
-// and its $2.90 recipe (330), read from their recipe.json / arch.json / network.py. The last column is the 8 h
-// verdict from the single-technique comparisons on Opus 5.5, GPT-6.2 Sol and GPT-6.2 Astra recipes
-// (reports/polytopia/techniques-combined-2026-11-19 in the bench repo), which predate Neon's runs.
-const VERDICT = {
-  up: ["ar-v-up", "▲ Helps"],
-  even: ["ar-v-even", "● About even"],
-  down: ["ar-v-down", "▼ Hurts"],
-} as const;
-const verdict = (v: keyof typeof VERDICT | string) =>
-  v in VERDICT ? (
-    <span className={`ar-chip ${VERDICT[v as keyof typeof VERDICT][0]}`}>
-      {VERDICT[v as keyof typeof VERDICT][1]}
-    </span>
-  ) : (
-    v
-  );
-const techniques: [string, string, boolean, boolean, string][] = [
-  [
-    "Playing old versions",
-    "Practise against a pool of 20–24 past copies of itself, mostly the ones it still loses to",
-    true,
-    true,
-    "Tested and dropped",
-  ],
-  [
-    "Turn-based credit",
-    "Measure time in game turns, not single commands",
-    true,
-    true,
-    "up",
-  ],
-  [
-    "Separate judge",
-    "A smaller network that sees both sides of the board estimates who is winning",
-    true,
-    true,
-    "Merging it hurt",
-  ],
-  [
-    "Scoreboard inputs",
-    "Hand the network a running tally of cities, units, territory and tech for both sides",
-    true,
-    false,
-    "Not tested",
-  ],
-  [
-    "Bigger network",
-    "3–4 layers × 64 wide instead of the starter's 2 × 32",
-    true,
-    true,
-    "even",
-  ],
-  [
-    "Bigger learning steps",
-    "3–4× the learning rate, lowered gradually over the run",
-    true,
-    true,
-    "even",
-  ],
-  [
-    "Reward for progress, faded out",
-    "Pay for score and economy early, then shrink the bonus toward zero",
-    true,
-    false,
-    "even",
-  ],
-];
-const mark = (on: boolean) => (on ? "✓" : "—");
-function TechniqueTable() {
-  return (
-    <Table
-      head={[
-        "Technique",
-        "In plain words",
-        "Neon $8.70 (416)",
-        "Neon $2.90 (330)",
-        "Earlier tests at 8 h",
-      ]}
-      rows={techniques.map(([name, plain, best, runnerUp, earlier]) => [
-        <strong>{name}</strong>,
-        plain,
-        mark(best),
-        mark(runnerUp),
-        verdict(earlier),
-      ])}
-    />
-  );
-}
 
 export default function AutoresearchPost() {
   return (
@@ -162,7 +72,7 @@ export default function AutoresearchPost() {
         Benchmark Design
       </h2>
       <p>
-        We wanted agents manage the process like a researcher. Which idea is
+        We wanted agents to manage the process like a researcher. Which idea is
         worth testing? How long should it train? When is a practice result
         strong enough to bet the rest of the budget on it? Each agent got a
         workspace with a game rulebook, simulator code, editable training code
@@ -170,7 +80,7 @@ export default function AutoresearchPost() {
         L40S and read logs.
       </p>
       <p>
-        Across our tasks, we landed on two submission formats for autoresearch:
+        Each task uses one of two submission formats:
       </p>
 
       <SubmissionFormats />
@@ -179,7 +89,7 @@ export default function AutoresearchPost() {
         wide
         caption={
           <>
-            5-hour auto-research session on Polytopia 15 minute training recipe
+            5-hour autoresearch session on a 15-minute Polytopia training recipe
             from an empty file. Measured via win rate against the 15-minute
             trained baseline recipe.
           </>
@@ -223,11 +133,8 @@ export default function AutoresearchPost() {
           How Gemini 4 Neon&rsquo;s $8.58 recipe pulled away
         </h3>
         <p>
-          This recipe matched the starter recipe with only half the budget, and
-          at full 8hrs of training finished at 72 elo points higher of any other
-          submission - stronger than the starter recipe trained for 64 hours.
-          Major interventions that set it apart from other models&rsquo;
-          submissions:
+          After the same 8 hours of training, this recipe finished well ahead
+          of every other submission. Four changes set it apart:
         </p>
         <NeonOutlierDiagrams />
       </section>
@@ -289,15 +196,16 @@ export default function AutoresearchPost() {
 
       <h3 id="forecast">Predicting which run will win</h3>
       <p>
-        Forecasting is a cheap microcosm of researchers ability: making accurate
-        predictions before buying compute. We sampled several historical
-        research runs, then showed forcasting agents only evidence from up until
-        it launched, like the training recipe and results from prior runs.
+        Forecasting is a cheap microcosm of researchers&rsquo; ability: making
+        accurate predictions before buying compute. We sampled several
+        historical research runs, then showed forecasting agents only evidence
+        from up until each run launched, like the training recipe and results
+        from prior runs.
       </p>
       <p>
         Given {pokeSkill.items} anonymized Pokémon runs cut off at launch, only{" "}
-        ({pokeSkill.above.join(" and ")}) reliably beat a simple ridge
-        regression on run length and practice history.
+        {pokeSkill.above.join(" and ")} reliably beat a simple ridge regression
+        on run length and practice history.
       </p>
       <Figure
         n={5}
@@ -449,58 +357,14 @@ export default function AutoresearchPost() {
           </a>{" "}
           by Matej Straka (MIT).
         </li>
-        <li>
-          <strong>Hex:</strong> MoHex 2.0 from{" "}
-          <a
-            href="https://github.com/cgao3/benzene-vanilla-cmake"
-            target="_blank"
-            rel="noreferrer"
-          >
-            Benzene
-          </a>{" "}
-          (LGPL-3.0), our evaluation opponent.
-        </li>
-        <li>
-          <strong>Clash:</strong>{" "}
-          <a
-            href="https://github.com/voonhous/crforge"
-            target="_blank"
-            rel="noreferrer"
-          >
-            crforge
-          </a>{" "}
-          (Apache-2.0), the rules oracle for our C++/CUDA engine.
-        </li>
-        <li>
-          <strong>Tavern (Battlegrounds):</strong>{" "}
-          <a
-            href="https://github.com/MCG-NJU/AutoTavern"
-            target="_blank"
-            rel="noreferrer"
-          >
-            AutoTavern
-          </a>{" "}
-          by the AutoTavern authors (MIT).
-        </li>
-        <li>
-          <strong>Dou Dizhu:</strong>{" "}
-          <a
-            href="https://github.com/kwai/DouZero"
-            target="_blank"
-            rel="noreferrer"
-          >
-            DouZero
-          </a>{" "}
-          by Kuaishou (Apache-2.0), the rules oracle for our native engine.
-        </li>
       </ul>
       <p
         className="pb-notes"
         style={{ fontSize: 13.5, color: "var(--secondary)" }}
       >
-        Pokémon, The Battle of Polytopia, Generals.io, Clash Royale and
-        Hearthstone Battlegrounds are trademarks of their respective owners.
-        This project is not affiliated with or endorsed by them.
+        Pokémon, The Battle of Polytopia and Generals.io are trademarks of
+        their respective owners. This project is not affiliated with or
+        endorsed by them.
       </p>
     </div>
   );

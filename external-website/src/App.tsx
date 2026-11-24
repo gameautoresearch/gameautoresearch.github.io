@@ -15,7 +15,7 @@ export default function App() {
       <div className="site-layout">
         <main className="profile">
           <article className="blog-post" aria-labelledby="post-title">
-            <h2 id="post-title">{PAGE.title}</h2>
+            <h1 id="post-title">{PAGE.title}</h1>
             <p className="post-byline">
               {PAGE.authors.map(({ name, url }, index) => (
                 <Fragment key={url}>

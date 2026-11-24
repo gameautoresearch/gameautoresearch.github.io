@@ -81,6 +81,7 @@ li + li { margin-top: 8px; }
 time { color: var(--secondary); font-size: 14px; font-variant-numeric: tabular-nums; }
 .back-link { margin-bottom: 24px; font-size: 14px; }
 .back-link a { color: var(--secondary); }
+.blog-post #post-title { margin-bottom: 8px; color: var(--ink); font-size: 20px; font-weight: 400; letter-spacing: normal; }
 .blog-post h2 { margin-bottom: 8px; color: var(--ink); font-size: 20px; }
 .post-content { margin-top: 28px; }
 .post-content > * + * { margin-top: 16px; }

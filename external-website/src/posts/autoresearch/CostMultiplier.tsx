@@ -47,6 +47,8 @@ const DATA = raw as unknown as {
   recipes: Recipe[];
 };
 const RATE = DATA.usdPerGpuHour;
+const displayModel = (mo: string) =>
+  mo === "Opus 5.5" ? "Claude Opus 5.5" : mo;
 
 // Monotone starter curve: weighted PAVA over the measured points, each block placed at its weighted mean log-time.
 const KNOTS = (() => {
@@ -160,7 +162,7 @@ export const costMult = {
   above: at8.filter((p) => p.x > 1).length,
   trainAbove: at8.filter((p) => p.xTrain > 1).length,
   top: {
-    model: TOP8.r.model,
+    model: displayModel(TOP8.r.model),
     spent: TOP8.r.spentUsd,
     x: TOP8.x,
     xTrain: TOP8.xTrain,
@@ -168,7 +170,11 @@ export const costMult = {
     starterHours: TOP8.sh,
     starterUsd: Math.round(TOP8.sh * RATE),
   },
-  second: { model: at8[1].r.model, spent: at8[1].r.spentUsd, x: at8[1].x },
+  second: {
+    model: displayModel(at8[1].r.model),
+    spent: at8[1].r.spentUsd,
+    x: at8[1].x,
+  },
   median: at8[at8.length >> 1].x,
 };
 
@@ -280,7 +286,7 @@ function TrainBars({ W }: { W: number }) {
         const midY = barY + barH / 2;
         return (
           <g key={p.r.key}>
-            <title>{`${p.r.model}, best recipe (${p.r.cell}): ${p.extrap ? "≈" : ""}${fx(p.x)} averaged over 6, 7 and 8 h of training; at 8 h as strong as the starter recipe after ${p.extrap ? "about " : ""}${hrs(p.sh8)}${p.extrap ? ` (extrapolated past the starter recipe's ${hrs(TOP.hours)} run)` : ""}`}</title>
+            <title>{`${displayModel(p.r.model)}, best recipe (${p.r.cell}): ${p.extrap ? "≈" : ""}${fx(p.x)} averaged over 6, 7 and 8 h of training; at 8 h as strong as the starter recipe after ${p.extrap ? "about " : ""}${hrs(p.sh8)}${p.extrap ? ` (extrapolated past the starter recipe's ${hrs(TOP.hours)} run)` : ""}`}</title>
             <rect x={0} y={y} width={W} height={row} fill="transparent" />
             {compact ? (
               <text
@@ -294,7 +300,7 @@ function TrainBars({ W }: { W: number }) {
                   strokeWidth: 3,
                 }}
               >
-                {p.r.model}
+                {displayModel(p.r.model)}
                 {p.extrap && <tspan className="viz-axis"> · extrap.</tspan>}
               </text>
             ) : (
@@ -305,7 +311,7 @@ function TrainBars({ W }: { W: number }) {
                 textAnchor="end"
                 dominantBaseline="middle"
               >
-                {p.r.model}
+                {displayModel(p.r.model)}
               </text>
             )}
             <rect
@@ -371,7 +377,7 @@ export function CostMultiplier() {
         ]}
         align={["l", "r", "r", "r", "r", "r"]}
         rows={at8.map((p) => [
-          `${p.r.model}, ${p.r.cell}`,
+          `${displayModel(p.r.model)}, ${p.r.cell}`,
           usd(p.r.spentUsd),
           usd(p.cost),
           `${p.extrap ? "about " : ""}${hrs(p.sh)}${p.extrap ? " (extrapolated)" : ""}`,
@@ -411,7 +417,7 @@ export function CostMultiplier() {
     cy: sy(vy(q)),
     key: q.r.key,
     model: q.r.model,
-    title: `${q.r.model}, ${q.r.cell}`,
+    title: `${displayModel(q.r.model)}, ${q.r.cell}`,
     lines: [
       `${hrs(q.hours)} trained: as strong as the starter recipe after ${q.extrap ? "about " : ""}${hrs(q.sh)}${q.extrap ? ` (extrapolated past its ${hrs(TOP.hours)} run)` : ""}`,
       `${q.extrap ? "≈" : ""}${fx(q.x)} less compute than the starter recipe, research included`,
@@ -456,7 +462,7 @@ export function CostMultiplier() {
           return (
             <span key={mo}>
               <i style={{ background: st.color }} />
-              {mo}
+              {displayModel(mo)}
             </span>
           );
         })}
@@ -601,11 +607,11 @@ export function CostMultiplier() {
                   </text>
                 )}
                 <text
-                  x={compact ? sx(cx(top)) - 8 : sx(cx(top)) + 9}
-                  y={compact ? sy(vy(top)) + 1 : sy(vy(top)) - 10}
+                  x={compact ? sx(cx(top)) : sx(cx(top)) + 9}
+                  y={compact ? sy(vy(top)) - 12 : sy(vy(top)) - 10}
                   className="viz-label"
                   textAnchor={compact ? "end" : "start"}
-                  dominantBaseline={compact ? "middle" : "auto"}
+                  dominantBaseline="auto"
                   style={{
                     fontSize: compact ? 11.5 : 12.5,
                     fontWeight: 600,
@@ -616,8 +622,8 @@ export function CostMultiplier() {
                   }}
                 >
                   {compact
-                    ? `${top.r.model}: ${top.extrap ? "≈" : ""}${fx(vy(top))}`
-                    : `${top.r.model}, ${usd(top.r.spentUsd)} session: ${top.extrap ? "≈" : ""}${fx(vy(top))}`}
+                    ? `${displayModel(top.r.model)}: ${top.extrap ? "≈" : ""}${fx(vy(top))}`
+                    : `${displayModel(top.r.model)}, ${usd(top.r.spentUsd)} session: ${top.extrap ? "≈" : ""}${fx(vy(top))}`}
                 </text>
               </svg>
               {hit && (

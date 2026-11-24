@@ -122,13 +122,26 @@ function fmtBranch(br: Branch) {
   return br.status ? `${br.label} (${br.status})` : br.label;
 }
 
-function BranchCell({ br, win }: { br: Branch; win: boolean }) {
+function BranchCell({
+  br,
+  win,
+  slot,
+}: {
+  br: Branch;
+  win: boolean;
+  slot: "a" | "b";
+}) {
   return (
     <div
-      className={`ar-nd-cell ${win ? "ar-nd-win" : "ar-nd-muted"}`}
+      className={`ar-nd-cell ar-nd-branch-${slot} ${win ? "ar-nd-win" : "ar-nd-muted"}`}
       role="cell"
     >
-      <span className="ar-nd-bname">{br.label}</span>
+      <span className="ar-nd-bname">
+        <span className="ar-nd-btag" aria-hidden="true">
+          {slot.toUpperCase()}
+        </span>
+        {br.label}
+      </span>
       {br.delta && (
         <span className={`ar-nd-lift ${br.delta.dir}${win ? " is-win" : ""}`}>
           {br.delta.dir === "up" ? "▲" : "▼"} {br.delta.text}
@@ -232,8 +245,8 @@ export default function NeonDiscipline() {
                   <strong>{r.cost}</strong>
                   <span>{r.time}</span>
                 </div>
-                <BranchCell br={r.a} win={r.winner === "a"} />
-                <BranchCell br={r.b} win={r.winner === "b"} />
+                <BranchCell br={r.a} win={r.winner === "a"} slot="a" />
+                <BranchCell br={r.b} win={r.winner === "b"} slot="b" />
                 <div className="ar-nd-cell r ar-nd-strength" role="cell">
                   {r.best === "—" ? "—" : `+${r.best}`}
                 </div>
@@ -292,6 +305,14 @@ export default function NeonDiscipline() {
             </div>
           </div>
         </div>
+      </div>
+      <div className="ar-nd-legend" aria-label="Budget bar key">
+        {LEGEND.map((item) => (
+          <span key={item.key}>
+            <i style={{ background: item.color }} aria-hidden="true" />
+            {item.label}
+          </span>
+        ))}
       </div>
     </div>
   );

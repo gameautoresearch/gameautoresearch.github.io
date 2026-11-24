@@ -145,7 +145,7 @@ function TrainedModelDiagram() {
         className="sf-sub mid"
         style={{ fill: C_DEEP, fontWeight: 600 }}
       >
-        Remaining GPU
+        Rest of budget
       </text>
 
       {/* Submission arrow carrying model weights */}
@@ -290,13 +290,13 @@ function TrainingRecipeDiagram() {
 
       {/* Column headers */}
       <text x={8} y={11} className="sf-kicker" style={{ fill: M_DEEP }}>
-        AGENT BUDGET
+        RESEARCH BUDGET
       </text>
       <text x={160} y={11} className="sf-kicker mid">
         SUBMIT
       </text>
       <text x={190} y={11} className="sf-kicker">
-        FIXED RETRAIN
+        RETRAIN + EVAL
       </text>
 
       {/* Submission boundary */}
@@ -351,7 +351,7 @@ function TrainingRecipeDiagram() {
         className="sf-sub mid"
         style={{ fill: M_DEEP, fontWeight: 600 }}
       >
-        100% research
+        Tests only
       </text>
 
       {/* Submission arrow carrying code + config */}
@@ -445,12 +445,12 @@ function TrainingRecipeDiagram() {
         className="sf-sub mid"
         style={{ fill: INK, fontWeight: 600 }}
       >
-        Fixed GPU → Eval
+        Fixed budget
       </text>
 
       {/* Footer captions */}
       <text x={69} y={98} className="sf-cap mid">
-        Nothing held back
+        No final run to save for
       </text>
       <text x={241} y={98} className="sf-cap mid">
         Retrained from scratch
@@ -463,13 +463,13 @@ const FORMATS = [
   {
     key: "model",
     title: "Submit a trained model",
-    body: "Research and training share one compute budget. Simpler, but agent must balance spending compute on tests against saving it for the final training run.",
+    body: "The agent trains the final network itself and submits the weights. Tests and the final run share one budget.",
     Diagram: TrainedModelDiagram,
   },
   {
     key: "recipe",
     title: "Submit a training recipe",
-    body: "The agent submits training code, and we retrain the recipe from scratch on a fixed final budget. The agent’s session budget goes purely to research.",
+    body: "The agent submits training code, and we retrain it from scratch on a fixed budget. The agent’s entire budget goes to research.",
     Diagram: TrainingRecipeDiagram,
   },
 ] as const;
