@@ -247,13 +247,9 @@ export default function AutoresearchPost() {
       </p>
       <p>
         Gemini 4 Neon&rsquo;s $8.58 Polytopia session&mdash;the same run that
-        produced the 416 Elo outlier recipe above&mdash;is a good example.
-        Instead of spending its $8.70 budget on a few long runs, it ran{" "}
-        <strong>five short A/B tests</strong> (mostly pairs of 12-minute runs at
-        ~$0.61 each), scored them on free practice matches, and used $0.04 of
-        CPU-only debugging to fix crashes rather than guessing on GPUs. That
-        left a third of the budget ($2.73) for one full 1-hour validation of the
-        winning recipe before submission.
+        produced the 416 Elo outlier recipe above&mdash;is a good example. It
+        ran <strong>five short A/B tests</strong> (mostly pairs of 12-minute
+        runs for ~$0.60 each).
       </p>
       <Figure
         n={3}
@@ -304,8 +300,8 @@ export default function AutoresearchPost() {
 
       <h3 id="techniques">What changes actually held up</h3>
       <p>
-        We retrained every Polytopia recipe for 8 hours. Gemini 4 Neon's $8.70
-        recipe was the strongest by a clear margin: 416 Elo, about 70 above the
+        We retrained every Polytopia recipe for 8 hours. One of Gemini 4 Neon's
+        recipes was the strongest by a clear margin: 416 Elo, about 70 above the
         best recipe from any other model. It stacked several changes at once, so
         the table lists what went into it and into Neon's $2.90 recipe (330,
         tied for second). The last column shows what earlier one-at-a-time tests
