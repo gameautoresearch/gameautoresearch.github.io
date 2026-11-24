@@ -40,7 +40,7 @@ export default function AutoresearchPost() {
         for niche domains. The efficiency of these solutions depends on the
         agent's judgment in executing machine learning workflows: carefully
         measuring success, choosing experiments, and allocating limited runs. We
-        observed intelligent agents were able to train strong policies for
+        observed intelligent agents were able to train stronger policies for
         smaller budgets.
       </p>
 
@@ -48,11 +48,11 @@ export default function AutoresearchPost() {
         Overall Ranking
       </h2>
       <p>
-        We graded 10 models across 5 training tasks: Polytopia from an empty
-        file, Pokémon 3v3 from a working starter, Polytopia recipes written
-        under five research budgets, forecasting training run results based on
-        previous data, and a Generals network trained from an empty starter and
-        ranked in a 19-network tournament.
+        We graded 10 models across 5 model training tasks: Polytopia from an
+        empty file, Pokémon 3v3 from a working starter, Polytopia recipes
+        written under varying research budgets, forecasting training run results
+        based on previous data, and a Generals network trained from an empty
+        starter and ranked in a 19-network tournament.
       </p>
       <Figure
         n={1}
@@ -79,9 +79,7 @@ export default function AutoresearchPost() {
         and configs, and a command-line tool to launch experiments on an NVIDIA
         L40S and read logs.
       </p>
-      <p>
-        Each task uses one of two submission formats:
-      </p>
+      <p>Each task uses one of two submission formats:</p>
 
       <SubmissionFormats />
       <Figure
@@ -133,8 +131,8 @@ export default function AutoresearchPost() {
           How Gemini 4 Neon&rsquo;s $8.58 recipe pulled away
         </h3>
         <p>
-          After the same 8 hours of training, this recipe finished well ahead
-          of every other submission. Four changes set it apart:
+          After the same 8 hours of training, this recipe finished well ahead of
+          every other submission. Four changes set it apart:
         </p>
         <NeonOutlierDiagrams />
       </section>
@@ -362,9 +360,9 @@ export default function AutoresearchPost() {
         className="pb-notes"
         style={{ fontSize: 13.5, color: "var(--secondary)" }}
       >
-        Pokémon, The Battle of Polytopia and Generals.io are trademarks of
-        their respective owners. This project is not affiliated with or
-        endorsed by them.
+        Pokémon, The Battle of Polytopia and Generals.io are trademarks of their
+        respective owners. This project is not affiliated with or endorsed by
+        them.
       </p>
     </div>
   );
