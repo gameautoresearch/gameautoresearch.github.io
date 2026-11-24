@@ -104,15 +104,7 @@ const bars: Bar[] = [...new Set(curves.map((c) => c.r.model))].map((model) =>
 ).sort((a, b) => b.x - a.x);
 export const trainBars = { n: bars.length, top: bars[0] };
 
-function TrainBars({
-  W,
-  on,
-  onHover,
-}: {
-  W: number;
-  on: string | null;
-  onHover: (model: string | null) => void;
-}) {
+function TrainBars({ W }: { W: number }) {
   const compact = W < 420;
   const hasBelow = bars.some((p) => p.x < 1);
   const row = compact ? 38 : 30;
@@ -143,18 +135,11 @@ function TrainBars({
         const st = modelStyle(p.r.model);
         const y = m.t + i * row;
         const x0 = sx(1), x1 = sx(p.x);
-        const dim = on !== null && on !== p.r.model;
         const barY = compact ? y + 19 : y + 5;
         const barH = compact ? 11 : row - 10;
         const midY = barY + barH / 2;
         return (
-          <g
-            key={p.r.key}
-            opacity={dim ? 0.28 : 1}
-            onPointerEnter={() => onHover(p.r.model)}
-            onPointerLeave={() => onHover(null)}
-            style={{ cursor: "default" }}
-          >
+          <g key={p.r.key}>
             <title>{`${p.r.model}, best recipe (${p.r.cell}): ${p.extrap ? "≈" : ""}${fx(p.x)} averaged over 6, 7 and 8 h of training; at 8 h as strong as the starter after ${p.extrap ? "about " : ""}${hrs(p.sh8)}${p.extrap ? ` (extrapolated past the starter's ${hrs(TOP.hours)} run)` : ""}`}</title>
             <rect x={0} y={y} width={W} height={row} fill="transparent" />
             {compact ? (
@@ -193,7 +178,6 @@ export function CostMultiplier() {
   const sideBySide = WR < 420;
   const compact = W < 520;
   const [hit, setHit] = useState<Hit | null>(null);
-  const [legendModel, setLegendModel] = useState<string | null>(null);
   if (agent) {
     return (
       <Table
@@ -216,10 +200,8 @@ export function CostMultiplier() {
   const xTicks: number[] = [];
   for (let x = 0; x <= COST_MAX; x += W < 380 ? 10 : 5) xTicks.push(x);
   const models = [...bars.map((b) => b.r.model), ...recipes.map((r) => r.model)].filter((mo, i, a) => a.indexOf(mo) === i);
-  // Hovering a recipe, bar, or legend entry highlights that model across both figures.
-  const on = hit?.model ?? legendModel;
   const top = TOP8;
-  const rank = (r: Recipe) => (r.key === hit?.key ? 3 : r.model === on ? 2 : r === top.r ? 1 : 0);
+  const rank = (r: Recipe) => (r.key === hit?.key ? 2 : r === top.r ? 1 : 0);
   const hits: Hit[] = all.map((q) => ({
     cx: sx(cx(q)), cy: sy(vy(q)), key: q.r.key, model: q.r.model, title: `${q.r.model}, ${q.r.cell}${q.final ? " (fresh 1 h final)" : ""}`,
     lines: [
@@ -244,12 +226,7 @@ export function CostMultiplier() {
         {models.map((mo) => {
           const st = modelStyle(mo);
           return (
-            <span
-              key={mo}
-              onPointerEnter={() => setLegendModel(mo)}
-              onPointerLeave={() => setLegendModel(null)}
-              style={{ cursor: "default", opacity: on !== null && on !== mo ? 0.45 : 1 }}
-            >
+            <span key={mo}>
               <i style={{ background: st.color }} />
               {mo}
             </span>
@@ -284,17 +261,16 @@ export function CostMultiplier() {
                   {compact ? "compute multiplier (log scale)" : "compute multiplier: starter's cost ÷ recipe's total cost (log scale)"}
                 </text>
                 {[...curves].sort((a, b) => rank(a.r) - rank(b.r)).map(({ r, pts, finals }) => {
-                  const st = modelStyle(r.model), lit = on === r.model, focus = hit?.key === r.key, dim = on !== null && !lit, hi = lit || (on === null && r === top.r);
-                  const op = dim ? 0.18 : hi ? 1 : 0.22;
+                  const st = modelStyle(r.model), focus = hit?.key === r.key, hi = r === top.r;
                   return (
                     <g key={r.key}>
-                      <path d={path(pts)} fill="none" stroke={st.color} strokeWidth={focus ? 3 : lit ? 2 : hi ? 2.4 : 1.4} strokeLinejoin="round" opacity={op} />
-                      {pts.map((p) => <circle key={p.hours} cx={sx(cx(p))} cy={sy(vy(p))} r={focus ? 4 : lit ? 3.2 : 2.6} fill={p.extrap ? "#fff" : st.color} stroke={p.extrap ? st.color : "#fff"} strokeWidth={p.extrap ? 1.6 : 1} opacity={dim ? 0.2 : hi ? 1 : 0.3} />)}
-                      {finals.map((p, i) => { const s = focus ? 4.5 : 3.5; return <rect key={i} x={sx(cx(p)) - s} y={sy(vy(p)) - s} width={2 * s} height={2 * s} rx={1.2} fill={st.color} stroke={CMYK.k} strokeWidth={1} opacity={dim ? 0.2 : hi ? 0.9 : 0.3} />; })}
+                      <path d={path(pts)} fill="none" stroke={st.color} strokeWidth={focus ? 2.8 : hi ? 2.4 : 1.4} strokeLinejoin="round" opacity={hi ? 1 : 0.25} />
+                      {pts.map((p) => <circle key={p.hours} cx={sx(cx(p))} cy={sy(vy(p))} r={focus ? 4 : 2.6} fill={p.extrap ? "#fff" : st.color} stroke={p.extrap ? st.color : "#fff"} strokeWidth={p.extrap ? 1.6 : 1} opacity={hi ? 1 : 0.35} />)}
+                      {finals.map((p, i) => { const s = focus ? 4.5 : 3.5; return <rect key={i} x={sx(cx(p)) - s} y={sy(vy(p)) - s} width={2 * s} height={2 * s} rx={1.2} fill={st.color} stroke={CMYK.k} strokeWidth={1} opacity={hi ? 0.9 : 0.35} />; })}
                     </g>
                   );
                 })}
-                <line x1={m.l} x2={W - m.r} y1={sy(1)} y2={sy(1)} stroke={CMYK.k} strokeWidth={on === null ? 2.2 : 1.5} />
+                <line x1={m.l} x2={W - m.r} y1={sy(1)} y2={sy(1)} stroke={CMYK.k} strokeWidth={2} />
                 {compact ? (
                   <text x={W - m.r} y={sy(1) - 6} className="viz-axis" textAnchor="end" style={{ fill: "var(--ink)", fontWeight: 600, paintOrder: "stroke", stroke: "#fff", strokeWidth: 3 }}>
                     Starter, 1×
@@ -327,7 +303,7 @@ export function CostMultiplier() {
         <figure className="pt-figure ar-cost-fig">
           <div className="ar-cost-head">Training compute only</div>
           <div className="viz ar-cost" ref={rightRef}>
-            <TrainBars W={WR} on={on} onHover={setLegendModel} />
+            <TrainBars W={WR} />
           </div>
         </figure>
       </div>

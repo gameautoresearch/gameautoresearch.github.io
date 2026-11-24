@@ -112,7 +112,7 @@ type ViewerProps = {
   start?: number;
   initialSpeed?: number;
   compact?: boolean;
-  renderSide?: (side: 0 | 1, meta: string) => ReactNode;
+  renderSide?: (side: 0 | 1) => ReactNode;
 };
 export default function ReplayViewer({ src, ...rest }: ViewerProps) {
   return (
@@ -237,9 +237,9 @@ function ReplayBoard({ url, names, still, start, initialSpeed, compact, renderSi
       return (
         <div className="replay replay-compact replay-flanked">
           <div className="sc-row">
-            {renderSide(0, "Loading…")}
+            {renderSide(0)}
             <div className="sc-center sc-wait">Loading replay…</div>
-            {renderSide(1, "Loading…")}
+            {renderSide(1)}
           </div>
           <div className="replay-controls sc-controls-stub" aria-hidden="true" />
         </div>
@@ -443,9 +443,22 @@ function ReplayBoard({ url, names, still, start, initialSpeed, compact, renderSi
     <div className={`replay${compact ? " replay-compact" : ""}${renderSide ? " replay-flanked" : ""}`} ref={root}>
       {renderSide ? (
         <div className="sc-row">
-          {renderSide(0, sideMeta(1))}
-          <div className="sc-center">{boardSvg}</div>
-          {renderSide(1, sideMeta(2))}
+          {renderSide(0)}
+          <div className="sc-center">
+            <div className="sc-live-hud">
+              {[1, 2].map((side) => (
+                <div key={side} className="sc-live-side">
+                  <i style={{ background: PLAYER[side] }} aria-hidden="true" />
+                  <div>
+                    <strong>{score[side - 1].toLocaleString()} pts</strong>
+                    <span>{cityCount[side]} cities · {unitCount[side]} units</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+            {boardSvg}
+          </div>
+          {renderSide(1)}
         </div>
       ) : (
         <>

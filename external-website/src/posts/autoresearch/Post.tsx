@@ -6,6 +6,7 @@ import TopScore from "./TopScore";
 import { ForecastLead, pokeSkill, polyForecastN } from "./Budget";
 import { CostMultiplier, costMult } from "./CostMultiplier";
 import NeonOutlierDiagrams from "./NeonOutlierDiagrams";
+import NeonDiscipline from "./NeonDiscipline";
 import { ResearchRace } from "./Frontier13";
 import { SessionTimeline } from "./Timeline";
 import "../shared/post.css";
@@ -234,7 +235,7 @@ export default function AutoresearchPost() {
       </section>
 
       <h2 className="ar-config ar-c3" id="taste">
-        What separates strong researchers from weak ones?
+        What do strong researchers do differently?
       </h2>
 
       <h3 id="inside">Experimental discipline</h3>
@@ -243,8 +244,32 @@ export default function AutoresearchPost() {
         models are dramatically more effective at choosing good interventions
         and interpreting results accurately.
       </p>
+      <p>
+        Gemini 4 Neon&rsquo;s $8.58 Polytopia session&mdash;the same run that
+        produced the 416 Elo outlier recipe above&mdash;is a good example.
+        Instead of spending its $8.70 budget on a few long runs, it ran{" "}
+        <strong>five short A/B tests</strong> (mostly pairs of 12-minute runs
+        at ~$0.61 each), scored them on free practice matches, and used $0.04 of
+        CPU-only debugging to fix crashes rather than guessing on GPUs. That
+        left a third of the budget ($2.73) for one full 1-hour validation of the
+        winning recipe before submission.
+      </p>
       <Figure
         n={3}
+        wide
+        caption={
+          <>
+            How Gemini 4 Neon spent $8.58 of its $8.70 Polytopia research
+            budget: five short A/B tests, $0.04 of CPU debugging, and a 1-hour
+            final validation. Scores are practice win rates against the
+            four-bot ladder.
+          </>
+        }
+      >
+        <NeonDiscipline />
+      </Figure>
+      <Figure
+        n={4}
         wide
         caption={
           <>
@@ -311,7 +336,7 @@ export default function AutoresearchPost() {
         ranked the eventual 8-hour winner last.
       </p>
       <Figure
-        n={4}
+        n={5}
         caption={
           <>
             Forecast skill across {pokeSkill.items} Pokémon runs (0 = blind

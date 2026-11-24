@@ -434,20 +434,17 @@ export default function EmptyEfficiency() {
             </g>
           ))}
 
-          {stepLines.map((ln) => {
-            const dim = activeKey !== null && activeKey !== ln.key;
-            return (
-              <path
-                key={ln.key}
-                d={ln.d}
-                fill="none"
-                stroke={ln.color}
-                strokeWidth={activeKey === ln.key ? 2.4 : 1.7}
-                strokeLinejoin="round"
-                opacity={dim ? 0.2 : 0.9}
-              />
-            );
-          })}
+          {stepLines.map((ln) => (
+            <path
+              key={ln.key}
+              d={ln.d}
+              fill="none"
+              stroke={ln.color}
+              strokeWidth={activeKey === ln.key ? 2.4 : 1.7}
+              strokeLinejoin="round"
+              opacity={0.9}
+            />
+          ))}
 
           {[...items].sort((a, b) => orderOf(a) - orderOf(b)).map((it, idx) => {
             const k = itemModel(it);
@@ -458,14 +455,13 @@ export default function EmptyEfficiency() {
             const col = modelStyle(MODEL_BY_KEY[k].label).color;
             const isTop = TOP_KEYS.includes(k);
             const isHl = activeKey === k;
-            const dim = activeKey !== null && !isHl;
             if (clipped) {
               return (
                 <path
                   key={`c-${idx}`}
                   d={`M${cx - 3.5},${cy - 3}L${cx + 3.5},${cy - 3}L${cx},${cy + 3}Z`}
                   fill={col}
-                  opacity={dim ? 0.18 : 0.7}
+                  opacity={0.7}
                 />
               );
             }
@@ -482,7 +478,6 @@ export default function EmptyEfficiency() {
                   fill={col}
                   stroke={CMYK.k}
                   strokeWidth={1.2}
-                  opacity={dim ? 0.2 : 1}
                 />
               );
             }
@@ -495,12 +490,12 @@ export default function EmptyEfficiency() {
                 fill={col}
                 stroke="#fff"
                 strokeWidth={1}
-                opacity={dim ? 0.18 : isTop || isHl ? 0.9 : 0.55}
+                opacity={isTop ? 0.9 : 0.55}
               />
             );
           })}
 
-          <g opacity={activeKey && activeKey !== "starter" ? 0.45 : 1}>
+          <g>
             <path d={linePath(starterRated)} fill="none" stroke={CMYK.k} strokeWidth={2.4} strokeLinejoin="round" />
             {starterMapped.length > 0 && (
               <path
@@ -549,7 +544,6 @@ export default function EmptyEfficiency() {
                 fill={col}
                 stroke={CMYK.k}
                 strokeWidth={1.3}
-                opacity={activeKey && activeKey !== k ? 0.35 : 1}
               />
             );
           })}

@@ -279,15 +279,15 @@ const GAMES: { id: Game; label: string }[] = [
   { id: "generals", label: "Generals" },
 ];
 
-function SideCard({ card, accent, live }: { card: PolicyCard; accent: string; live: string }) {
+function SideCard({ card, accent }: { card: PolicyCard; accent: string }) {
   return (
-    <div className="sc-card" style={{ borderTopColor: accent }}>
+    <div className="sc-card">
       <div className="sc-card-head">
         <span className="sc-card-name">
           <i style={{ background: accent }} aria-hidden="true" />
           <strong>{card.name}</strong>
         </span>
-        <span className="sc-card-live">{live}</span>
+        <span className="sc-card-tag">{card.tag}</span>
       </div>
       <div className="sc-card-stats">
         {card.stats.map((s) => (
@@ -311,14 +311,14 @@ function SideCard({ card, accent, live }: { card: PolicyCard; accent: string; li
   );
 }
 
-function Pokemon({ item, renderSide }: { item: Item; renderSide: (side: 0 | 1, live: string) => ReactNode }) {
+function Pokemon({ item, renderSide }: { item: Item; renderSide: (side: 0 | 1) => ReactNode }) {
   const file = usePokemonReplay(item.id);
   const wait = (
     <div className="psr psr-flanked">
       <div className="sc-row">
-        {renderSide(0, "3/3 Pokémon left")}
+        {renderSide(0)}
         <div className="sc-center sc-wait">{file === "error" ? "This battle could not load." : "Loading battle…"}</div>
-        {renderSide(1, "3/3 Pokémon left")}
+        {renderSide(1)}
       </div>
       <div className="psr-bar sc-controls-stub" aria-hidden="true" />
     </div>
@@ -334,8 +334,8 @@ function Pokemon({ item, renderSide }: { item: Item; renderSide: (side: 0 | 1, l
 
 function Stage({ item }: { item: Item }) {
   const accents = SIDE_COLORS[item.game];
-  const renderSide = (side: 0 | 1, live: string) => (
-    <SideCard card={item.cards[side]} accent={accents[side]} live={live} />
+  const renderSide = (side: 0 | 1) => (
+    <SideCard card={item.cards[side]} accent={accents[side]} />
   );
   if (item.game === "pokemon") return <Pokemon item={item} renderSide={renderSide} />;
   if (item.game === "polytopia") {

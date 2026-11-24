@@ -151,17 +151,17 @@ export function ResearchRace() {
           <clipPath id={plotId}><rect x={m.l - 6} y={m.t - 6} width={W - m.l - m.r + 12} height={H - m.t - m.b + 12} /></clipPath>
           <g clipPath={`url(#${plotId})`}>
             {[...MODELS].sort((a, b) => rank(a) - rank(b)).map((model) => {
-              const st = modelStyle(model.label), lit = model.key === highlighted;
+              const st = modelStyle(model.label), isTop = model.key === top.key, focus = model.key === hit?.key;
               return (
                 <g key={model.key}>
-                  <path d={path(bestSoFar(model))} fill="none" stroke={st.color} strokeWidth={lit ? 2.4 : 1.4} strokeLinejoin="round" opacity={lit ? 1 : hit ? 0.18 : 0.22} />
+                  <path d={path(bestSoFar(model))} fill="none" stroke={st.color} strokeWidth={focus ? 2.6 : isTop ? 2.4 : 1.4} strokeLinejoin="round" opacity={isTop ? 1 : 0.28} />
                   {model.nets.map(([hours, elo, , submitted], i) => elo >= yMin && (
                     <circle key={i} cx={sx(hours)} cy={sy(elo)} r={submitted ? 3.5 : 2.8} fill={st.color}
-                      stroke="#fff" strokeWidth={1} opacity={lit ? 1 : hit ? 0.2 : 0.3} />
+                      stroke="#fff" strokeWidth={1} opacity={isTop ? 1 : 0.35} />
                   ))}
                   {model.final.elo >= yMin && (
                     <path d={`M${sx(model.gpu)},${sy(model.final.elo) - 5}l5,5l-5,5l-5,-5z`} fill={st.color}
-                      stroke="#fff" strokeWidth={1.2} opacity={lit ? 1 : hit ? 0.2 : 0.3} />
+                      stroke="#fff" strokeWidth={1.2} opacity={isTop ? 1 : 0.35} />
                   )}
                 </g>
               );

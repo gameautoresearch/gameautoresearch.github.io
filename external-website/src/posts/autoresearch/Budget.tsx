@@ -163,7 +163,7 @@ export function RecipeCurves() {
         <text x={m.l} y={m.t - 4} className="viz-axis">Elo (starter at 200M samples = 0)</text>
         {withCurves.filter((r) => r !== BEST && (!only || r.model === only)).map((r) => (
           <path key={r.key} d={line(r.curve)} fill="none" stroke={only ? modelStyle(r.model).color : "#b9b9b9"} strokeWidth={only ? 1.75 : 1.25}
-            opacity={tip && tip !== r.key ? 0.35 : 0.9} onMouseEnter={() => setTip(r.key)} onMouseLeave={() => setTip(null)}>
+            onMouseEnter={() => setTip(r.key)} onMouseLeave={() => setTip(null)}>
             <title>{`${r.model}, ${r.cell}: ${signed(r.curve[r.curve.length - 1].elo)} at 8 h`}</title>
           </path>
         ))}
@@ -354,7 +354,6 @@ export function CostCurves({ only }: { only?: "zero" | "trained" | "long" } = {}
     setHit(near);
   };
   const path = (pts: [number, number][]) => pts.map(([x, y], i) => `${i ? "L" : "M"}${sx(x).toFixed(1)},${sy(y).toFixed(1)}`).join("");
-  const starterDim = on && on !== "starter" ? 0.45 : 1;
   const tipLeft = hit ? Math.max(0, hit.cx + 12 + 240 > W ? hit.cx - 252 : hit.cx + 12) : 0;
 
   return (
@@ -390,23 +389,23 @@ export function CostCurves({ only }: { only?: "zero" | "trained" | "long" } = {}
           <line x1={m.l} x2={W - m.r} y1={sy(lastStarter.elo)} y2={sy(lastStarter.elo)} className="viz-ref" />
           {!narrow && <text x={W - m.r + 6} y={sy(lastStarter.elo)} className="fr-ref" dominantBaseline="middle">{`${lastStarter.hours} h starter ($${payback.starterLongCostUsd})`}</text>}
         </g>
-        {/* At rest the best recipe is in full colour and the others sit faded behind it; hovering a recipe takes over. */}
+        {/* The best recipe is in full colour and the others sit softly behind it. */}
         {[...withCurves].sort((a, b) => rank(a) - rank(b)).map((r) => {
-          const st = modelStyle(r.model), lit = on === r.key, dim = on !== null && !lit, top = lit || (on === null && r === TOP);
-          const stroke = { fill: "none", stroke: st.color, strokeWidth: lit ? 2.6 : top ? 2.4 : 1.4, opacity: dim ? 0.18 : top ? 1 : 0.22 };
+          const st = modelStyle(r.model), lit = on === r.key, top = r === TOP;
+          const stroke = { fill: "none", stroke: st.color, strokeWidth: lit ? 2.6 : top ? 2.4 : 1.4, opacity: top ? 1 : 0.25 };
           const first = r.curve[0];
           return (
             <g key={r.key}>
               {fromZero && <path d={path([[r.spentUsd, ZERO.elo], ...early(r).map((p) => [costOf(r, p.hours), p.elo] as [number, number]), [costOf(r, first.hours), first.elo]])} strokeLinejoin="round" {...stroke} />}
-              {early(r).map((p) => <circle key={p.hours} cx={sx(costOf(r, p.hours))} cy={sy(p.elo)} r={lit ? 3.4 : 2} fill={st.color} opacity={dim ? 0.2 : top ? 1 : 0.3} />)}
-              {fromZero && <circle cx={sx(r.spentUsd)} cy={sy(ZERO.elo)} r={lit ? 4 : 3} fill="#fff" stroke={st.color} strokeWidth={1.4} opacity={dim ? 0.2 : top ? 1 : 0.3} />}
+              {early(r).map((p) => <circle key={p.hours} cx={sx(costOf(r, p.hours))} cy={sy(p.elo)} r={lit ? 3.4 : 2} fill={st.color} opacity={top ? 1 : 0.35} />)}
+              {fromZero && <circle cx={sx(r.spentUsd)} cy={sy(ZERO.elo)} r={lit ? 4 : 3} fill="#fff" stroke={st.color} strokeWidth={1.4} opacity={top ? 1 : 0.35} />}
               <path d={path(r.curve.map((p) => [costOf(r, p.hours), p.elo]))} strokeLinejoin="round" {...stroke} />
-              {r.curve.map((p) => <circle key={p.hours} cx={sx(costOf(r, p.hours))} cy={sy(p.elo)} r={lit ? 4 : 2.8} fill={st.color} stroke="#fff" strokeWidth={1} opacity={dim ? 0.2 : top ? 1 : 0.3} />)}
-              {r.finals1h.map((e, i) => { const s = lit ? 5 : 4; return <rect key={i} x={sx(costOf(r, 1)) - s} y={sy(e) - s} width={2 * s} height={2 * s} rx={1.2} fill={st.color} stroke={CMYK.k} strokeWidth={1} opacity={dim ? 0.2 : top ? 0.9 : 0.3} />; })}
+              {r.curve.map((p) => <circle key={p.hours} cx={sx(costOf(r, p.hours))} cy={sy(p.elo)} r={lit ? 4 : 2.8} fill={st.color} stroke="#fff" strokeWidth={1} opacity={top ? 1 : 0.35} />)}
+              {r.finals1h.map((e, i) => { const s = lit ? 5 : 4; return <rect key={i} x={sx(costOf(r, 1)) - s} y={sy(e) - s} width={2 * s} height={2 * s} rx={1.2} fill={st.color} stroke={CMYK.k} strokeWidth={1} opacity={top ? 0.9 : 0.35} />; })}
             </g>
           );
         })}
-        <g opacity={starterDim}>
+        <g>
           <path d={path([...(fromZero ? [[0, ZERO.elo] as [number, number]] : []), ...[...yardEarly, ...yard].map((p) => [p.hours * RATE, p.elo] as [number, number])])}
             fill="none" stroke={CMYK.k} strokeWidth={on === "starter" ? 3.4 : 2.5} strokeLinejoin="round" />
           {fromZero && <circle cx={sx(0)} cy={sy(ZERO.elo)} r={4.4} fill="#fff" stroke={CMYK.k} strokeWidth={2} />}
@@ -414,7 +413,7 @@ export function CostCurves({ only }: { only?: "zero" | "trained" | "long" } = {}
           {!narrow && <text x={sx(yardEnd.hours * RATE) + 9} y={sy(yardEnd.elo)} className="viz-label" dominantBaseline="middle" style={{ fontWeight: 600 }}>Starter, {hrs(yardEnd.hours)}</text>}
         </g>
         {fromZero && <text x={sx(0) + 9} y={sy(ZERO.elo) + 18} className="viz-axis">untrained = random play, {elo(ZERO.elo)}</text>}
-        {costFrontier.map((q, i) => <circle key={i} cx={sx(q.cost)} cy={sy(q.elo)} r={3.9} fill={modelStyle(q.r.model).color} stroke={CMYK.k} strokeWidth={1.3} opacity={q.r.key === (on ?? TOP.key) ? 1 : 0.4} />)}
+        {costFrontier.map((q, i) => <circle key={i} cx={sx(q.cost)} cy={sy(q.elo)} r={3.9} fill={modelStyle(q.r.model).color} stroke={CMYK.k} strokeWidth={1.3} opacity={q.r.key === TOP.key ? 1 : 0.45} />)}
         {!narrow && (
           <text x={sx(lastFrontier.cost) - 8} y={sy(lastFrontier.elo) - 10} className="viz-label" textAnchor="end" style={{ fontWeight: 600, paintOrder: "stroke", stroke: "#fff", strokeWidth: 4, strokeLinejoin: "round" }}>
             {lastFrontier.r.model}, {lastFrontier.r.cell}

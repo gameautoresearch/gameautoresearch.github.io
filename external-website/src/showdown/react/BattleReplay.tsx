@@ -22,7 +22,7 @@ export interface BattleReplayProps {
   /** Crop Showdown's 100px trainer sidebars and focus on the 440×360 center arena. */
   cropSidebars?: boolean;
   /** Optional left/right side cards rendered flanking the arena (0 = p1, 1 = p2). */
-  renderSide?: (side: 0 | 1, meta: string) => ReactNode;
+  renderSide?: (side: 0 | 1) => ReactNode;
   className?: string;
 }
 
@@ -107,10 +107,6 @@ export default function BattleReplay({ log, autoplay = true, startTurn, initialS
     title: `Turn ${k.turn}: ${k.pokemon} (${summary.players[k.side]}) fainted`,
   }));
   const playLabel = state.finished ? "Watch again" : state.playing ? "Pause" : "Play";
-  const leftCount = (side: "p1" | "p2") => {
-    const fainted = summary.knockouts.filter((k) => k.side === side && (state.finished ? true : k.turn < position)).length;
-    return `${Math.max(0, 3 - fainted)}/3 Pokémon left`;
-  };
   const stageEl = (
     <div className="psr-stage" ref={stage} style={{ height: Math.round(360 * scale) }} onClick={toggle}>
       <div
@@ -129,9 +125,9 @@ export default function BattleReplay({ log, autoplay = true, startTurn, initialS
     <div className={`psr${cropSidebars ? " psr-crop" : ""}${renderSide ? " psr-flanked" : ""} ${className ?? ""}`} onKeyDown={onKeyDown}>
       {renderSide ? (
         <div className="sc-row">
-          {renderSide(0, leftCount("p1"))}
+          {renderSide(0)}
           <div className="sc-center sc-center-poke">{stageEl}</div>
-          {renderSide(1, leftCount("p2"))}
+          {renderSide(1)}
         </div>
       ) : (
         stageEl

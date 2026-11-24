@@ -24,7 +24,7 @@ function decodeOrder(id: number, width: number, actionWidth: number) {
 
 export default function GeneralsReplay({ src, names, start = 0, initialSpeed = 1, renderSide }: {
   src: string; names?: [string, string]; start?: number; initialSpeed?: number;
-  renderSide?: (side: 0 | 1, meta: string) => ReactNode;
+  renderSide?: (side: 0 | 1) => ReactNode;
 }) {
   const [rec, setRec] = useState<Recording | null>(null);
   const [pos, setPos] = useState(0);
@@ -83,9 +83,9 @@ export default function GeneralsReplay({ src, names, start = 0, initialSpeed = 1
       return (
         <div className="gr gr-flanked">
           <div className="sc-row">
-            {renderSide(0, "Loading…")}
+            {renderSide(0)}
             <div className="sc-center sc-wait">Loading game…</div>
-            {renderSide(1, "Loading…")}
+            {renderSide(1)}
           </div>
           <div className="gr-controls sc-controls-stub" aria-hidden="true" />
         </div>
@@ -136,9 +136,22 @@ export default function GeneralsReplay({ src, names, start = 0, initialSpeed = 1
     <div className={`gr${renderSide ? " gr-flanked" : ""}`}>
       {renderSide ? (
         <div className="sc-row">
-          {renderSide(0, sideMeta(0))}
-          <div className="sc-center">{boardSvg}</div>
-          {renderSide(1, sideMeta(1))}
+          {renderSide(0)}
+          <div className="sc-center">
+            <div className="sc-live-hud">
+              {[0, 1].map((p) => (
+                <div key={p} className="sc-live-side">
+                  <i style={{ background: SEAT_COLORS[p] }} aria-hidden="true" />
+                  <div>
+                    <strong>{f.scores[p].army.toLocaleString()} army</strong>
+                    <span>{f.scores[p].land} land</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+            {boardSvg}
+          </div>
+          {renderSide(1)}
         </div>
       ) : (
         <>
