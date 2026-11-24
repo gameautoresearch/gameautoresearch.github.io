@@ -141,7 +141,7 @@ function TrainBars({ W }: { W: number }) {
         const midY = barY + barH / 2;
         return (
           <g key={p.r.key}>
-            <title>{`${p.r.model}, best recipe (${p.r.cell}): ${p.extrap ? "≈" : ""}${fx(p.x)} averaged over 6, 7 and 8 h of training; at 8 h as strong as the starter after ${p.extrap ? "about " : ""}${hrs(p.sh8)}${p.extrap ? ` (extrapolated past the starter's ${hrs(TOP.hours)} run)` : ""}`}</title>
+            <title>{`${p.r.model}, best recipe (${p.r.cell}): ${p.extrap ? "≈" : ""}${fx(p.x)} averaged over 6, 7 and 8 h of training; at 8 h as strong as the starter recipe after ${p.extrap ? "about " : ""}${hrs(p.sh8)}${p.extrap ? ` (extrapolated past the starter recipe's ${hrs(TOP.hours)} run)` : ""}`}</title>
             <rect x={0} y={y} width={W} height={row} fill="transparent" />
             {compact ? (
               <text
@@ -182,7 +182,7 @@ export function CostMultiplier() {
   if (agent) {
     return (
       <Table
-        head={["Recipe", "Research spend", "Total cost at 8 h", "Starter training to match", "Compute multiplier, research included", "Training only"]}
+        head={["Recipe", "Research spend", "Total cost at 8 h", "Starter recipe training to match", "Compute multiplier, research included", "Training only"]}
         align={["l", "r", "r", "r", "r", "r"]}
         rows={at8.map((p) => [`${p.r.model}, ${p.r.cell}`, usd(p.r.spentUsd), usd(p.cost), `${p.extrap ? "about " : ""}${hrs(p.sh)}${p.extrap ? " (extrapolated)" : ""}`,
           `${p.extrap ? "≈" : ""}${fx(p.x)}`, `${p.extrap ? "≈" : ""}${fx(p.xTrain)}`])}
@@ -207,8 +207,8 @@ export function CostMultiplier() {
   const hits: Hit[] = all.map((q) => ({
     cx: sx(cx(q)), cy: sy(vy(q)), key: q.r.key, model: q.r.model, title: `${q.r.model}, ${q.r.cell}`,
     lines: [
-      `${hrs(q.hours)} trained: as strong as the starter after ${q.extrap ? "about " : ""}${hrs(q.sh)}${q.extrap ? ` (extrapolated past its ${hrs(TOP.hours)} run)` : ""}`,
-      `${q.extrap ? "≈" : ""}${fx(q.x)} less compute than the starter, research included`,
+      `${hrs(q.hours)} trained: as strong as the starter recipe after ${q.extrap ? "about " : ""}${hrs(q.sh)}${q.extrap ? ` (extrapolated past its ${hrs(TOP.hours)} run)` : ""}`,
+      `${q.extrap ? "≈" : ""}${fx(q.x)} less compute than the starter recipe, research included`,
       `research ${usd(q.r.spentUsd)} + training ${usd(q.hours * RATE)} = ${usd(q.cost)}; training alone ${q.extrap ? "≈" : ""}${fx(q.xTrain)}`,
     ],
   }));
@@ -234,7 +234,7 @@ export function CostMultiplier() {
             </span>
           );
         })}
-        <span><i style={{ background: CMYK.k }} />Starter (1×)</span>
+        <span><i style={{ background: CMYK.k }} />Starter recipe (1×)</span>
       </div>
       <div className="ar-cost-pair">
         <figure className="pt-figure ar-cost-fig">

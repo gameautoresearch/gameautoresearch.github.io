@@ -200,18 +200,19 @@ export default function AutoresearchPost() {
       </h2>
       <p>
         We were curious about the "payoff" timelines of tokens and compute spent
-        on improving this recipe. We measure a recipe by its{" "}
+        improving the <strong>starter recipe</strong>, the basic PPO setup every
+        agent began from. We measure a recipe by its{" "}
         <strong>compute multiplier</strong>: how much <i>less</i> compute it
-        needs to train a network of equivalent strength to the basic PPO recipe.
-        Most runs do not pay back within 8 hours of training. The best pays back
+        needs to train a network as strong as one from the starter recipe. Most
+        runs do not pay back within 8 hours of training. The best pays back
         dramatically, though. One of {costMult.top.model}&rsquo;s sessions
-        trains in 8 hours a network that our default recipe would need about{" "}
+        trains in 8 hours a network that the starter recipe would need about{" "}
         {Math.round(costMult.top.starterHours)} hours to match ($
         {costMult.top.starterUsd}
         ), so it needs{" "}
         <strong>about {costMult.top.x.toFixed(0)}× less total compute</strong>.
-        The next best, {costMult.second.model}
-        &rsquo;s ${costMult.second.spent.toFixed(2)} session, reaches{" "}
+        The next bes a {costMult.second.model} run that spent &rsquo;s $
+        {costMult.second.spent.toFixed(2)} on research, reaches{" "}
         {costMult.second.x.toFixed(1)}× savings after 8 hours of training.
       </p>
       <CostMultiplier />
@@ -224,7 +225,7 @@ export default function AutoresearchPost() {
         <p>
           This recipe matched the starter recipe with only half the budget, and
           at full 8hrs of training finished at 72 elo points higher of any other
-          submission - stronger than the starter&rsquo;s 64-hour training run.
+          submission - stronger than the starter recipe trained for 64 hours.
           Major interventions that set it apart from other models&rsquo;
           submissions:
         </p>
