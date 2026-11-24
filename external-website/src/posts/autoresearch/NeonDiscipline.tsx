@@ -3,255 +3,252 @@ import { Table } from "../shared/text";
 
 // Gemini 4 Neon's $8.70 Polytopia recipe session (`polytopia-neon-b3`, $8.58 spent).
 // Sourced from its research ledger (`ledger.sqlite3`) and `NOTES.md`.
+// Each branch's lift is its 512-game practice win-rate change over the best prior 12-minute result:
+// base0 0.00% -> v1b 3.13% (+3.1%) -> v3a 11.33% (+8.2%) / v3b 15.23% (+12.1%)
+// -> v4a 18.36% (+3.1%) / v4b 15.43% (+0.2%) -> v5a 22.66% (+4.3%) / v5b 21.68% (+3.3%) -> v6final 47.85%.
 
-type Arm = {
+type Branch = {
   label: string;
-  score: number | null; // practice win rate %, null if crashed
+  delta?: { dir: "up" | "down"; text: string };
+  status?: string;
   crash?: string;
-  winner?: boolean;
 };
 
-type Stage = {
+type Row = {
   key: string;
-  badge: string;
-  title: string;
+  costUsd: number;
+  cpuUsd?: number;
   cost: string;
-  color: string;
-  arms: [Arm, Arm];
-  note: string;
+  time: string;
+  a: Branch;
+  b: Branch;
+  winner?: "a" | "b";
+  best: string;
 };
 
 const BUDGET = 8.7;
 const SPENT = 8.58;
-const VALIDATION_COST = 2.73;
+const UNUSED = BUDGET - SPENT;
+const PX_PER_USD = 46;
 
-const STAGES: Stage[] = [
+const ROWS: Row[] = [
   {
     key: "r1",
-    badge: "A/B 1",
-    title: "Baseline vs. dual-view critic and turn-based credit",
+    costUsd: 0.9,
     cost: "$0.90",
-    color: "#a8beee",
-    arms: [
-      { label: "Starter recipe", score: 0.0 },
-      { label: "Dual-view critic + turn-based credit", score: 3.1, winner: true },
-    ],
-    note: "Beat the starter in a short run and revealed that slow training speed was the main bottleneck.",
+    time: "5m + 12m",
+    a: { label: "Starter recipe", status: "baseline (0.0%)" },
+    b: { label: "Dual-view critic + turn credit", delta: { dir: "up", text: "+3.1%" } },
+    winner: "b",
+    best: "3.1%",
   },
   {
     key: "r2",
-    badge: "A/B 2",
-    title: "Faster pyramid network: self-play vs. opponent pool",
-    cost: "$1.23 + $0.04 CPU",
-    color: "#8aa8e8",
-    arms: [
-      { label: "Pyramid network, self-play only", score: null, crash: "Eval crash" },
-      { label: "Pyramid network + opponent pool", score: null, crash: "Eval crash" },
-    ],
-    note: "Instead of guessing on GPUs, Neon spent $0.04 on six tiny CPU-only workers to isolate an eval crash in the new network and a bug in the opponent pool.",
+    costUsd: 1.23,
+    cpuUsd: 0.04,
+    cost: "$1.27",
+    time: "2×12m + CPU",
+    a: { label: "Pyramid net, self-play", crash: "Eval crash (discarded)" },
+    b: { label: "Pyramid net + opponent pool", crash: "Eval crash · fixed on CPU ($0.04)" },
+    best: "—",
   },
   {
     key: "r3",
-    badge: "A/B 3",
-    title: "Self-play vs. historical opponent pool",
+    costUsd: 1.22,
     cost: "$1.22",
-    color: "#6a8ee0",
-    arms: [
-      { label: "Self-play only", score: 11.3 },
-      { label: "With historical opponent pool", score: 15.2, winner: true },
-    ],
-    note: "Clean single-variable check after the fixes: playing past versions of itself clearly helped.",
+    time: "2×12m",
+    a: { label: "Fixed pyramid net, self-play", delta: { dir: "up", text: "+8.2%" } },
+    b: { label: "Fixed pyramid + opponent pool", delta: { dir: "up", text: "+12.1%" } },
+    winner: "b",
+    best: "15.2%",
   },
   {
     key: "r4",
-    badge: "A/B 4",
-    title: "Faster updates vs. a richer critic",
+    costUsd: 1.23,
     cost: "$1.23",
-    color: "#4a71d2",
-    arms: [
-      { label: "1-epoch updates, standard critic", score: 18.4, winner: true },
-      { label: "2-epoch updates, distributional critic", score: 15.4 },
-    ],
-    note: "Added scoreboard inputs; faster throughput beat the heavier critic and logs showed room for more frequent gradient steps.",
+    time: "2×12m",
+    a: { label: "1-epoch, standard critic", delta: { dir: "up", text: "+3.1%" } },
+    b: { label: "2-epoch, distributional critic", delta: { dir: "up", text: "+0.2%" } },
+    winner: "a",
+    best: "18.4%",
   },
   {
     key: "r5",
-    badge: "A/B 5",
-    title: "More frequent updates vs. heavier shaping",
+    costUsd: 1.23,
     cost: "$1.23",
-    color: "#2f55c4",
-    arms: [
-      { label: "Smaller batches (more updates)", score: 22.7, winner: true },
-      { label: "Larger batches + heavier shaping", score: 21.7 },
-    ],
-    note: "Doubled gradient step frequency without losing speed; smaller batches won overall and balanced both seats.",
+    time: "2×12m",
+    a: { label: "Smaller batches (more updates)", delta: { dir: "up", text: "+4.3%" } },
+    b: { label: "Larger batches + extra shaping", delta: { dir: "up", text: "+3.3%" } },
+    winner: "a",
+    best: "22.7%",
   },
 ];
 
-const BAR_SEGMENTS = [
-  { key: "r1", label: "A/B 1", cost: 0.9, color: "#a8beee" },
-  { key: "r2", label: "A/B 2", cost: 1.23, color: "#8aa8e8" },
-  { key: "dbg", label: "CPU debug", cost: 0.04, color: "#d4a000" },
-  { key: "r3", label: "A/B 3", cost: 1.22, color: "#6a8ee0" },
-  { key: "r4", label: "A/B 4", cost: 1.23, color: "#4a71d2" },
-  { key: "r5", label: "A/B 5", cost: 1.23, color: "#2f55c4" },
-  { key: "val", label: "1 h validation", cost: VALIDATION_COST, color: "#19337d" },
-  { key: "left", label: "Unused", cost: BUDGET - SPENT, color: "#e6e5e0" },
+const LEGEND = [
+  { key: "ab", label: "5 A/B tests ($5.81)", color: "#4a71d2" },
+  { key: "dbg", label: "CPU debug ($0.04)", color: "#d4a000" },
+  { key: "val", label: "1 h validation ($2.73)", color: "#19337d" },
+  { key: "left", label: "Unused ($0.12)", color: "#dcdbd5" },
 ];
 
-const MAX_SHORT_SCORE = 25;
+function fmtBranch(br: Branch) {
+  if (br.delta) return `${br.label} (${br.delta.dir === "up" ? "▲" : "▼"} ${br.delta.text})`;
+  if (br.crash) return `${br.label} (${br.crash})`;
+  return br.status ? `${br.label} (${br.status})` : br.label;
+}
+
+function BranchCell({ br, win }: { br: Branch; win: boolean }) {
+  return (
+    <div className={`ar-nd-cell ${win ? "ar-nd-win" : "ar-nd-muted"}`} role="cell">
+      <span className="ar-nd-bname">{br.label}</span>
+      {br.delta && (
+        <span className={`ar-nd-lift ${br.delta.dir}${win ? " is-win" : ""}`}>
+          {br.delta.dir === "up" ? "▲" : "▼"} {br.delta.text}
+        </span>
+      )}
+      {br.crash && <span className="ar-nd-lift crash">{br.crash}</span>}
+      {br.status && <span className="ar-nd-sub">{br.status}</span>}
+    </div>
+  );
+}
 
 export default function NeonDiscipline() {
   if (useAgentView()) {
     return (
       <Table
-        head={["Stage", "Cost", "Arm A", "Arm B", "Takeaway"]}
+        head={["Cost & time", "Branch A (vs. prior best)", "Branch B (vs. prior best)", "Lift"]}
+        align={["l", "l", "l", "r"]}
         rows={[
-          ...STAGES.map((s) => [
-            `${s.badge}: ${s.title}`,
-            s.cost,
-            `${s.arms[0].label}: ${s.arms[0].score !== null ? `${s.arms[0].score.toFixed(1)}%` : s.arms[0].crash}`,
-            `${s.arms[1].label}: ${s.arms[1].score !== null ? `${s.arms[1].score.toFixed(1)}%` : s.arms[1].crash}`,
-            s.note,
+          ...ROWS.map((r) => [
+            `${r.cost} (${r.time})`,
+            r.winner === "a" ? <strong>{fmtBranch(r.a)}</strong> : fmtBranch(r.a),
+            r.winner === "b" ? <strong>{fmtBranch(r.b)}</strong> : fmtBranch(r.b),
+            r.best === "—" ? "—" : `+${r.best}`,
           ]),
           [
-            "Validation",
-            "$2.73",
-            "Winning recipe trained for 1 hour: 47.9%",
+            "$2.73 (56m)",
+            "1-hour validation of winning recipe: dual-view critic and turn-based credit, spatial pyramid, scoreboard inputs, historical opponent pool, and fast 1-epoch updates on smaller batches (final submission).",
             "—",
-            "Confirmed end-to-end before submission ($8.58 of $8.70 spent); reached 416 Elo at 8 h host retrain.",
+            <strong>+47.9%</strong>,
           ],
         ]}
       />
     );
   }
 
+  const h = (usd: number) => Math.round(usd * PX_PER_USD);
+
   return (
     <div className="ar-nd">
-      <div className="ar-nd-budget">
-        <div className="ar-nd-budget-head">
-          <strong>$8.70 research budget</strong>
-          <span>5 short A/B tests ($5.85) · 1 h validation ($2.73)</span>
-        </div>
+      <div className="pt-table-wrap ar-nd-wrap">
         <div
-          className="ar-nd-bar"
-          role="img"
-          aria-label="Breakdown of Gemini 4 Neon's $8.70 budget: five short A/B tests totaling $5.81, $0.04 of CPU debugging, $2.73 for a 1-hour validation run, and $0.12 unused"
+          className="ar-nd-grid"
+          role="table"
+          aria-label="Gemini 4 Neon's $8.70 Polytopia research budget and five A/B tests"
         >
-          {BAR_SEGMENTS.map((seg) => {
-            const pct = (seg.cost / BUDGET) * 100;
+          <div className="ar-nd-row ar-nd-head" role="row">
+            <div className="ar-nd-bar-col" role="columnheader" aria-label="Budget share" />
+            <div role="columnheader">Cost &amp; time</div>
+            <div role="columnheader">Branch A</div>
+            <div role="columnheader">Branch B</div>
+            <div className="r" role="columnheader">Lift</div>
+          </div>
+
+          {ROWS.map((r, i) => {
+            const totalUsd = r.costUsd + (r.cpuUsd ?? 0);
             return (
               <div
-                key={seg.key}
-                className="ar-nd-seg"
-                style={{
-                  width: `${Math.max(pct, seg.key === "dbg" ? 0.7 : 0)}%`,
-                  background: seg.color,
-                }}
+                key={r.key}
+                className="ar-nd-row"
+                role="row"
+                style={{ minHeight: h(totalUsd) }}
               >
-                {pct >= 10 && (
-                  <span className={seg.key === "r1" ? "dark" : ""}>
-                    {seg.key === "val" ? "1 h validation · $2.73" : seg.label}
-                  </span>
-                )}
+                <div className="ar-nd-bar-col" aria-hidden="true">
+                  <span
+                    className={`ar-nd-vseg${i === 0 ? " is-first" : ""}`}
+                    style={{
+                      flex: `${r.costUsd} 0 0`,
+                      background: "#4a71d2",
+                    }}
+                  />
+                  {r.cpuUsd && (
+                    <span
+                      className="ar-nd-vseg"
+                      style={{
+                        flex: `0 0 ${Math.max(3, Math.round(r.cpuUsd * PX_PER_USD))}px`,
+                        background: "#d4a000",
+                      }}
+                    />
+                  )}
+                </div>
+                <div className="ar-nd-cell ar-nd-cost" role="cell">
+                  <strong>{r.cost}</strong>
+                  <span>{r.time}</span>
+                </div>
+                <BranchCell br={r.a} win={r.winner === "a"} />
+                <BranchCell br={r.b} win={r.winner === "b"} />
+                <div className="ar-nd-cell r ar-nd-strength" role="cell">
+                  {r.best === "—" ? "—" : `+${r.best}`}
+                </div>
               </div>
             );
           })}
-        </div>
-        <div className="ar-nd-bar-foot">
-          <span>
-            <i style={{ background: "#4a71d2" }} />5 A/B tests ($5.81)
-          </span>
-          <span>
-            <i style={{ background: "#d4a000" }} />CPU debug ($0.04)
-          </span>
-          <span>
-            <i style={{ background: "#19337d" }} />1 h validation ($2.73)
-          </span>
-          <span>
-            <i style={{ background: "#e6e5e0" }} />Unused ($0.12)
-          </span>
+
+          <div
+            className="ar-nd-row ar-nd-final"
+            role="row"
+            style={{ minHeight: h(2.73) }}
+          >
+            <div className="ar-nd-bar-col" aria-hidden="true">
+              <span
+                className="ar-nd-vseg"
+                style={{ flex: "1 0 0", background: "#19337d" }}
+              />
+            </div>
+            <div className="ar-nd-cell ar-nd-cost" role="cell">
+              <strong>$2.73</strong>
+              <span>56m</span>
+            </div>
+            <div className="ar-nd-cell ar-nd-span2 ar-nd-win" role="cell">
+              <span className="ar-nd-bname">1-hour validation of winning recipe</span>
+              <span className="ar-nd-val-summary">
+                Dual-view critic and turn-based credit, spatial pyramid,
+                scoreboard inputs, historical opponent pool, and fast 1-epoch
+                updates on smaller batches.
+              </span>
+              <span className="ar-nd-sub">
+                Final submission · beat both starter benchmarks in practice
+              </span>
+            </div>
+            <div className="ar-nd-cell r ar-nd-strength ar-nd-final-val" role="cell">
+              +47.9%
+            </div>
+          </div>
+
+          <div className="ar-nd-row ar-nd-tail" role="row">
+            <div className="ar-nd-bar-col" aria-hidden="true">
+              <span
+                className="ar-nd-vseg is-last"
+                style={{
+                  height: Math.max(5, h(UNUSED)),
+                  background: "#dcdbd5",
+                }}
+              />
+            </div>
+            <div className="ar-nd-tail-label" role="cell">
+              $0.12 unused (of $8.70)
+            </div>
+          </div>
         </div>
       </div>
 
-      <div className="ar-nd-list">
-        {STAGES.map((stage) => (
-          <div key={stage.key} className="ar-nd-stage">
-            <div className="ar-nd-stage-head">
-              <div className="ar-nd-stage-title">
-                <span
-                  className="ar-nd-badge"
-                  style={{
-                    background: stage.color,
-                    color: stage.key === "r1" ? "#102154" : "#fff",
-                  }}
-                >
-                  {stage.badge}
-                </span>
-                <strong>{stage.title}</strong>
-              </div>
-              <span className="ar-nd-meta">{stage.cost}</span>
-            </div>
-
-            <div className="ar-nd-arms">
-              {stage.arms.map((arm) => {
-                const crashed = arm.score === null;
-                return (
-                  <div
-                    key={arm.label}
-                    className={`ar-nd-arm${arm.winner ? " is-win" : ""}${crashed ? " is-crash" : ""}`}
-                  >
-                    <div className="ar-nd-arm-top">
-                      <span className="ar-nd-arm-label">
-                        {arm.label}
-                        {arm.winner && <em className="ar-nd-tag-win">kept</em>}
-                      </span>
-                      <span className="ar-nd-score">
-                        {crashed ? arm.crash : `${arm.score!.toFixed(1)}%`}
-                      </span>
-                    </div>
-                    {!crashed && (
-                      <div className="ar-nd-meter" aria-hidden="true">
-                        <i
-                          style={{
-                            width: `${Math.max((arm.score! / MAX_SHORT_SCORE) * 100, arm.score! > 0 ? 3 : 0)}%`,
-                          }}
-                        />
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-
-            <p className="ar-nd-takeaway">{stage.note}</p>
-          </div>
+      <div className="ar-nd-legend">
+        {LEGEND.map((item) => (
+          <span key={item.key}>
+            <i style={{ background: item.color }} />
+            {item.label}
+          </span>
         ))}
-
-        <div className="ar-nd-stage ar-nd-val">
-          <div className="ar-nd-stage-head">
-            <div className="ar-nd-stage-title">
-              <span
-                className="ar-nd-badge"
-                style={{ background: "#19337d", color: "#fff" }}
-              >
-                Validation
-              </span>
-              <strong>1-hour run of the winning recipe</strong>
-            </div>
-            <span className="ar-nd-meta">$2.73</span>
-          </div>
-          <div className="ar-nd-val-body">
-            <p className="ar-nd-val-desc">
-              Scaled the winner of A/B 5 to the full 1-hour grading length and
-              verified it beat both starter benchmarks before submitting.
-            </p>
-            <div className="ar-nd-val-stat">
-              <strong>47.9%</strong>
-              <span>practice win rate</span>
-            </div>
-          </div>
-        </div>
       </div>
     </div>
   );

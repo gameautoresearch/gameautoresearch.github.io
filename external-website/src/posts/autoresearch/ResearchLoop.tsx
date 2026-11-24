@@ -132,47 +132,198 @@ function curve(x: number, y: number, w: number, h: number, a: number, b: number,
   return pts;
 }
 
-// The GPU budget as one pile of bills, its centre level with the green run-cost strip to the right. While runs
-// train, bills come off the top one at a time, shrink and slide toward the runs. Outside spending (and
-// while the budget refills between scenes) the pile shows whole bills only, so no half-spent bill is left hanging.
+// The GPU budget as a pile of bills on the left feeding an NVIDIA L40S graphics card rented from Modal on the right.
+// While runs train, bills peel off the top one at a time, shrink and slide into the GPU, waking its LED and passive
+// heatsink fins. Outside spending (and while the budget refills between scenes) the pile shows whole bills only.
 const BUDGET_USD = 14.5, BILLS = 15;
-const BILL_W = 96, BILL_H = 30;
+const BILL_W = 72, BILL_H = 23;
 function Bill({ x, y, op = 1, sc = 1, seal }: { x: number; y: number; op?: number; sc?: number; seal?: boolean }) {
   const w = BILL_W, h = BILL_H, g = "#2f9e5c";
   return (
     <g transform={`translate(${x} ${y}) scale(${sc})`} opacity={op}>
-      <rect x={0} y={0} width={w} height={h} rx={3} fill="#e1f4e7" stroke={g} strokeWidth={1.1} />
+      <rect x={0} y={0} width={w} height={h} rx={2.6} fill="#e1f4e7" stroke={g} strokeWidth={1.05} />
       {seal && <>
-        <rect x={3} y={3} width={w - 6} height={h - 6} rx={1.6} fill="none" stroke={g} strokeWidth={0.8} opacity={0.75} />
-        <ellipse cx={w / 2} cy={h / 2} rx={15} ry={9} fill="none" stroke={g} strokeWidth={0.8} opacity={0.6} />
-        <circle cx={w / 2} cy={h / 2} r={6} fill={g} />
-        <text x={w / 2} y={h / 2 + 3.3} className="rl-seal" style={{ fontSize: 9.5 }}>$</text>
-        {[12, w - 12].map((cx) => <circle key={cx} cx={cx} cy={h / 2} r={3} fill="none" stroke={g} strokeWidth={0.8} opacity={0.7} />)}
+        <rect x={2.6} y={2.6} width={w - 5.2} height={h - 5.2} rx={1.4} fill="none" stroke={g} strokeWidth={0.75} opacity={0.75} />
+        <ellipse cx={w / 2} cy={h / 2} rx={11.5} ry={6.8} fill="none" stroke={g} strokeWidth={0.75} opacity={0.6} />
+        <circle cx={w / 2} cy={h / 2} r={4.8} fill={g} />
+        <text x={w / 2} y={h / 2 + 2.7} className="rl-seal" style={{ fontSize: 8 }}>$</text>
+        {[9.5, w - 9.5].map((cx) => <circle key={cx} cx={cx} cy={h / 2} r={2.3} fill="none" stroke={g} strokeWidth={0.75} opacity={0.7} />)}
       </>}
     </g>
   );
 }
-function CashPile({ left, spending, x, cy, compact }: { left: number; spending: boolean; x: number; cy: number; compact: boolean }) {
-  const exact = left * BILLS, stackDy = 3, rightEdge = x + 210, y = cy - BILL_H / 2;
-  // The pile sits centred between the "GPU budget" label and the amount below it.
-  const px = x + (rightEdge - x - BILL_W) / 2;
+
+// Modal's tilted-prism "M" mark in miniature, used beside the GPU caption.
+function ModalMark({ x, y, active }: { x: number; y: number; active: boolean }) {
+  const deep = active ? "#2f9e5c" : "#6b9e79";
+  const bright = active ? "#74e85c" : "#9bd4a8";
+  return (
+    <g transform={`translate(${x} ${y})`}>
+      <polygon points="0.4,7.3 1.2,0.8 3.2,0.8 2.4,7.3" fill={deep} />
+      <polygon points="3.2,0.8 4.9,4.3 6.6,0.8 6.6,3.2 4.9,6.2 3.2,3.2" fill={bright} />
+      <polygon points="6.6,0.8 8.6,0.8 7.8,7.3 5.8,7.3" fill={deep} />
+    </g>
+  );
+}
+
+// Visual representation of the passively cooled NVIDIA L40S PCIe datacenter card rented from Modal:
+// dual-slot I/O bracket on the left, golden PCIe x16 edge fingers underneath, dark anodized shroud with the
+// signature champagne-gold accent stripe, exposed passive heatsink fins, 16-pin power socket, and live activity LED.
+function GpuCard({ x, y, active, t, compact }: { x: number; y: number; active: boolean; t: number; compact: boolean }) {
+  const pulse = active ? 0.55 + 0.45 * Math.sin(t / 130) : 0;
+  const wave = (t / 480) % 1;
+  const pins = Array.from({ length: 16 }, (_, i) => 33 + i * 2.7);
+  const fins = Array.from({ length: 9 }, (_, i) => 20.4 + i * 2.15);
+  return (
+    <g transform={`translate(${x} ${y})`}>
+      {/* Soft ground shadow & subtle active Modal-green glow */}
+      <ellipse cx={64} cy={53.2} rx={51} ry={2.2} fill="#111" opacity={0.07} />
+      {active && (
+        <rect x={8} y={5} width={110} height={39} rx={4} fill="#7fee64" opacity={0.07 + pulse * 0.07} />
+      )}
+
+      {/* Dual-slot brushed-steel PCIe I/O bracket */}
+      <path
+        d="M0.5 3.5 H8.5 V49.2 H7.5 V52.2 H5.3 V49.2 H4.5 V6.1 H0.5 Z"
+        fill="#dce0e6"
+        stroke="#787f8a"
+        strokeWidth={0.8}
+        strokeLinejoin="round"
+      />
+      {[12, 19, 26, 33].map((vy) => (
+        <rect key={vy} x={5.7} y={vy} width={1.5} height={4.2} rx={0.4} fill="#5b616c" />
+      ))}
+
+      {/* PCB bottom edge + notched golden PCIe x16 contact fingers */}
+      <rect x={10} y={42.5} width={103} height={4.6} rx={0.8} fill="#1f3128" stroke="#15221b" strokeWidth={0.7} />
+      {/* Retention hook */}
+      <path d="M80 47 H86.5 L88 49.6 L85 50.6 H80 Z" fill="#1f3128" stroke="#15221b" strokeWidth={0.65} strokeLinejoin="round" />
+      {/* Short PCIe key segment */}
+      <rect x={17.5} y={46.6} width={10.5} height={5.2} rx={1} fill="#d4aa49" stroke="#967426" strokeWidth={0.65} />
+      {[20, 22.7, 25.4].map((px) => (
+        <line key={px} x1={px} y1={47.5} x2={px} y2={51.1} stroke="#f5df96" strokeWidth={0.85} />
+      ))}
+      {/* Long PCIe x16 segment */}
+      <rect x={30.5} y={46.6} width={46.5} height={5.2} rx={1} fill="#d4aa49" stroke="#967426" strokeWidth={0.65} />
+      {pins.map((px) => (
+        <line key={px} x1={px} y1={47.5} x2={px} y2={51.1} stroke="#f5df96" strokeWidth={0.85} />
+      ))}
+
+      {/* 16-pin PCIe auxiliary power socket on the rear edge */}
+      <rect x={116.5} y={17} width={4.2} height={11} rx={1} fill="#1b1d22" stroke="#454b55" strokeWidth={0.7} />
+      <line x1={118.6} y1={19.5} x2={118.6} y2={25.5} stroke="#5e6572" strokeWidth={0.8} strokeDasharray="1.3 1.2" />
+
+      {/* Main matte charcoal anodized shroud */}
+      <path
+        d="M8.5 8.2 Q8.5 6 10.7 6 H113.5 L117.5 10 V41.2 Q117.5 43.4 115.3 43.4 H10.7 Q8.5 43.4 8.5 41.2 Z"
+        fill="url(#rl-gpu-shroud)"
+        stroke="#1b1d22"
+        strokeWidth={0.95}
+      />
+      {/* Top chamfer highlight */}
+      <line x1={11} y1={7.2} x2={112.5} y2={7.2} stroke="#5f6673" strokeWidth={0.7} opacity={0.55} />
+
+      {/* Signature NVIDIA L40S champagne-gold accent stripe */}
+      <path
+        d="M9.4 11.4 H69.5 L74.2 15.8 H116.6"
+        fill="none"
+        stroke="url(#rl-gpu-gold)"
+        strokeWidth={2}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+
+      {/* Recessed passive-cooling heatsink fin bay */}
+      <rect x={76} y={18.6} width={37.5} height={21.4} rx={1.6} fill="#15171c" stroke="#3e434d" strokeWidth={0.75} />
+      {fins.map((fy, i) => {
+        // Subtle airflow shimmer gliding down the fin stack while the card is under load
+        const dist = Math.abs(((i / fins.length) - wave + 1) % 1 - 0.5);
+        const lit = active ? Math.max(0, 1 - dist * 4.5) : 0;
+        return (
+          <line
+            key={fy}
+            x1={77.8}
+            y1={fy}
+            x2={111.7}
+            y2={fy}
+            stroke={lit > 0.15 ? "#72d88f" : "#676e7a"}
+            strokeWidth={0.95}
+            opacity={lit > 0.15 ? 0.55 + lit * 0.45 : 0.72}
+          />
+        );
+      })}
+
+      {/* Shroud typography: NVIDIA L40S 48GB */}
+      <text x={15} y={21.8} className="rl-gpu-brand">NVIDIA</text>
+      <text x={14.5} y={34.5} className="rl-gpu-model">L40S</text>
+      <text x={50.5} y={34.2} className="rl-gpu-spec">48GB</text>
+
+      {/* Live status LED (Modal green when training, muted grey when idle) */}
+      {active && <circle cx={108.5} cy={11.4} r={4.2} fill="#7fee64" opacity={0.22 + pulse * 0.25} />}
+      <circle
+        cx={108.5}
+        cy={11.4}
+        r={2}
+        fill={active ? "#7fee64" : "#4b515c"}
+        stroke={active ? "#2f9e5c" : "#2e3239"}
+        strokeWidth={0.75}
+      />
+
+      {/* Subtle compute pulses bridging from the GPU into the training runs column (wide layout only) */}
+      {!compact && active && [0, 1, 2].map((i) => {
+        const f = ((t / 520) + i / 3) % 1;
+        return (
+          <circle
+            key={i}
+            cx={124 + f * 12}
+            cy={29}
+            r={1.55}
+            fill="#2f9e5c"
+            opacity={Math.sin(f * Math.PI) * 0.85}
+          />
+        );
+      })}
+    </g>
+  );
+}
+
+function CashPile({ left, spending, x, cy, t, compact }: { left: number; spending: boolean; x: number; cy: number; t: number; compact: boolean }) {
+  const exact = left * BILLS, stackDy = 2.4, y = cy - BILL_H / 2;
+  const px = x + 1;
   const full = spending ? Math.floor(exact + 1e-6) : Math.round(exact), frac = spending ? exact - full : 0;
   const bills: JSX.Element[] = [];
   for (let i = 0; i < full; i++) bills.push(<Bill key={i} x={px} y={y - i * stackDy} seal={i === full - 1} />);
-  // The bill being spent leaves the top of the pile and shrinks toward the run-cost strip, fading as it goes.
+  // The bill being spent leaves the top of the pile, arcs right, and feeds directly into the NVIDIA L40S card.
   let flying: JSX.Element | null = null;
   if (frac > 0.001) {
-    const k = ease(1 - frac), sc = 1 - k * 0.6, startY = y - full * stackDy;
-    const endX = (compact ? rightEdge : rightEdge + 14) - BILL_W * sc;
-    flying = <Bill x={px + k * (endX - px)} y={startY + k * (cy - BILL_H * sc / 2 - startY)} sc={sc} op={1 - k * 0.85} seal />;
+    const k = ease(1 - frac), sc = 1 - k * 0.55, startY = y - full * stackDy;
+    const endX = x + 114 - BILL_W * sc * 0.5;
+    const endY = cy - 12 - BILL_H * sc * 0.5;
+    const arcY = -Math.sin(k * Math.PI) * 7;
+    flying = (
+      <Bill
+        x={px + k * (endX - px)}
+        y={startY + k * (endY - startY) + arcY}
+        sc={sc}
+        op={Math.max(0, (1 - k) ** 1.15)}
+        seal
+      />
+    );
   }
+  const labelY = 244;
   return (
     <g>
-      <rect x={px} y={y} width={BILL_W} height={BILL_H} rx={3} fill="#f7faf8" stroke="#d8e6dd" strokeDasharray="3 2.5" />
+      <rect x={px} y={y} width={BILL_W} height={BILL_H} rx={2.6} fill="#f7faf8" stroke="#d8e6dd" strokeDasharray="3 2.5" />
       {bills}
+      <GpuCard x={x + 92} y={174} active={spending} t={t} compact={compact} />
       {flying}
-      <text x={x} y={y + BILL_H + 15} className="rl-small">GPU budget</text>
-      <text x={rightEdge} y={y + BILL_H + 15} className="rl-amount" textAnchor="end">${(BUDGET_USD * left).toFixed(2)}</text>
+      <text x={px + BILL_W / 2} y={labelY} className="rl-small" textAnchor="middle">
+        budget <tspan className="rl-amount">${(BUDGET_USD * left).toFixed(2)}</tspan>
+      </text>
+      <ModalMark x={x + 109} y={labelY - 7.5} active={spending} />
+      <text x={x + 121} y={labelY} className="rl-small">
+        rented on <tspan className="rl-modal">Modal</tspan>
+      </text>
     </g>
   );
 }
@@ -316,7 +467,7 @@ function Agent({ s, t, color, compact, out }: { s: Scene; t: number; color: stri
         <Avatar s={s} t={t} color={color} x={40} y={botY + 26} R={25} seed={SCENES.indexOf(s)} />
         <text x={78} y={botY + 31} className="rl-name">{label}</text>
       </g>
-      <CashPile left={remain} spending={spending} x={0} cy={215} compact={compact} />
+      <CashPile left={remain} spending={spending} x={0} cy={213} t={t} compact={compact} />
     </g>
   );
 }
@@ -862,12 +1013,24 @@ export default function ResearchLoop() {
   const go = (i: number) => setFrame({ scene: i, t: reduce ? T.out : 0 });
   const vb = narrow ? "0 0 388 518" : "0 0 632 262";
   const place = narrow
-    ? { agent: "translate(71 0)", runs: "translate(6 258)", game: "translate(214 258)" }
+    ? { agent: "translate(85 0)", runs: "translate(6 258)", game: "translate(214 258)" }
     : { agent: "translate(8 0)", runs: "translate(240 0)", game: "translate(456 0)" };
   return (
     <div className="rl" ref={ref}>
-      <svg viewBox={vb} role="img" aria-label={`${labelOf(s)} researching ${GAME_NAME[s.game]}: “${s.quote}” ${s.result}.`}
+      <svg viewBox={vb} role="img" aria-label={`${labelOf(s)} researching ${GAME_NAME[s.game]} on an NVIDIA L40S GPU rented from Modal: “${s.quote}” ${s.result}.`}
         onClick={() => go((scene + 1) % SCENES.length)}>
+        <defs>
+          <linearGradient id="rl-gpu-shroud" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%" stopColor="#3b4049" />
+            <stop offset="52%" stopColor="#272a31" />
+            <stop offset="100%" stopColor="#1e2026" />
+          </linearGradient>
+          <linearGradient id="rl-gpu-gold" x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0%" stopColor="#b99242" />
+            <stop offset="48%" stopColor="#e5c77c" />
+            <stop offset="100%" stopColor="#c59e4f" />
+          </linearGradient>
+        </defs>
         <g transform={place.agent}><Agent s={s} t={t} color={color} compact={narrow} out={out} /></g>
         <g transform={place.runs}><Runs s={s} t={t} out={out} refOp={refOp} /></g>
         <g transform={place.game}><Match s={s} t={t} out={out} boardOp={boardOp} /></g>

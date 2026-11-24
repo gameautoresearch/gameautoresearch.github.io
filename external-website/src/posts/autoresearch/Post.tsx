@@ -9,6 +9,7 @@ import NeonOutlierDiagrams from "./NeonOutlierDiagrams";
 import NeonDiscipline from "./NeonDiscipline";
 import { ResearchRace } from "./Frontier13";
 import { SessionTimeline } from "./Timeline";
+import modalWordmark from "./modal-wordmark.svg";
 import "../shared/post.css";
 import "./post.css";
 
@@ -248,8 +249,8 @@ export default function AutoresearchPost() {
         Gemini 4 Neon&rsquo;s $8.58 Polytopia session&mdash;the same run that
         produced the 416 Elo outlier recipe above&mdash;is a good example.
         Instead of spending its $8.70 budget on a few long runs, it ran{" "}
-        <strong>five short A/B tests</strong> (mostly pairs of 12-minute runs
-        at ~$0.61 each), scored them on free practice matches, and used $0.04 of
+        <strong>five short A/B tests</strong> (mostly pairs of 12-minute runs at
+        ~$0.61 each), scored them on free practice matches, and used $0.04 of
         CPU-only debugging to fix crashes rather than guessing on GPUs. That
         left a third of the budget ($2.73) for one full 1-hour validation of the
         winning recipe before submission.
@@ -261,8 +262,8 @@ export default function AutoresearchPost() {
           <>
             How Gemini 4 Neon spent $8.58 of its $8.70 Polytopia research
             budget: five short A/B tests, $0.04 of CPU debugging, and a 1-hour
-            final validation. Scores are practice win rates against the
-            four-bot ladder.
+            final validation. Arrows show each branch&rsquo;s practice win-rate
+            uplift over the previous best; the kept branch is bolded.
           </>
         }
       >
@@ -370,6 +371,14 @@ export default function AutoresearchPost() {
         to spend maintaining bots.
       </p>
       <p>We thank Modal for providing compute credits for this research.</p>
+      <a
+        className="ar-sponsor"
+        href="https://modal.com"
+        target="_blank"
+        rel="noreferrer"
+      >
+        <img src={modalWordmark} alt="Modal" width={140} />
+      </a>
 
       <hr />
       <h3 id="related">Related work</h3>
@@ -423,9 +432,8 @@ export default function AutoresearchPost() {
 
       <h3 id="credits">Open-source credits</h3>
       <p>
-        Several of our simulators are built on, or checked against, open-source
-        projects. Thank you to their authors. We keep each project&rsquo;s
-        license and notices with our copy.
+        Several of our simulators are built on or checked against the following
+        open-source projects. Thank you to the authors of:
       </p>
       <ul className="ar-credits">
         <li>
