@@ -694,3 +694,37 @@ html.agent-view .ar-outlier-kicker { color: inherit; }
 
 .ar-sponsor { display: inline-block; margin: 4px 0 8px; }
 .ar-sponsor img { display: block; height: auto; }
+
+/* Figure 6: historical model training capability over time (Feb–Nov 2026). */
+.ar-ct { font-variant-numeric: tabular-nums; }
+.ar-ct-plot { position: relative; }
+.ar-ct-pt { cursor: pointer; }
+.ar-ct-pt:focus { outline: none; }
+.ar-ct-ref {
+  fill: #8a8a85;
+  font-size: 10.5px;
+}
+.ar-ct-ref-main {
+  fill: var(--c-deep);
+  font-weight: 600;
+}
+.ar-ct-rel {
+  fill: #8a8a85;
+  font-size: 10px;
+  letter-spacing: 0.01em;
+}
+.ar-ct-lbl {
+  fill: #242422;
+  font-size: 11px;
+  font-weight: 600;
+  paint-order: stroke;
+  stroke: #fff;
+  stroke-width: 3.5px;
+  stroke-linejoin: round;
+  pointer-events: none;
+}
+.ar-ct-lbl-margin { font-size: 11px; }
+.ar-ct-lbl-val { font-weight: 400; fill: var(--secondary); }
+.ar-ct-tip { width: 224px; max-width: 224px; }
+.ar-ct-tip b { font-weight: 600; color: var(--ink); }
+.ar-ct-tip-meta { color: var(--secondary); font-size: 11.5px; margin-bottom: 3px; }

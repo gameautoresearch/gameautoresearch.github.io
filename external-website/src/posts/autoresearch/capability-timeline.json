@@ -1,0 +1,221 @@
+{
+  "source": "Pooled Polytopia empty-starter checkpoint Elo (2,499,920 games, 865 entrants, poly-fill-pooled-20261122) mapped onto the unmodified PPO starter compute curve (reports/polytopia/compute-multipliers-2026-11-20/curve.json). finalMult is null below the 0.43x measured floor (starter-20m, -215 Elo); plotMult gives the curve's raw extrapolation for visual placement within the <0.43x band.",
+  "floorMult": 0.43,
+  "models": [
+    {
+      "key": "opus46",
+      "model": "Claude Opus 4.6",
+      "short": "Opus 4.6",
+      "lab": "anthropic",
+      "date": "2026-02-04",
+      "grade": 0.3,
+      "finalElo": -2461,
+      "finalMult": null,
+      "plotMult": 0.01,
+      "note": "Final retrain loses to random play (1.2% of games)."
+    },
+    {
+      "key": "gem31pro",
+      "model": "Gemini 3.1 Pro",
+      "short": "Gemini 3.1 Pro",
+      "lab": "google",
+      "date": "2026-02-19",
+      "grade": 0.7,
+      "finalElo": -1838,
+      "finalMult": null,
+      "plotMult": 0.01,
+      "note": "Preview release; final retrain loses to random play (2.7% of games)."
+    },
+    {
+      "key": "opus47",
+      "model": "Claude Opus 4.7",
+      "short": "Opus 4.7",
+      "lab": "anthropic",
+      "date": "2026-04-14",
+      "grade": 6.8,
+      "finalElo": -1622,
+      "finalMult": null,
+      "plotMult": 0.02
+    },
+    {
+      "key": "opus48",
+      "model": "Claude Opus 4.8",
+      "short": "Opus 4.8",
+      "lab": "anthropic",
+      "date": "2026-05-28",
+      "grade": 24.5,
+      "finalElo": -1275,
+      "finalMult": null,
+      "plotMult": 0.03
+    },
+    {
+      "key": "fable5",
+      "model": "Claude Fable 5",
+      "short": "Fable 5",
+      "lab": "anthropic",
+      "date": "2026-06-09",
+      "grade": 22.1,
+      "finalElo": -1236,
+      "finalMult": null,
+      "plotMult": 0.04
+    },
+    {
+      "key": "sol56",
+      "model": "GPT-5.6 Sol",
+      "short": "GPT-5.6 Sol",
+      "lab": "openai",
+      "date": "2026-07-09",
+      "grade": 30.0,
+      "finalElo": -1162,
+      "finalMult": null,
+      "plotMult": 0.04
+    },
+    {
+      "key": "opus5",
+      "model": "Claude Opus 5",
+      "short": "Opus 5",
+      "lab": "anthropic",
+      "date": "2026-07-24",
+      "grade": 26.8,
+      "finalElo": -622,
+      "finalMult": null,
+      "plotMult": 0.13,
+      "note": "Ran at medium reasoning effort (high effort was refused on the route)."
+    },
+    {
+      "key": "gem38f",
+      "model": "Gemini 3.8 Flash",
+      "short": "Gemini 3.8 Flash",
+      "lab": "google",
+      "date": "2026-09-02",
+      "grade": 15.9,
+      "finalElo": -960,
+      "finalMult": null,
+      "plotMult": 0.06
+    },
+    {
+      "key": "astra",
+      "model": "GPT-6 Astra",
+      "short": "GPT-6 Astra",
+      "lab": "openai",
+      "date": "2026-09-04",
+      "grade": 77.4,
+      "finalElo": 217,
+      "finalMult": 3.02,
+      "plotMult": 3.02
+    },
+    {
+      "key": "sol6",
+      "model": "GPT-6 Sol",
+      "short": "GPT-6 Sol",
+      "lab": "openai",
+      "date": "2026-09-22",
+      "grade": 21.9,
+      "finalElo": -1249,
+      "finalMult": null,
+      "plotMult": 0.04,
+      "note": "Counted second attempt; an uncounted first attempt also finished below 0.43×."
+    },
+    {
+      "key": "opus",
+      "model": "Claude Opus 5.5",
+      "short": "Opus 5.5",
+      "lab": "anthropic",
+      "date": "2026-09-22",
+      "grade": 57.5,
+      "finalElo": 18,
+      "finalMult": 1.08,
+      "plotMult": 1.08
+    },
+    {
+      "key": "sol",
+      "model": "GPT-6.1 Sol",
+      "short": "GPT-6.1 Sol",
+      "lab": "openai",
+      "date": "2026-09-29",
+      "grade": 70.7,
+      "finalElo": 145,
+      "finalMult": 2.02,
+      "plotMult": 2.02
+    },
+    {
+      "key": "argon",
+      "model": "Gemini 4 Argon",
+      "short": "Gemini 4 Argon",
+      "lab": "google",
+      "date": "2026-10-13",
+      "grade": 55.6,
+      "finalElo": -97,
+      "finalMult": 0.67,
+      "plotMult": 0.67,
+      "note": "Run through the Antigravity CLI with tools disabled."
+    },
+    {
+      "key": "fable",
+      "model": "Claude Fable 5.2",
+      "short": "Fable 5.2",
+      "lab": "anthropic",
+      "date": "2026-11-09",
+      "grade": 67.8,
+      "finalElo": 180,
+      "finalMult": 2.44,
+      "plotMult": 2.44
+    },
+    {
+      "key": "gem4c",
+      "model": "Gemini 4 Carbon",
+      "short": "Gemini 4 Carbon",
+      "lab": "google",
+      "date": "2026-11-10",
+      "grade": 61.5,
+      "finalElo": -1,
+      "finalMult": 1.0,
+      "plotMult": 1.0
+    },
+    {
+      "key": "gem4h",
+      "model": "Gemini 4 Hydrogen",
+      "short": "Gemini 4 Hydrogen",
+      "lab": "google",
+      "date": "2026-11-12",
+      "grade": 35.5,
+      "finalElo": -338,
+      "finalMult": null,
+      "plotMult": 0.29
+    },
+    {
+      "key": "astra62",
+      "model": "GPT-6.2 Astra",
+      "short": "GPT-6.2 Astra",
+      "lab": "openai",
+      "date": "2026-11-17",
+      "grade": 39.8,
+      "finalElo": -284,
+      "finalMult": null,
+      "plotMult": 0.34,
+      "note": "Used 22% of its GPU budget after a script bug; best in-session network reached 3.2×."
+    },
+    {
+      "key": "sol62",
+      "model": "GPT-6.2 Sol",
+      "short": "GPT-6.2 Sol",
+      "lab": "openai",
+      "date": "2026-11-17",
+      "grade": 71.9,
+      "finalElo": 197,
+      "finalMult": 2.69,
+      "plotMult": 2.69
+    },
+    {
+      "key": "gem4n",
+      "model": "Gemini 4 Neon",
+      "short": "Gemini 4 Neon",
+      "lab": "google",
+      "date": "2026-11-18",
+      "grade": 73.2,
+      "finalElo": 186,
+      "finalMult": 2.52,
+      "plotMult": 2.52
+    }
+  ]
+}

@@ -9,6 +9,7 @@ import NeonOutlierDiagrams from "./NeonOutlierDiagrams";
 import NeonDiscipline from "./NeonDiscipline";
 import RecipeTimelines from "./RecipeTimelines";
 import { ResearchRace } from "./Frontier13";
+import CapabilityTimeline from "./CapabilityTimeline";
 import modalWordmark from "./modal-wordmark.svg";
 import "../shared/post.css";
 import "./post.css";
@@ -215,6 +216,35 @@ export default function AutoresearchPost() {
         }
       >
         <ForecastLead />
+      </Figure>
+
+      <h2 className="ar-config" id="progress">
+        How are model training capabilities improving over time?
+      </h2>
+      <p>
+        We also ran older model releases from OpenAI, Anthropic, and Google on
+        the same empty-starter Polytopia task to see how quickly training skill
+        is advancing. Earlier in the year, frontier models struggled to produce
+        useful policies at all&mdash;the oldest ones could not beat random play,
+        and even midsummer releases fell well short of our basic PPO starter.
+        Starting in the fall, newer models crossed a clear threshold and began
+        training policies that beat the starter on the same compute budget.
+      </p>
+      <Figure
+        n={6}
+        wide
+        caption={
+          <>
+            Compute multiplier of each model&rsquo;s fresh 15-minute Polytopia
+            retrain by release date (February&ndash;November 2026). Higher means
+            the unmodified PPO starter needs more compute to match the policy;
+            points in the bottom band fall below the starter curve&rsquo;s
+            measured floor. Each point is a single run; hover any point for
+            details.
+          </>
+        }
+      >
+        <CapabilityTimeline />
       </Figure>
 
       <h2 className="ar-config" id="closing-thoughts">
