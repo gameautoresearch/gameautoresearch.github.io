@@ -69,18 +69,31 @@ function labelTextColor(label: string) {
   return c;
 }
 
-type Step = { x: number; y: number; elo: number; run: string; submitted: number };
+type NetPoint = {
+  x: number;
+  y: number;
+  elo: number;
+  run: string;
+  submitted: number;
+  isFrontier: boolean;
+  bestAtTime: number;
+};
 
-function frontierSteps(m: Model): Step[] {
-  const steps: Step[] = [];
+function modelPoints(m: Model): NetPoint[] {
   let best = -Infinity;
-  for (const [x, elo, run, submitted] of m.nets) {
-    if (elo > best) {
-      best = elo;
-      steps.push({ x, y: winPct(elo), elo, run, submitted });
-    }
-  }
-  return steps;
+  return m.nets.map(([x, elo, run, submitted]) => {
+    const isFrontier = elo > best;
+    if (isFrontier) best = elo;
+    return {
+      x,
+      y: winPct(elo),
+      elo,
+      run,
+      submitted,
+      isFrontier,
+      bestAtTime: best,
+    };
+  });
 }
 
 function distSqToSegment(px: number, py: number, x1: number, y1: number, x2: number, y2: number) {
@@ -137,10 +150,14 @@ type HoverState = {
   key: string;
   cx: number;
   cy: number;
-  step: Step | null;
+  point: NetPoint | null;
+  fromDot: boolean;
 };
 
-const MODEL_STEPS = new Map(MODELS.map((model) => [model.key, frontierSteps(model)]));
+const MODEL_POINTS = new Map(MODELS.map((model) => [model.key, modelPoints(model)]));
+const MODEL_STEPS = new Map(
+  MODELS.map((model) => [model.key, (MODEL_POINTS.get(model.key) ?? []).filter((p) => p.isFrontier)]),
+);
 const MODEL_BY_KEY = new Map(MODELS.map((model) => [model.key, model]));
 
 export function ResearchRace() {
@@ -150,6 +167,7 @@ export function ResearchRace() {
   const W = useWidth(ref);
   const narrow = W < 540;
   const [hover, setHover] = useState<HoverState | null>(null);
+  const [pinnedKey, setPinnedKey] = useState<string | null>(null);
 
   if (agent) {
     return (
@@ -197,68 +215,136 @@ export function ResearchRace() {
     sy(10),
   );
 
-  const move = (ev: React.PointerEvent<SVGSVGElement>) => {
-    const box = ev.currentTarget.getBoundingClientRect();
-    const k = W / box.width;
-    const px = (ev.clientX - box.left) * k;
-    const py = (ev.clientY - box.top) * k;
+  const hitAt = (px: number, py: number): HoverState | null => {
     if (px < m.l - 8 || px > W - m.r + 8 || py < m.t - 8 || py > H - m.b + 8) {
-      setHover(null);
-      return;
+      return null;
     }
 
+    // When a model is pinned, let the user inspect all of its experiment dots freely without losing focus.
+    if (pinnedKey) {
+      const pts = MODEL_POINTS.get(pinnedKey) ?? [];
+      let nearPt: NetPoint | null = null;
+      let nearD2 = 16 * 16;
+      for (const p of pts) {
+        const d2 = (sx(p.x) - px) ** 2 + (sy(p.y) - py) ** 2;
+        if (d2 < nearD2) {
+          nearD2 = d2;
+          nearPt = p;
+        }
+      }
+      if (nearPt) {
+        return { key: pinnedKey, cx: sx(nearPt.x), cy: sy(nearPt.y), point: nearPt, fromDot: true };
+      }
+    }
+
+    // Check experiment dots of the currently active model first if the cursor is right on one.
+    const currentKey = pinnedKey ?? hover?.key ?? null;
+    if (currentKey && !pinnedKey) {
+      const pts = MODEL_POINTS.get(currentKey) ?? [];
+      let nearPt: NetPoint | null = null;
+      let nearD2 = 10 * 10;
+      for (const p of pts) {
+        const d2 = (sx(p.x) - px) ** 2 + (sy(p.y) - py) ** 2;
+        if (d2 < nearD2) {
+          nearD2 = d2;
+          nearPt = p;
+        }
+      }
+      if (nearPt) {
+        return { key: currentKey, cx: sx(nearPt.x), cy: sy(nearPt.y), point: nearPt, fromDot: true };
+      }
+    }
+
+    const candidates = pinnedKey ? [MODEL_BY_KEY.get(pinnedKey)!].filter(Boolean) : MODELS;
     let bestDist = 16 * 16;
     let found: HoverState | null = null;
-    for (const model of MODELS) {
+    for (const model of candidates) {
       const steps = MODEL_STEPS.get(model.key) ?? [];
       if (!steps.length) continue;
       let curX = sx(0);
       let curY = sy(0);
-      let curStep: Step | null = null;
+      let curStep: NetPoint | null = null;
 
       for (const s of steps) {
         const nx = sx(s.x);
         const ny = sy(s.y);
-        // Horizontal segment leading to this jump
         const hSeg = distSqToSegment(px, py, curX, curY, nx, curY);
         if (hSeg.d2 < bestDist) {
           bestDist = hSeg.d2;
-          found = { key: model.key, cx: hSeg.qx, cy: hSeg.qy, step: curStep ?? s };
+          found = { key: model.key, cx: hSeg.qx, cy: hSeg.qy, point: curStep ?? s, fromDot: false };
         }
-        // Vertical jump up to this step
         const vSeg = distSqToSegment(px, py, nx, curY, nx, ny);
         if (vSeg.d2 < bestDist) {
           bestDist = vSeg.d2;
-          found = { key: model.key, cx: vSeg.qx, cy: vSeg.qy, step: s };
+          found = { key: model.key, cx: vSeg.qx, cy: vSeg.qy, point: s, fromDot: false };
         }
         curX = nx;
         curY = ny;
         curStep = s;
       }
 
-      // Final horizontal plateau from last breakthrough to session end
       const endX = sx(model.gpu);
       const lastSeg = distSqToSegment(px, py, curX, curY, endX, curY);
       if (lastSeg.d2 < bestDist) {
         bestDist = lastSeg.d2;
-        found = { key: model.key, cx: lastSeg.qx, cy: lastSeg.qy, step: curStep };
+        found = { key: model.key, cx: lastSeg.qx, cy: lastSeg.qy, point: curStep, fromDot: false };
       }
     }
-    setHover(found);
+    return found;
+  };
+
+  const toPlotCoords = (ev: React.PointerEvent<SVGSVGElement>) => {
+    const box = ev.currentTarget.getBoundingClientRect();
+    const k = W / box.width;
+    return { px: (ev.clientX - box.left) * k, py: (ev.clientY - box.top) * k };
+  };
+
+  const move = (ev: React.PointerEvent<SVGSVGElement>) => {
+    const { px, py } = toPlotCoords(ev);
+    setHover(hitAt(px, py));
+  };
+
+  const clickPlot = (ev: React.PointerEvent<SVGSVGElement>) => {
+    const { px, py } = toPlotCoords(ev);
+    const found = hitAt(px, py);
+    if (ev.pointerType === "touch") {
+      setHover(found);
+      setPinnedKey(found ? found.key : null);
+      return;
+    }
+    if (!found) {
+      setPinnedKey(null);
+      setHover(null);
+    } else if (!pinnedKey) {
+      setPinnedKey(found.key);
+      setHover(found);
+    }
   };
 
   const hoverFromLabel = (model: Model) => {
+    if (pinnedKey && pinnedKey !== model.key) return;
     const steps = MODEL_STEPS.get(model.key) ?? [];
     const last = steps[steps.length - 1] ?? null;
     setHover({
       key: model.key,
       cx: sx(model.gpu),
       cy: sy(winPct(model.best.elo)),
-      step: last,
+      point: last,
+      fromDot: false,
     });
   };
 
-  const activeKey = hover?.key ?? null;
+  const togglePinLabel = (model: Model) => {
+    if (pinnedKey === model.key) {
+      setPinnedKey(null);
+      setHover(null);
+    } else {
+      setPinnedKey(model.key);
+      setHover(null);
+    }
+  };
+
+  const activeKey = pinnedKey ?? hover?.key ?? null;
   const activeModel = activeKey ? MODEL_BY_KEY.get(activeKey) ?? null : null;
   const isColored = (model: Model) => LABELED_KEYS.has(model.key);
   const drawOrder = [...MODELS].sort((a, b) => {
@@ -277,6 +363,22 @@ export function ResearchRace() {
 
   return (
     <div className="viz fr" ref={ref}>
+      <div className="fr-head">
+        <div className="fr-title">Best 15-minute network found over 5 hours of research</div>
+        {pinnedKey && activeModel && (
+          <button
+            type="button"
+            className="fr-pin-chip"
+            onClick={() => {
+              setPinnedKey(null);
+              setHover(null);
+            }}
+          >
+            <i style={{ background: curveColor(activeModel.label) }} />
+            {activeModel.label} ({activeModel.nets.length} runs) ×
+          </button>
+        )}
+      </div>
       {narrow && (
         <div className="viz-legend fr-compact-key">
           {topModels.map((model) => (
@@ -295,9 +397,9 @@ export function ResearchRace() {
         <svg
           viewBox={`0 0 ${W} ${H}`}
           role="img"
-          aria-label={`Best network win rate against research GPU-hours, ${MODELS.length} models`}
+          aria-label={`Best 15-minute network win rate over 5 hours of research, ${MODELS.length} models`}
           onPointerMove={move}
-          onPointerDown={move}
+          onPointerDown={clickPlot}
           onPointerLeave={() => setHover(null)}
           style={{ touchAction: "pan-y" }}
         >
@@ -370,7 +472,7 @@ export function ResearchRace() {
               const strokeWidth = isFocus ? 2.6 : isTop ? 2.0 : colored ? 1.55 : 1.1;
               const baseOpacity = isTop ? 0.95 : isSol61 ? 0.65 : colored ? 0.8 : 0.45;
               const opacity = isFocus ? 1 : dimmed ? (colored ? 0.14 : 0.08) : baseOpacity;
-              const steps = MODEL_STEPS.get(model.key) ?? [];
+              const points = MODEL_POINTS.get(model.key) ?? [];
               const endX = sx(model.gpu);
               const endY = sy(winPct(model.best.elo));
 
@@ -385,30 +487,47 @@ export function ResearchRace() {
                     opacity={opacity}
                   />
                   {/* Mark early-stopped colored curves subtly so it's clear where their session ended */}
-                  {colored && model.gpu < 4.75 && (
+                  {colored && model.gpu < 4.75 && !isFocus && (
                     <circle
                       cx={endX}
                       cy={endY}
-                      r={isFocus ? 3.5 : 2.3}
+                      r={2.3}
                       fill={col}
                       stroke="#fff"
                       strokeWidth={1}
                       opacity={opacity}
                     />
                   )}
-                  {/* On hover only, show the hovered model's breakthrough steps cleanly */}
+                  {/* When highlighted, show every experiment run: open dots for sub-frontier/failed runs, solid dots on the frontier */}
                   {isFocus &&
-                    steps.map((s, idx) => (
-                      <circle
-                        key={idx}
-                        cx={sx(s.x)}
-                        cy={sy(s.y)}
-                        r={hover?.step === s ? 4 : 2.6}
-                        fill={col}
-                        stroke="#fff"
-                        strokeWidth={1.2}
-                      />
-                    ))}
+                    points.map((p, idx) => {
+                      const isHoveredPt = hover?.point === p;
+                      if (p.isFrontier) {
+                        return (
+                          <circle
+                            key={idx}
+                            cx={sx(p.x)}
+                            cy={sy(p.y)}
+                            r={isHoveredPt ? 4.4 : 3.2}
+                            fill={col}
+                            stroke="#fff"
+                            strokeWidth={1.3}
+                          />
+                        );
+                      }
+                      return (
+                        <circle
+                          key={idx}
+                          cx={sx(p.x)}
+                          cy={sy(p.y)}
+                          r={isHoveredPt ? 4.0 : 2.8}
+                          fill="#fff"
+                          stroke={col}
+                          strokeWidth={isHoveredPt ? 1.8 : 1.3}
+                          opacity={isHoveredPt ? 1 : 0.78}
+                        />
+                      );
+                    })}
                 </g>
               );
             })}
@@ -437,6 +556,10 @@ export function ResearchRace() {
                     opacity={dimmed ? 0.2 : 1}
                     onPointerEnter={() => hoverFromLabel(model)}
                     onPointerLeave={() => setHover(null)}
+                    onPointerDown={(ev) => {
+                      ev.stopPropagation();
+                      togglePinLabel(model);
+                    }}
                   >
                     {stoppedEarly && (
                       <line
@@ -475,7 +598,7 @@ export function ResearchRace() {
                   {otherCount} other models
                 </text>
                 <text x={W - m.r + 12} y={sy(2.5) + 8} className="fr-pack-sub" dominantBaseline="middle">
-                  Hover any line to inspect
+                  Hover or click any line
                 </text>
               </g>
             </g>
@@ -496,15 +619,26 @@ export function ResearchRace() {
               <i style={{ background: curveColor(activeModel.label) }} />
               {activeModel.label}
             </strong>
-            {hover.step && hover.step.elo !== activeModel.best.elo ? (
+            {hover.point && !hover.point.isFrontier ? (
               <>
                 <span>
-                  Best so far: <b>{fmtWin(hover.step.elo)}</b> ({signed(hover.step.elo)} Elo) ·{" "}
-                  {hover.step.run} at {gpuText(hover.step.x)}
+                  Run <b>{hover.point.run}</b>: {fmtWin(hover.point.elo)} ({signed(hover.point.elo)} Elo) at{" "}
+                  {gpuText(hover.point.x)}
                 </span>
                 <span>
-                  Session peak: {fmtWin(activeModel.best.elo)} at {gpuText(activeModel.best.gpu)} ·
-                  15-min retrain: {fmtWin(activeModel.final.elo)}
+                  Did not beat best so far ({fmtWin(hover.point.bestAtTime)}) · session peak{" "}
+                  {fmtWin(activeModel.best.elo)}
+                </span>
+              </>
+            ) : hover.point && hover.point.elo !== activeModel.best.elo ? (
+              <>
+                <span>
+                  New best <b>{hover.point.run}</b>: <b>{fmtWin(hover.point.elo)}</b> (
+                  {signed(hover.point.elo)} Elo) at {gpuText(hover.point.x)}
+                </span>
+                <span>
+                  Session peak: {fmtWin(activeModel.best.elo)} at {gpuText(activeModel.best.gpu)} ·{" "}
+                  {activeModel.nets.length} runs total
                 </span>
               </>
             ) : (
@@ -514,13 +648,15 @@ export function ResearchRace() {
                   Elo) · {activeModel.best.run} at {gpuText(activeModel.best.gpu)}
                 </span>
                 <span>
-                  Fresh 15-min retrain: {fmtWin(activeModel.final.elo)} (
-                  {signed(activeModel.final.elo)} Elo)
+                  {activeModel.nets.length} training runs · fresh 15-min retrain:{" "}
+                  {fmtWin(activeModel.final.elo)} ({signed(activeModel.final.elo)} Elo)
                 </span>
               </>
             )}
-            {activeModel.gpu < 4.0 && (
+            {activeModel.gpu < 4.0 ? (
               <em>Ended at {gpuText(activeModel.gpu)} of 5h budget</em>
+            ) : (
+              !pinnedKey && <em>Solid dots = new best · open dots = other runs (click to pin)</em>
             )}
           </div>
         )}
