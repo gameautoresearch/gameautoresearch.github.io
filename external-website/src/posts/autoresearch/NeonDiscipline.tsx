@@ -38,7 +38,10 @@ const ROWS: Row[] = [
     cost: "$0.90",
     time: "5m + 12m",
     a: { label: "Starter recipe", status: "baseline (0.0%)" },
-    b: { label: "Dual-view critic + turn credit", delta: { dir: "up", text: "+3.1%" } },
+    b: {
+      label: "Dual-view critic + turn credit",
+      delta: { dir: "up", text: "+3.1%" },
+    },
     winner: "b",
     best: "3.1%",
   },
@@ -49,7 +52,10 @@ const ROWS: Row[] = [
     cost: "$1.27",
     time: "2×12m + CPU",
     a: { label: "Pyramid net, self-play", crash: "Eval crash (discarded)" },
-    b: { label: "Pyramid net + opponent pool", crash: "Eval crash · fixed on CPU ($0.04)" },
+    b: {
+      label: "Pyramid net + opponent pool",
+      crash: "Eval crash · fixed on CPU ($0.04)",
+    },
     best: "—",
   },
   {
@@ -57,8 +63,14 @@ const ROWS: Row[] = [
     costUsd: 1.22,
     cost: "$1.22",
     time: "2×12m",
-    a: { label: "Fixed pyramid net, self-play", delta: { dir: "up", text: "+8.2%" } },
-    b: { label: "Fixed pyramid + opponent pool", delta: { dir: "up", text: "+12.1%" } },
+    a: {
+      label: "Fixed pyramid net, self-play",
+      delta: { dir: "up", text: "+8.2%" },
+    },
+    b: {
+      label: "Fixed pyramid + opponent pool",
+      delta: { dir: "up", text: "+12.1%" },
+    },
     winner: "b",
     best: "15.2%",
   },
@@ -67,8 +79,14 @@ const ROWS: Row[] = [
     costUsd: 1.23,
     cost: "$1.23",
     time: "2×12m",
-    a: { label: "1-epoch, standard critic", delta: { dir: "up", text: "+3.1%" } },
-    b: { label: "2-epoch, distributional critic", delta: { dir: "up", text: "+0.2%" } },
+    a: {
+      label: "1-epoch, standard critic",
+      delta: { dir: "up", text: "+3.1%" },
+    },
+    b: {
+      label: "2-epoch, distributional critic",
+      delta: { dir: "up", text: "+0.2%" },
+    },
     winner: "a",
     best: "18.4%",
   },
@@ -77,8 +95,14 @@ const ROWS: Row[] = [
     costUsd: 1.23,
     cost: "$1.23",
     time: "2×12m",
-    a: { label: "Smaller batches (more updates)", delta: { dir: "up", text: "+4.3%" } },
-    b: { label: "Larger batches + extra shaping", delta: { dir: "up", text: "+3.3%" } },
+    a: {
+      label: "Smaller batches (more updates)",
+      delta: { dir: "up", text: "+4.3%" },
+    },
+    b: {
+      label: "Larger batches + extra shaping",
+      delta: { dir: "up", text: "+3.3%" },
+    },
     winner: "a",
     best: "22.7%",
   },
@@ -92,14 +116,18 @@ const LEGEND = [
 ];
 
 function fmtBranch(br: Branch) {
-  if (br.delta) return `${br.label} (${br.delta.dir === "up" ? "▲" : "▼"} ${br.delta.text})`;
+  if (br.delta)
+    return `${br.label} (${br.delta.dir === "up" ? "▲" : "▼"} ${br.delta.text})`;
   if (br.crash) return `${br.label} (${br.crash})`;
   return br.status ? `${br.label} (${br.status})` : br.label;
 }
 
 function BranchCell({ br, win }: { br: Branch; win: boolean }) {
   return (
-    <div className={`ar-nd-cell ${win ? "ar-nd-win" : "ar-nd-muted"}`} role="cell">
+    <div
+      className={`ar-nd-cell ${win ? "ar-nd-win" : "ar-nd-muted"}`}
+      role="cell"
+    >
       <span className="ar-nd-bname">{br.label}</span>
       {br.delta && (
         <span className={`ar-nd-lift ${br.delta.dir}${win ? " is-win" : ""}`}>
@@ -116,13 +144,26 @@ export default function NeonDiscipline() {
   if (useAgentView()) {
     return (
       <Table
-        head={["Cost & time", "Branch A (vs. prior best)", "Branch B (vs. prior best)", "Lift"]}
+        head={[
+          "Cost & time",
+          "Branch A (vs. prior best)",
+          "Branch B (vs. prior best)",
+          "Lift",
+        ]}
         align={["l", "l", "l", "r"]}
         rows={[
           ...ROWS.map((r) => [
             `${r.cost} (${r.time})`,
-            r.winner === "a" ? <strong>{fmtBranch(r.a)}</strong> : fmtBranch(r.a),
-            r.winner === "b" ? <strong>{fmtBranch(r.b)}</strong> : fmtBranch(r.b),
+            r.winner === "a" ? (
+              <strong>{fmtBranch(r.a)}</strong>
+            ) : (
+              fmtBranch(r.a)
+            ),
+            r.winner === "b" ? (
+              <strong>{fmtBranch(r.b)}</strong>
+            ) : (
+              fmtBranch(r.b)
+            ),
             r.best === "—" ? "—" : `+${r.best}`,
           ]),
           [
@@ -147,11 +188,17 @@ export default function NeonDiscipline() {
           aria-label="Gemini 4 Neon's $8.70 Polytopia research budget and five A/B tests"
         >
           <div className="ar-nd-row ar-nd-head" role="row">
-            <div className="ar-nd-bar-col" role="columnheader" aria-label="Budget share" />
+            <div
+              className="ar-nd-bar-col"
+              role="columnheader"
+              aria-label="Budget share"
+            />
             <div role="columnheader">Cost &amp; time</div>
             <div role="columnheader">Branch A</div>
             <div role="columnheader">Branch B</div>
-            <div className="r" role="columnheader">Lift</div>
+            <div className="r" role="columnheader">
+              Lift
+            </div>
           </div>
 
           {ROWS.map((r, i) => {
@@ -210,7 +257,9 @@ export default function NeonDiscipline() {
               <span>56m</span>
             </div>
             <div className="ar-nd-cell ar-nd-span2 ar-nd-win" role="cell">
-              <span className="ar-nd-bname">1-hour validation of winning recipe</span>
+              <span className="ar-nd-bname">
+                1-hour validation of winning recipe
+              </span>
               <span className="ar-nd-val-summary">
                 Dual-view critic and turn-based credit, spatial pyramid,
                 scoreboard inputs, historical opponent pool, and fast 1-epoch
@@ -220,7 +269,10 @@ export default function NeonDiscipline() {
                 Final submission · beat both starter benchmarks in practice
               </span>
             </div>
-            <div className="ar-nd-cell r ar-nd-strength ar-nd-final-val" role="cell">
+            <div
+              className="ar-nd-cell r ar-nd-strength ar-nd-final-val"
+              role="cell"
+            >
               +47.9%
             </div>
           </div>
@@ -240,15 +292,6 @@ export default function NeonDiscipline() {
             </div>
           </div>
         </div>
-      </div>
-
-      <div className="ar-nd-legend">
-        {LEGEND.map((item) => (
-          <span key={item.key}>
-            <i style={{ background: item.color }} />
-            {item.label}
-          </span>
-        ))}
       </div>
     </div>
   );

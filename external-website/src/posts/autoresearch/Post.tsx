@@ -246,7 +246,7 @@ export default function AutoresearchPost() {
         ran <strong>five short A/B tests</strong> (mostly pairs of 12-minute
         runs for ~$0.60 each).
       </p>
-      <Figure n={3} wide caption={<></>}>
+      <Figure n={3} wide caption={<>Neon's 5 A/B tests</>}>
         <NeonDiscipline />
       </Figure>
       <p>
