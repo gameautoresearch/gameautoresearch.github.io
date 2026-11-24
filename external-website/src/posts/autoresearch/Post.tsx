@@ -179,20 +179,20 @@ export default function AutoresearchPost() {
         wide
         caption={
           <>
-            Best network found so far across a 5 GPU-hour auto-research session
-            on Polytopia from an empty file. Win rate is measured against our
-            15-minute trained baseline; the upper dashed line is the same
-            baseline trained for 36 minutes.
+            5 Hour auto-research session on Polytopia 15 minute training recipe
+            from an empty file. Measured via win rate against the 15-minute
+            trained baseline recipe.
           </>
         }
       >
         <ResearchRace />
       </Figure>
       <p>
-        The best in-session networks of GPT-6.2 Sol and GPT-6 Astra edged out
-        our tuned starter trained for 200 million samples. Astra&rsquo;s fresh
-        retrain ranked first among submissions and stayed below the tuned
-        starter.
+        Over their 5 GPU-hours, GPT-6.2 Sol trained 28 networks and GPT-6 Astra
+        trained 25, about one every 12 minutes. The best in-session networks of
+        both edged out our tuned starter trained for 200 million samples.
+        Astra&rsquo;s fresh retrain ranked first among submissions and stayed
+        below the tuned starter.
       </p>
 
       <h2 className="ar-config ar-c2" id="efficiency">
@@ -315,24 +315,25 @@ export default function AutoresearchPost() {
         Closing Thoughts
       </h2>
       <p>
-        In a world where software truly proliferates, writing code is the first
-        step. We expect training models to become just as routine. An agent
-        could build an application, train the models it needs, and ship them to
-        run independently. Autonomous training is a building block for recursive
-        self-improvement. It could also put a specialized model within reach for
-        almost any niche task, from a crop-image classifier to a small model
-        embedded in clinical software. We built this benchmark to measure how
-        well agents can do that training under a compute budget.
+        In a world of cheap software, writing code is only the first step.
+        Specialized models are coming into reach for almost any niche task, from
+        a image classifiers to motor controls. We built this benchmark to
+        measure how well agents can do that training under a compute budget. We
+        view thisability to train small usefull models as an indicator of
+        recursive self-improvement capabilities.
       </p>
       <p>
-        Take games, for example. Rules can change daily during production and
-        keep changing after a live-service game launches. If agents can cheaply
-        retrain and test bots as the rules change, studios can use them to check
-        game balance and give players reliable teammates. That could make both
-        practical for more developers, especially indie teams with little time
-        to spend maintaining bots.
+        At game studios like Curio, rules can change daily during production and
+        keep changing after a live-service game launches. If we can cheaply
+        retrain and test bots as the rules change, it helps check game balance
+        and give players reliable teammates. This is newly practical for more
+        developers, especially indie teams with little time to spend maintaining
+        bots.
       </p>
-      <p>We thank Modal for providing compute credits for this research.</p>
+      <p>
+        We thank Modal for providing compute and services that made this
+        research possible.
+      </p>
       <a
         className="ar-sponsor"
         href="https://modal.com"
