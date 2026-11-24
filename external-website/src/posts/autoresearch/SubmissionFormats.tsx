@@ -463,13 +463,13 @@ const FORMATS = [
   {
     key: "model",
     title: "Submit a trained model",
-    body: "The agent trains the final network itself and submits the weights. Tests and the final run share one budget.",
+    body: "The agent trains the final network itself and submits the weights. Tests and the final run share a budget.",
     Diagram: TrainedModelDiagram,
   },
   {
     key: "recipe",
     title: "Submit a training recipe",
-    body: "The agent submits training code, and we retrain it from scratch on a fixed budget. The agent’s entire budget goes to research.",
+    body: "The agent submits training code, and we retrain it from scratch, with a fixed training budget. ",
     Diagram: TrainingRecipeDiagram,
   },
 ] as const;
