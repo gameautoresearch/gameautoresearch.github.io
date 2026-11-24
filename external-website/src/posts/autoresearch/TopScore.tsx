@@ -241,12 +241,17 @@ const SHORT_TASK: Record<string, string> = {
   forecast: "Forecasting",
   recipe8: "Polytopia recipes",
 };
-// Two-line column heads for the per-task cells.
+// Per-task cells in display order: the two Polytopia tasks sit side by side under one shared "Polytopia" head, so the
+// columns can stay narrow and leave the width to the dot plot. Indexes into RECIPE_TASKS / Row.each.
+const CELL_ORDER = ["poly_empty", "recipe8", "poke", "forecast"].map((id) =>
+  RECIPE_TASKS.indexOf(id),
+);
+// Two-line column heads; the Polytopia pair shares a spanning first line (drawn separately).
 const TASK_HEAD: Record<string, [string, string]> = {
-  poly_empty: ["Polytopia", "empty file"],
+  poly_empty: ["", "empty"],
+  recipe8: ["", "recipes"],
   poke: ["Pokémon", "3v3"],
   forecast: ["Fore-", "casting"],
-  recipe8: ["Polytopia", "recipes"],
 };
 
 function fmtTaskScore(id: string, v: number) {
@@ -261,16 +266,15 @@ function markColor(model: string) {
   return c === "#b5b5b5" || c === "#bdbdbd" || c === "#9a9a9a" ? "#575752" : c;
 }
 
-// Per-task cell tint: one sequential blue-grey ramp, pale grey (low) to slate blue (high), over 30–65 on the
-// score scale. Values on the darker half of the ramp switch to white ink.
-const CELL_LO = [238, 239, 241],
-  CELL_HI = [70, 104, 142];
+// Per-task cell tint: a quiet sequential ramp, near-white (low) to pale slate (high), over 30–65 on the score scale.
+// Kept light so the cells stay secondary to the overall score; the ink stays dark on every step.
+const CELL_LO = [247, 247, 248],
+  CELL_HI = [184, 196, 212];
 const cellT = (v: number) => Math.max(0, Math.min(1, (v - 30) / 35));
 function cellFill(v: number) {
   const t = cellT(v);
   return `rgb(${CELL_LO.map((a, i) => Math.round(a + (CELL_HI[i] - a) * t)).join(",")})`;
 }
-const cellInk = (v: number) => (cellT(v) > 0.62 ? "#fff" : "var(--ink)");
 
 export default function TopScore() {
   const agent = useAgentView();
@@ -308,16 +312,17 @@ export default function TopScore() {
   const LO = 35,
     HI = 65;
   const rowH = narrow ? 40 : 30;
-  const cellW = 50,
-    cellGap = 3;
+  const cellW = 39,
+    cellGap = 2,
+    cellsGap = 14;
   const cellsW = narrow
     ? 0
     : RECIPE_TASKS.length * cellW + (RECIPE_TASKS.length - 1) * cellGap;
   const scoreW = 40;
-  const nameW = narrow ? 0 : 150;
+  const nameW = narrow ? 0 : 144;
   const m = {
     l: narrow ? 8 : 26 + nameW,
-    r: narrow ? scoreW : scoreW + (cellsW ? cellsW + 18 : 0),
+    r: narrow ? scoreW : scoreW + (cellsW ? cellsW + cellsGap : 0),
     t: 40,
     b: 40,
   };
@@ -325,11 +330,12 @@ export default function TopScore() {
   const plotR = W - m.r;
   const sx = (v: number) =>
     m.l +
-    8 +
-    ((Math.max(LO, Math.min(HI, v)) - LO) / (HI - LO)) * (plotR - m.l - 16);
+    6 +
+    ((Math.max(LO, Math.min(HI, v)) - LO) / (HI - LO)) * (plotR - m.l - 12);
   const ticks = [35, 40, 45, 50, 55, 60, 65];
   const scoreX = plotR + scoreW - 4;
-  const cellX = (k: number) => plotR + scoreW + 18 + k * (cellW + cellGap);
+  const cellX = (k: number) =>
+    plotR + scoreW + cellsGap + k * (cellW + cellGap);
 
   return (
     <div className="viz ar-top" ref={ref}>
@@ -342,26 +348,49 @@ export default function TopScore() {
         <text
           x={scoreX}
           y={m.t - 10}
-          className="viz-axis ts-head"
+          className="viz-axis ts-head ts-score-head"
           textAnchor="end"
         >
           Score
         </text>
-        {!narrow &&
-          RECIPE_TASKS.map((id, k) => (
+        {!narrow && (
+          <>
             <text
-              key={id}
-              x={cellX(k) + cellW / 2}
-              y={m.t - 22}
-              className="viz-axis ts-head"
+              x={cellX(1) - cellGap / 2}
+              y={m.t - 24}
+              className="viz-axis ts-head ts-cell-head"
               textAnchor="middle"
             >
-              <tspan x={cellX(k) + cellW / 2}>{TASK_HEAD[id][0]}</tspan>
-              <tspan x={cellX(k) + cellW / 2} dy={12}>
-                {TASK_HEAD[id][1]}
-              </tspan>
+              Polytopia
             </text>
-          ))}
+            <line
+              x1={cellX(0) + 2}
+              x2={cellX(1) + cellW - 2}
+              y1={m.t - 19.5}
+              y2={m.t - 19.5}
+              className="ts-span-rule"
+            />
+          </>
+        )}
+        {!narrow &&
+          CELL_ORDER.map((j, k) => {
+            const id = RECIPE_TASKS[j];
+            const cx = cellX(k) + cellW / 2;
+            return (
+              <text
+                key={id}
+                x={cx}
+                y={m.t - 24}
+                className="viz-axis ts-head ts-cell-head"
+                textAnchor="middle"
+              >
+                <tspan x={cx}>{TASK_HEAD[id][0]}</tspan>
+                <tspan x={cx} dy={14}>
+                  {TASK_HEAD[id][1]}
+                </tspan>
+              </text>
+            );
+          })}
         {ticks.map((t) => (
           <g key={t}>
             <line
@@ -445,35 +474,37 @@ export default function TopScore() {
               <text
                 x={scoreX}
                 y={y}
-                className="viz-value"
+                className="viz-value ts-score"
                 textAnchor="end"
                 dominantBaseline="middle"
               >
                 {r.score.toFixed(1)}
               </text>
               {!narrow &&
-                r.each.map((v, k) => (
-                  <g key={k}>
-                    <rect
-                      x={cellX(k)}
-                      y={top + 3}
-                      width={cellW}
-                      height={rowH - 6}
-                      rx={2}
-                      fill={cellFill(v)}
-                    />
-                    <text
-                      x={cellX(k) + cellW / 2}
-                      y={y}
-                      className="viz-axis ts-cell-val"
-                      style={{ fill: cellInk(v) }}
-                      textAnchor="middle"
-                      dominantBaseline="middle"
-                    >
-                      {v.toFixed(0)}
-                    </text>
-                  </g>
-                ))}
+                CELL_ORDER.map((j, k) => {
+                  const v = r.each[j];
+                  return (
+                    <g key={k}>
+                      <rect
+                        x={cellX(k)}
+                        y={top + 4}
+                        width={cellW}
+                        height={rowH - 8}
+                        rx={2}
+                        fill={cellFill(v)}
+                      />
+                      <text
+                        x={cellX(k) + cellW / 2}
+                        y={y}
+                        className="viz-axis ts-cell-val"
+                        textAnchor="middle"
+                        dominantBaseline="middle"
+                      >
+                        {v.toFixed(0)}
+                      </text>
+                    </g>
+                  );
+                })}
             </g>
           );
         })}

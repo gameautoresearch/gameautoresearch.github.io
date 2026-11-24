@@ -446,7 +446,11 @@ html.agent-view .ar-chip { padding: 0; background: none; color: inherit; font-si
 
 /* Overall model score chart. */
 .ar-top .ts-head { fill: var(--secondary); font-weight: 600; }
-.ar-top .ts-cell-val { fill: var(--ink); font-size: 11.5px; }
+.ar-top .ts-cell-head { font-size: 10px; font-weight: 500; }
+.ar-top .ts-span-rule { stroke: #d4d4d0; stroke-width: 1; }
+.ar-top .ts-score-head { fill: var(--ink); font-size: 12px; font-weight: 700; }
+.ar-top .ts-score { font-size: 14.5px; font-weight: 700; }
+.ar-top .ts-cell-val { fill: #5c5c58; font-size: 10.5px; }
 
 /* Special callout section: deep dive on Gemini 4 Neon's outlier $8.58 recipe. */
 .ar-outlier {
