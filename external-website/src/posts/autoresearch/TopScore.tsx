@@ -1,19 +1,17 @@
-import { useRef, useState } from "react";
+import { useRef } from "react";
 import { useAgentView } from "../../view";
 import { Table } from "../shared/text";
-import { CMYK, modelStyle } from "./colors";
+import { modelStyle } from "./colors";
 import { useWidth } from "./Frontier13";
 import raw from "./top-scores.json";
 import budgetRaw from "./budget.json";
 import { starterHoursFor } from "./CostMultiplier";
 
-// Composite model scores across all campaigns (reports/top-level-score-2026-11-20/build.py).
-// Default view ("recipe", below): the ten models with Polytopia empty file, Pokémon 3v3, forecasting and the
-// Polytopia research-budget recipes. "two": the models that ran both tasks (Polytopia empty file, Pokémon 3v3); each task is
-// standardized across those models and the two are averaged; the whisker spans the two tasks taken alone.
-// Other views: each task's scores are standardized within its field, then one least-squares fit estimates
-// score = model strength + task offset (with a small ridge prior). Scaled to 50 = average entrant,
-// 10 points = 1 SD. Whiskers show the leave-one-task-out range (min to max when dropping any one task).
+// Overall model score (Figure 1): the ten models with all four shared tasks (Polytopia empty file, Pokémon 3v3,
+// forecasting and the Polytopia research-budget recipes). Task scores come from top-scores.json
+// (reports/top-level-score-2026-11-20/build.py) and budget.json. Each task is standardized across these models
+// (50 = their average, 10 points = 1 SD) and the four are averaged; the whisker is ±1 standard error of that average
+// across tasks (sample SD of the four task scores / √4).
 
 type Task = {
   id: string;
@@ -28,21 +26,14 @@ type Row = {
   score: number;
   lo: number;
   hi: number;
-  tasks: string[];
-  rank: number;
+  // Each task's standardized score, in RECIPE_TASKS order.
+  each: number[];
 };
 
-const DATA = raw as unknown as {
-  tasks: Task[];
-  two: Row[];
-  pooled: Row[];
-  judgement: Row[];
-};
-const CORE = DATA.pooled.filter((r) => r.tasks.length >= 3);
+const DATA = raw as unknown as { tasks: Task[] };
 const TASK_MAP = Object.fromEntries(DATA.tasks.map((t) => [t.id, t]));
 
-// "Recipe" view: the two shared tasks plus forecasting and the Polytopia research-budget campaign, restricted to
-// models with all four. The recipe task uses every researched cell of that campaign ($2.90, $8.70, $23, and $8.70 with
+// The recipe task uses every researched cell of the Polytopia research-budget campaign ($2.90, $8.70, $23, and $8.70 with
 // a 2 h or 4 h limit; zero-shot is left out because it has no research). Each recipe is measured twice, both as a
 // training-compute multiplier (starter's training hours to reach the same Elo / the recipe's hours; research spend not
 // counted): the 1 h retrain on two seeds (multiplier1h) and the 8 h retrain read off its curve (Figure 2's yardstick).
@@ -50,10 +41,8 @@ const TASK_MAP = Object.fromEntries(DATA.tasks.map((t) => [t.id, t]));
 // build.py). For each measurement, log multiplier = model + cell is fit by least squares, so the models that only ran
 // the $8.70 cell (`fill`: GPT-6 Astra, GPT-6.1 Sol, Gemini 4 Carbon, campaign poly-budget-fill-20261122b, same
 // scales) are adjusted for how that cell went for everyone. The recipe score is exp(mean of the 1 h and 8 h model
-// effects): the multiplier on a typical cell. It is standardized on a log scale since it is a ratio. Same method as
-// "two" otherwise: each task standardized (population SD) across just these models, averaged; the whisker spans the
-// tasks taken alone. 50 = average of this smaller field, so not comparable to the other views. Figures 2 and 3 don't
-// read `fill`.
+// effects): the multiplier on a typical cell. It is standardized on a log scale since it is a ratio. Figures 2 and 3
+// don't read `fill`.
 type BudgetRecipe = {
   model: string;
   cell: string;
@@ -61,24 +50,37 @@ type BudgetRecipe = {
   multiplier1h: number | null;
   curve: { hours: number; elo: number }[];
 };
-const BUDGET = budgetRaw as unknown as { recipes: BudgetRecipe[]; fill?: BudgetRecipe[] };
-const budgetModel = (mo: string) => (mo === "Opus 5.5" ? "Claude Opus 5.5" : mo);
+const BUDGET = budgetRaw as unknown as {
+  recipes: BudgetRecipe[];
+  fill?: BudgetRecipe[];
+};
+const budgetModel = (mo: string) =>
+  mo === "Opus 5.5" ? "Claude Opus 5.5" : mo;
 const CRASH_MULT = 0.5;
 type CellObs = { model: string; cell: string; y: number };
+const mean = (v: number[]) => v.reduce((s, x) => s + x, 0) / v.length;
 // Two-way additive fit y = a[model] + b[cell], mean of b = 0, by alternating means (converges to least squares).
-function modelEffects(obs: CellObs[]): Record<string, number> {
+function fitCells(obs: CellObs[]): {
+  a: Record<string, number>;
+  b: Record<string, number>;
+} {
   const models = [...new Set(obs.map((o) => o.model))];
   const cells = [...new Set(obs.map((o) => o.cell))];
-  const a: Record<string, number> = Object.fromEntries(models.map((m) => [m, 0]));
-  const b: Record<string, number> = Object.fromEntries(cells.map((c) => [c, 0]));
-  const mean = (v: number[]) => v.reduce((s, x) => s + x, 0) / v.length;
+  const a: Record<string, number> = Object.fromEntries(
+    models.map((m) => [m, 0]),
+  );
+  const b: Record<string, number> = Object.fromEntries(
+    cells.map((c) => [c, 0]),
+  );
   for (let it = 0; it < 500; it++) {
-    for (const c of cells) b[c] = mean(obs.filter((o) => o.cell === c).map((o) => o.y - a[o.model]));
+    for (const c of cells)
+      b[c] = mean(obs.filter((o) => o.cell === c).map((o) => o.y - a[o.model]));
     const mb = mean(cells.map((c) => b[c]));
     for (const c of cells) b[c] -= mb;
-    for (const m of models) a[m] = mean(obs.filter((o) => o.model === m).map((o) => o.y - b[o.cell]));
+    for (const m of models)
+      a[m] = mean(obs.filter((o) => o.model === m).map((o) => o.y - b[o.cell]));
   }
-  return a;
+  return { a, b };
 }
 const obs1h: CellObs[] = [];
 const obs8h: CellObs[] = [];
@@ -87,15 +89,103 @@ for (const r of [...BUDGET.recipes, ...(BUDGET.fill ?? [])]) {
   const model = budgetModel(r.model);
   const end = r.curve[r.curve.length - 1];
   const m1 = r.broken || r.multiplier1h === null ? CRASH_MULT : r.multiplier1h;
-  const m8 = r.broken || !end ? CRASH_MULT : starterHoursFor(end.elo).hours / end.hours;
+  const m8 =
+    r.broken || !end ? CRASH_MULT : starterHoursFor(end.elo).hours / end.hours;
   obs1h.push({ model, cell: r.cell, y: Math.log(m1) });
   obs8h.push({ model, cell: r.cell, y: Math.log(m8) });
 }
-const eff1h = modelEffects(obs1h);
-const eff8h = modelEffects(obs8h);
-const RECIPE_ALL: Record<string, number> = Object.fromEntries(
-  Object.keys(eff8h).map((m) => [m, Math.exp((eff1h[m] + eff8h[m]) / 2)]),
-);
+
+const RECIPE_TASKS = ["poly_empty", "poke", "forecast", "recipe8"];
+// Value that gets standardized: the recipe multiplier on a log scale (it is a ratio), the others as reported.
+const taskValue = (id: string, v: number) =>
+  id === "recipe8" ? Math.log(v) : v;
+
+// Frozen scale, v1 (2026-11-23). Scores are measured against fixed constants from a reference group, so adding a model
+// later doesn't move anyone else: 50 = the average of the ten reference models below, 10 points = their standard
+// deviation on that task. Two things are frozen:
+//   CELL_OFFSETS: how each recipe budget cell went (log multiplier, 1 h and 8 h), from the least-squares fit above over
+//     the reference models. A model's recipe effect is the mean over the cells it ran of (its log multiplier - offset).
+//   NORMS: each task's mean and population SD across the reference models (recipe task on a log scale).
+// Both are what the live fit gave on 2026-11-23, so the reference models' scores are unchanged. Models added later
+// score against the same constants and may land outside 35–65. To re-norm, compute new constants with
+// computeReference() and bump the version in the caption and post; don't edit these silently.
+const SCALE_VERSION = "v1 (Nov 2026)";
+const REFERENCE_MODELS = [
+  "Gemini 4 Neon",
+  "Claude Fable 5.2",
+  "Gemini 4 Carbon",
+  "GPT-6.2 Sol",
+  "GPT-6.2 Astra",
+  "GPT-6 Astra",
+  "GPT-6.1 Sol",
+  "Claude Opus 5.5",
+  "DeepSeek V4.1 Flash",
+  "Kimi K3.1 Pro",
+];
+const CELL_OFFSETS: Record<"1h" | "8h", Record<string, number>> = {
+  "1h": {
+    "$2.90": 0.146952658206,
+    "$8.70": -0.010457718437,
+    $23: -0.009175502062,
+    "$8.70, 2 h limit": 0.020613940092,
+    "$8.70, 4 h limit": -0.147933377799,
+  },
+  "8h": {
+    "$2.90": 0.043603072642,
+    "$8.70": 0.496266981517,
+    $23: -0.334910462831,
+    "$8.70, 2 h limit": 0.087929094771,
+    "$8.70, 4 h limit": -0.292888686099,
+  },
+};
+const NORMS: Record<string, { mean: number; sd: number }> = {
+  poly_empty: { mean: 62.48, sd: 11.394981351455 },
+  poke: { mean: 67.76, sd: 7.682994207989 },
+  forecast: { mean: 0.2868, sd: 0.061315250958 },
+  recipe8: { mean: -0.08217861795, sd: 0.239269587071 },
+};
+
+// Recompute the frozen constants from the data: the cell fit and task norms over the reference models only.
+export function computeReference() {
+  const ref = new Set(REFERENCE_MODELS);
+  const f1 = fitCells(obs1h.filter((o) => ref.has(o.model)));
+  const f8 = fitCells(obs8h.filter((o) => ref.has(o.model)));
+  const recipe = Object.fromEntries(
+    REFERENCE_MODELS.map((m) => [m, Math.exp((f1.a[m] + f8.a[m]) / 2)]),
+  );
+  const raw = (id: string, m: string) =>
+    id === "recipe8" ? recipe[m] : TASK_MAP[id].scores[m];
+  const norms = Object.fromEntries(
+    RECIPE_TASKS.map((id) => {
+      const v = REFERENCE_MODELS.map((m) => taskValue(id, raw(id, m)));
+      const mu = mean(v);
+      return [
+        id,
+        { mean: mu, sd: Math.sqrt(mean(v.map((x) => (x - mu) ** 2))) },
+      ];
+    }),
+  );
+  return { cells: { "1h": f1.b, "8h": f8.b }, norms };
+}
+
+// A model's recipe score against the frozen cell offsets: exp(mean of its 1 h and 8 h effects).
+function frozenEffect(
+  obs: CellObs[],
+  offsets: Record<string, number>,
+  model: string,
+) {
+  const mine = obs.filter(
+    (o) => o.model === model && offsets[o.cell] !== undefined,
+  );
+  return mine.length ? mean(mine.map((o) => o.y - offsets[o.cell])) : undefined;
+}
+const RECIPE_ALL: Record<string, number> = {};
+for (const m of new Set(obs8h.map((o) => o.model))) {
+  const e1 = frozenEffect(obs1h, CELL_OFFSETS["1h"], m);
+  const e8 = frozenEffect(obs8h, CELL_OFFSETS["8h"], m);
+  if (e1 !== undefined && e8 !== undefined)
+    RECIPE_ALL[m] = Math.exp((e1 + e8) / 2);
+}
 TASK_MAP.recipe8 = {
   id: "recipe8",
   name: "Polytopia recipes, five budget cells at 1 h and 8 h",
@@ -104,271 +194,290 @@ TASK_MAP.recipe8 = {
   sessions: 5,
   scores: RECIPE_ALL,
 };
-const RECIPE_TASKS = ["poly_empty", "poke", "forecast", "recipe8"];
-const RECIPE: Row[] = (() => {
-  const models = Object.keys(TASK_MAP.poly_empty.scores).filter((mo) =>
-    RECIPE_TASKS.every((id) => TASK_MAP[id].scores[mo] !== undefined),
-  );
-  const val = (id: string, mo: string) => (id === "recipe8" ? Math.log(TASK_MAP[id].scores[mo]) : TASK_MAP[id].scores[mo]);
-  const z = Object.fromEntries(
-    RECIPE_TASKS.map((id) => {
-      const v = models.map((mo) => val(id, mo));
-      const mu = v.reduce((a, b) => a + b, 0) / v.length;
-      const sd = Math.sqrt(v.reduce((a, b) => a + (b - mu) ** 2, 0) / v.length);
-      return [id, Object.fromEntries(models.map((mo) => [mo, 50 + (10 * (val(id, mo) - mu)) / sd]))];
-    }),
-  );
-  return models
-    .map((mo) => {
-      const each = RECIPE_TASKS.map((id) => z[id][mo]);
-      return {
-        model: mo,
-        score: each.reduce((a, b) => a + b, 0) / each.length,
-        lo: Math.min(...each),
-        hi: Math.max(...each),
-        tasks: RECIPE_TASKS,
-        rank: 0,
-      };
-    })
-    .sort((a, b) => b.score - a.score)
-    .map((r, i) => ({ ...r, rank: i + 1 }));
-})();
+
+// Dev-only: warn if the reference data no longer reproduces the frozen constants (e.g. a reference model's run was
+// redone). Then decide deliberately whether to re-norm.
+if (import.meta.env?.DEV) {
+  const now = computeReference();
+  const off = (a: number, b: number) => Math.abs(a - b) > 1e-6;
+  const drift = [
+    ...(["1h", "8h"] as const).flatMap((k) =>
+      Object.keys(now.cells[k])
+        .filter((c) => off(now.cells[k][c], CELL_OFFSETS[k][c] ?? NaN))
+        .map((c) => `cell ${k} ${c}`),
+    ),
+    ...RECIPE_TASKS.filter(
+      (id) =>
+        off(now.norms[id].mean, NORMS[id].mean) ||
+        off(now.norms[id].sd, NORMS[id].sd),
+    ).map((id) => `norm ${id}`),
+  ];
+  if (drift.length)
+    console.warn(
+      `TopScore: reference data no longer matches frozen scale ${SCALE_VERSION}:`,
+      drift,
+      now,
+    );
+}
+
+// One task value on the frozen scale.
+const standardize = (id: string, raw: number) => 50 + (10 * (taskValue(id, raw) - NORMS[id].mean)) / NORMS[id].sd;
+
+// Every model with all four tasks, scored against the frozen scale.
+export const RECIPE: Row[] = Object.keys(TASK_MAP.poly_empty.scores)
+  .filter((mo) => RECIPE_TASKS.every((id) => TASK_MAP[id].scores[mo] !== undefined))
+  .map((mo) => {
+    const each = RECIPE_TASKS.map((id) => standardize(id, TASK_MAP[id].scores[mo]));
+    const n = each.length;
+    const score = mean(each);
+    const se = Math.sqrt(each.reduce((a, b) => a + (b - score) ** 2, 0) / (n - 1) / n);
+    return { model: mo, score, lo: score - se, hi: score + se, each };
+  })
+  .sort((a, b) => b.score - a.score);
 
 const SHORT_TASK: Record<string, string> = {
   poly_empty: "Polytopia empty",
   poke: "Pokémon 3v3",
-  poly_budget: "Polytopia efficiency",
-  poly_suite: "Polytopia $35",
-  hex: "Hex 9×9",
-  generals: "Generals",
-  slowsim: "Generals slow sim",
-  clash: "Clash",
   forecast: "Forecasting",
   recipe8: "Polytopia recipes",
 };
+// Two-line column heads for the per-task cells.
+const TASK_HEAD: Record<string, [string, string]> = {
+  poly_empty: ["Polytopia", "empty file"],
+  poke: ["Pokémon", "3v3"],
+  forecast: ["Fore-", "casting"],
+  recipe8: ["Polytopia", "recipes"],
+};
 
 function fmtTaskScore(id: string, v: number) {
-  if (id === "poly_budget" || id === "recipe8") return `${v.toFixed(2)}×`;
+  if (id === "recipe8") return `${v.toFixed(2)}×`;
   if (id === "forecast") return `+${v.toFixed(2)}`;
   return v.toFixed(1);
 }
 
 // Keep featured models in their post color and give light-grey models legible ink weight on white.
-function markColor(model: string, deep: boolean) {
+function markColor(model: string) {
   const c = modelStyle(model).color;
-  if (c === "#b5b5b5" || c === "#bdbdbd" || c === "#9a9a9a") {
-    return deep ? "#575752" : "#80807a";
-  }
-  return c;
+  return c === "#b5b5b5" || c === "#bdbdbd" || c === "#9a9a9a" ? "#575752" : c;
 }
 
-type Mode = "two" | "recipe" | "all" | "core" | "forecast";
+// Per-task cell tint: one sequential blue-grey ramp, pale grey (low) to slate blue (high), over 30–65 on the
+// score scale. Values on the darker half of the ramp switch to white ink.
+const CELL_LO = [238, 239, 241],
+  CELL_HI = [70, 104, 142];
+const cellT = (v: number) => Math.max(0, Math.min(1, (v - 30) / 35));
+function cellFill(v: number) {
+  const t = cellT(v);
+  return `rgb(${CELL_LO.map((a, i) => Math.round(a + (CELL_HI[i] - a) * t)).join(",")})`;
+}
+const cellInk = (v: number) => (cellT(v) > 0.62 ? "#fff" : "var(--ink)");
 
 export default function TopScore() {
   const agent = useAgentView();
   const ref = useRef<HTMLDivElement>(null);
   const W = useWidth(ref);
-  const [mode, setMode] = useState<Mode>("recipe");
-  const [tip, setTip] = useState<string | null>(null);
-
-  const recipe = mode === "recipe";
-  // "two" and "recipe" share a method: every listed model ran every task, whiskers are each task alone.
-  const two = mode === "two" || recipe;
-  const rows: Row[] =
-    mode === "two"
-      ? DATA.two
-      : recipe
-        ? RECIPE
-        : mode === "forecast"
-        ? DATA.judgement
-        : mode === "core"
-          ? CORE
-          : DATA.pooled;
-  // Solid marks: a model with enough evidence for the view (both tasks in "two", 3+ tasks in the pooled views).
-  const isDeep = (r: Row) => two || r.tasks.length >= 3;
+  const rows = RECIPE;
 
   if (agent) {
     return (
       <Table
-        head={["#", "Model", "Four-task score (50 = avg of these models)", "Range (each task alone)", "Tasks", "Per-task scores"]}
-        align={["r", "l", "r", "r", "r", "l"]}
-        rows={RECIPE.map((r, i) => [
+        head={[
+          "#",
+          "Model",
+          `Overall score (50 = avg of the ten reference models, scale ${SCALE_VERSION})`,
+          "±1 standard error across tasks",
+          ...RECIPE_TASKS.map((id) => `${SHORT_TASK[id]} (standardized; raw)`),
+        ]}
+        align={["r", "l", "r", "r", "r", "r", "r", "r"]}
+        rows={rows.map((r, i) => [
           i + 1,
           r.model,
           r.score.toFixed(1),
-          r.tasks.length > 1 ? `${r.lo.toFixed(1)}–${r.hi.toFixed(1)}` : "—",
-          r.tasks.length,
-          r.tasks.map((id) => `${SHORT_TASK[id]}: ${fmtTaskScore(id, TASK_MAP[id].scores[r.model])}`).join("; "),
+          `${r.lo.toFixed(1)}–${r.hi.toFixed(1)}`,
+          ...RECIPE_TASKS.map(
+            (id, k) =>
+              `${r.each[k].toFixed(0)} (${fmtTaskScore(id, TASK_MAP[id].scores[r.model])})`,
+          ),
         ])}
       />
     );
   }
 
-  const narrow = W < 500;
-  const LO = 30, HI = 66;
-  const rowH = narrow ? 40 : 27;
-  const m = { l: narrow ? 8 : 210, r: narrow ? 42 : 48, t: 24, b: 36 };
+  // Wide: rank · name · dot plot · score · four per-task cells. Narrow: name above each dot, per-task cells dropped.
+  const narrow = W < 560;
+  const LO = 35,
+    HI = 65;
+  const rowH = narrow ? 40 : 30;
+  const cellW = 50,
+    cellGap = 3;
+  const cellsW = narrow
+    ? 0
+    : RECIPE_TASKS.length * cellW + (RECIPE_TASKS.length - 1) * cellGap;
+  const scoreW = 40;
+  const nameW = narrow ? 0 : 150;
+  const m = {
+    l: narrow ? 8 : 26 + nameW,
+    r: narrow ? scoreW : scoreW + (cellsW ? cellsW + 18 : 0),
+    t: 40,
+    b: 40,
+  };
   const H = m.t + m.b + rows.length * rowH;
-  const sx = (v: number) => m.l + ((Math.max(LO, Math.min(HI, v)) - LO) / (HI - LO)) * (W - m.l - m.r);
-  const ticks = narrow ? [30, 40, 50, 60] : [30, 35, 40, 45, 50, 55, 60, 65];
-  const hovered = tip ? rows.find((r) => r.model === tip) ?? null : null;
+  const plotR = W - m.r;
+  const sx = (v: number) =>
+    m.l +
+    8 +
+    ((Math.max(LO, Math.min(HI, v)) - LO) / (HI - LO)) * (plotR - m.l - 16);
+  const ticks = [35, 40, 45, 50, 55, 60, 65];
+  const scoreX = plotR + scoreW - 4;
+  const cellX = (k: number) => plotR + scoreW + 18 + k * (cellW + cellGap);
 
   return (
-    <div className="viz ar-top" ref={ref} onMouseLeave={() => setTip(null)}>
-      <div className="ar-tabs ar-tabs-wrap" role="tablist" aria-label="Composite score view">
-        <button role="tab" aria-selected={recipe} onClick={() => { setMode("recipe"); setTip(null); }}>
-          Two tasks + forecasting + recipes ({RECIPE.length})
-        </button>
-        <button role="tab" aria-selected={mode === "two"} onClick={() => { setMode("two"); setTip(null); }}>
-          Two tasks ({DATA.two.length})
-        </button>
-        <button role="tab" aria-selected={mode === "all"} onClick={() => { setMode("all"); setTip(null); }}>
-          All research, pooled ({DATA.pooled.length})
-        </button>
-        <button role="tab" aria-selected={mode === "core"} onClick={() => { setMode("core"); setTip(null); }}>
-          3+ tasks only ({CORE.length})
-        </button>
-        <button role="tab" aria-selected={mode === "forecast"} onClick={() => { setMode("forecast"); setTip(null); }}>
-          Research + forecasting
-        </button>
-      </div>
-      <div className="viz-legend">
-        <span><i className="ts-dot solid" />{recipe ? "Polytopia empty + Pokémon 3v3 + forecasting + Polytopia recipes (5 budget cells, 1 h + 8 h)" : two ? "Polytopia empty + Pokémon 3v3" : "3+ tasks"}</span>
-        {!two && mode !== "core" && <span><i className="ts-dot hollow" />1–2 tasks</span>}
-        <span><i className="ts-whisk" />{two ? "Each task alone" : "Range dropping any one task"}</span>
-      </div>
-      <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label="Synthesized model scores across research tasks">
+    <div className="viz ar-top" ref={ref}>
+      <svg
+        viewBox={`0 0 ${W} ${H}`}
+        role="img"
+        aria-label="Overall model scores across four research tasks"
+      >
+        {/* Column heads */}
+        <text
+          x={scoreX}
+          y={m.t - 10}
+          className="viz-axis ts-head"
+          textAnchor="end"
+        >
+          Score
+        </text>
+        {!narrow &&
+          RECIPE_TASKS.map((id, k) => (
+            <text
+              key={id}
+              x={cellX(k) + cellW / 2}
+              y={m.t - 22}
+              className="viz-axis ts-head"
+              textAnchor="middle"
+            >
+              <tspan x={cellX(k) + cellW / 2}>{TASK_HEAD[id][0]}</tspan>
+              <tspan x={cellX(k) + cellW / 2} dy={12}>
+                {TASK_HEAD[id][1]}
+              </tspan>
+            </text>
+          ))}
         {ticks.map((t) => (
           <g key={t}>
             <line
               x1={sx(t)}
               x2={sx(t)}
-              y1={t === 50 ? m.t - 6 : m.t}
+              y1={m.t}
               y2={H - m.b}
-              className={t === 50 ? undefined : "viz-grid"}
-              stroke={t === 50 ? CMYK.k : undefined}
-              strokeDasharray={t === 50 ? "3 3" : undefined}
-              strokeOpacity={t === 50 ? 0.5 : undefined}
+              className="viz-grid"
             />
-            <text x={sx(t)} y={H - m.b + 16} className="viz-axis" textAnchor="middle">
+            <text
+              x={sx(t)}
+              y={H - m.b + 15}
+              className="viz-axis"
+              textAnchor="middle"
+            >
               {t}
             </text>
           </g>
         ))}
-        <text x={sx(50)} y={m.t - 10} className="viz-axis" textAnchor="middle">
-          average (50)
-        </text>
-        <text x={(sx(LO) + sx(HI)) / 2} y={H - 4} className="viz-axis" textAnchor="middle">
-          {recipe ? "four-task index (50 = average of these models, +10 = +1 SD)" : two ? "two-task index (50 = average model, +10 = +1 SD)" : "pooled index (50 = average entrant, +10 = +1 SD)"}
+        <text
+          x={(sx(LO) + sx(HI)) / 2}
+          y={H - 6}
+          className="viz-axis"
+          textAnchor="middle"
+        >
+          {narrow
+            ? "score (50 = average, +10 = +1 SD)"
+            : `overall score (50 = average of the ten reference models, +10 = +1 SD; scale ${SCALE_VERSION})`}
         </text>
         {rows.map((r, i) => {
-          const y = m.t + i * rowH + (narrow ? rowH * 0.68 : rowH / 2);
-          const deep = isDeep(r);
-          const col = markColor(r.model, deep);
-          const lit = tip === r.model;
-          const dim = tip !== null && !lit;
-          const xScore = sx(r.score);
-          const xEnd = r.tasks.length > 1 ? sx(Math.max(r.score, r.hi)) : xScore;
+          const top = m.t + i * rowH;
+          const y = top + (narrow ? rowH * 0.7 : rowH / 2);
+          const col = markColor(r.model);
           return (
-            <g
-              key={r.model}
-              tabIndex={0}
-              className="ar-top-row"
-              onMouseEnter={() => setTip(r.model)}
-              onFocus={() => setTip(r.model)}
-              opacity={dim ? 0.32 : 1}
-            >
-              <rect x={0} y={m.t + i * rowH} width={W} height={rowH} fill={lit ? "#f6f6f3" : "transparent"} />
+            <g key={r.model}>
               {narrow ? (
-                <text x={m.l} y={y - 12} className="viz-label" style={{ fontWeight: deep ? 600 : 400 }}>
-                  <tspan className="viz-axis">{i + 1}. </tspan>
-                  {r.model}
-                  <tspan className="viz-axis"> · {r.tasks.length}t</tspan>
+                <text x={m.l} y={y - 13} className="viz-label">
+                  <tspan className="viz-axis">{i + 1}</tspan>
+                  <tspan dx={6}>{r.model}</tspan>
                 </text>
               ) : (
                 <>
-                  <text x={20} y={y} className="viz-axis" textAnchor="end" dominantBaseline="middle">
+                  <text
+                    x={16}
+                    y={y}
+                    className="viz-axis"
+                    textAnchor="end"
+                    dominantBaseline="middle"
+                  >
                     {i + 1}
                   </text>
                   <text
-                    x={m.l - 12}
+                    x={26}
                     y={y}
                     className="viz-label"
-                    textAnchor="end"
                     dominantBaseline="middle"
-                    style={{ fontWeight: deep ? 600 : 400 }}
+                    style={{ fontWeight: 600 }}
                   >
                     {r.model}
-                    <tspan className="viz-axis" style={{ fontWeight: 400 }}>
-                      {" "}
-                      ({r.tasks.length})
-                    </tspan>
                   </text>
                 </>
               )}
-              {r.tasks.length > 1 && (
-                <line
-                  x1={sx(r.lo)}
-                  x2={sx(r.hi)}
-                  y1={y}
-                  y2={y}
-                  stroke={col}
-                  strokeOpacity={lit ? 0.55 : 0.3}
-                  strokeWidth={4.5}
-                  strokeLinecap="round"
-                />
-              )}
+              <line
+                x1={sx(r.lo)}
+                x2={sx(r.hi)}
+                y1={y}
+                y2={y}
+                stroke={col}
+                strokeOpacity={0.32}
+                strokeWidth={5}
+                strokeLinecap="round"
+              />
               <circle
-                cx={xScore}
+                cx={sx(r.score)}
                 cy={y}
-                r={deep ? 5.2 : 4.6}
-                fill={deep ? col : "#fff"}
-                stroke={deep ? "#fff" : col}
-                strokeWidth={deep ? 1.4 : 2}
+                r={5.5}
+                fill={col}
+                stroke="#fff"
+                strokeWidth={1.5}
               />
               <text
-                x={xEnd + 8}
+                x={scoreX}
                 y={y}
-                className="viz-axis"
+                className="viz-value"
+                textAnchor="end"
                 dominantBaseline="middle"
-                style={{
-                  fill: deep ? "var(--ink)" : "var(--secondary)",
-                  fontWeight: deep ? 600 : 400,
-                  paintOrder: "stroke",
-                  stroke: lit ? "#f6f6f3" : "#fff",
-                  strokeWidth: 4,
-                }}
               >
                 {r.score.toFixed(1)}
               </text>
+              {!narrow &&
+                r.each.map((v, k) => (
+                  <g key={k}>
+                    <rect
+                      x={cellX(k)}
+                      y={top + 3}
+                      width={cellW}
+                      height={rowH - 6}
+                      rx={2}
+                      fill={cellFill(v)}
+                    />
+                    <text
+                      x={cellX(k) + cellW / 2}
+                      y={y}
+                      className="viz-axis ts-cell-val"
+                      style={{ fill: cellInk(v) }}
+                      textAnchor="middle"
+                      dominantBaseline="middle"
+                    >
+                      {v.toFixed(0)}
+                    </text>
+                  </g>
+                ))}
             </g>
           );
         })}
       </svg>
-      <div className="ar-tl-detail" aria-live="polite">
-        {hovered ? (
-          <>
-            <strong>{hovered.model}</strong>: index <b>{hovered.score.toFixed(1)}</b>
-            {hovered.tasks.length > 1 && (
-              <span>
-                {" "}
-                ({two ? "each task alone" : "leave-one-task-out"} {hovered.lo.toFixed(1)}–{hovered.hi.toFixed(1)})
-              </span>
-            )}
-            <span>
-              {" "}
-              ·{" "}
-              {hovered.tasks
-                .map((id) => `${SHORT_TASK[id]} ${fmtTaskScore(id, TASK_MAP[id].scores[hovered.model])}`)
-                .join(" · ")}
-            </span>
-          </>
-        ) : (
-          <span>
-            Hover a model for its individual task scores. Parentheses show the number of tasks each model ran.
-          </span>
-        )}
-      </div>
     </div>
   );
 }

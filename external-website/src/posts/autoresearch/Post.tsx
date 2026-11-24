@@ -132,58 +132,37 @@ export default function AutoresearchPost() {
       </p>
 
       <h2 className="ar-config ar-c1" id="results">
-        Top Line Results
+        Overall Ranking
       </h2>
       <p>
-        Ten models have results on the same four tasks: Polytopia from an
-        empty file, Pokémon 3v3 from a working starter, Polytopia recipes
-        written under five research budgets, and forecasting training runs.
-        Gemini 4 Neon leads, six models follow close together, and Claude
-        Opus 5.5, DeepSeek V4.1 Flash and Kimi K3.1 Pro trail. The other tabs
-        cover the nineteen models that ran the first two tasks and pool all
-        eight research tasks across Polytopia, Pokémon, Hex, Generals and
-        Clash.
+        We graded 10 models accross 4 training tasks: Polytopia from an empty
+        file, Pokémon 3v3 from a working starter, Polytopia recipes written
+        under five research budgets, and forecasting training run results based
+        on previous data.
       </p>
       <Figure
         n={1}
         wide
         caption={
           <>
-            Standardized model scores on four shared tasks (50 = average of
-            these ten models), with tabs for more models and broader task
-            pools.
+            Overall model scores on four tasks with normalized scores, ±1 std
+            dev
           </>
         }
       >
         <TopScore />
       </Figure>
 
-      <p>
-        The headline score uses only the models that ran all four tasks, so
-        each model is judged on the same evidence. We standardize each task
-        across those models and average the four: 50 is the average of the
-        ten, and 10 points is one standard deviation. The recipe task combines
-        five budget levels, each recipe retrained for 1 hour and for 8 hours,
-        and adjusts for how each budget level went across models, since three
-        models ran only the $8.70 level. The two-task tab applies the same
-        method to the nineteen models that ran Polytopia and Pokémon. The
-        pooled tabs fit one rating through all
-        eight research tasks, standardized within each task. The whiskers there
-        show how much a score moves when any one task is left out, and models
-        with fewer tasks have less evidence behind them. The forecasting tab
-        adds a separate test of how well models predict training outcomes.
-      </p>
-
       <h2 className="ar-config" id="setup">
         How we designed the benchmark
       </h2>
       <p>
-        We wanted agents to make the decisions a researcher makes between runs.
-        Which idea is worth testing? How long should it train? When is a
-        practice result strong enough to bet the rest of the budget on it? Each
-        agent got the same kind of workspace: a game rulebook, simulator code,
-        editable training code and configs, and a command-line tool to launch
-        experiments on an NVIDIA L40S.
+        We wanted agents manage the process like a researcher. Which idea is
+        worth testing? How long should it train? When is a practice result
+        strong enough to bet the rest of the budget on it? Each agent got a
+        workspace with a game rulebook, simulator code, editable training code
+        and configs, and a command-line tool to launch experiments on an NVIDIA
+        L40S and read logs.
       </p>
       <p>Across our tasks, we used two submission formats:</p>
 
@@ -194,10 +173,10 @@ export default function AutoresearchPost() {
               title: "Submit a trained model",
               body: (
                 <>
-                  The agent submits model weights directly (as in Generals).
-                  Research and training share one compute budget, so the agent
-                  must weigh spending compute on tests and research against
-                  saving it for the final training run.
+                  The agent submits model weights directly. Research and
+                  training share one compute budget, so the agent must weigh
+                  spending compute on tests and research against saving it for
+                  the final training run.
                 </>
               ),
             },
@@ -206,9 +185,9 @@ export default function AutoresearchPost() {
               body: (
                 <>
                   The agent submits training code and settings, and we retrain
-                  the recipe from scratch (as in Pok&eacute;mon 3v3 and
-                  Polytopia). Because the compute of the final run is fixed, the
-                  agent&rsquo;s session budget goes purely to research.
+                  the recipe from scratch. Because the compute for the final run
+                  is fixed, the agent&rsquo;s session budget goes purely to
+                  research.
                 </>
               ),
             },
@@ -235,8 +214,7 @@ export default function AutoresearchPost() {
       </p>
 
       <h2 className="ar-config ar-c2" id="efficiency">
-        How efficient are the recipes
-        agents discover?
+        How efficient are the recipes agents discover?
       </h2>
       <p>
         GPU experiments helped on average compared with the one-cent condition.
@@ -252,9 +230,9 @@ export default function AutoresearchPost() {
         basic PPO recipe. We were curious about the "payoff" timelines of tokens
         and compute spent on improving this recipe. Most runs do not pay back
         within 8 hours of training. The best pays back dramatically, though. One
-        of {costMult.top.model}&rsquo;s sessions trains in 8 hours a network that our
-        default recipe would need about {Math.round(costMult.top.starterHours)}{" "}
-        hours to match ($
+        of {costMult.top.model}&rsquo;s sessions trains in 8 hours a network
+        that our default recipe would need about{" "}
+        {Math.round(costMult.top.starterHours)} hours to match ($
         {costMult.top.starterUsd}
         ), so it needs{" "}
         <strong>about {costMult.top.x.toFixed(0)}× less total compute</strong>.
@@ -280,15 +258,14 @@ export default function AutoresearchPost() {
       </section>
 
       <h2 className="ar-config ar-c3" id="taste">
-        What separates strong researchers from weak
-        ones?
+        What separates strong researchers from weak ones?
       </h2>
 
       <h3 id="inside">Experimental discipline</h3>
       <p>
         Most models propose plausible changes and do experiments, but some
-        models are dramatically more effective at choosing good interventions and
-        interpreting results accurately.
+        models are dramatically more effective at choosing good interventions
+        and interpreting results accurately.
       </p>
       <Figure
         n={3}
@@ -329,8 +306,8 @@ export default function AutoresearchPost() {
         recipe was the strongest by a clear margin: 416 Elo, about 70 above the
         best recipe from any other model. It stacked several changes at once, so
         the table lists what went into it and into Neon's $2.90 recipe (330,
-        tied for second). The last column shows what earlier one-at-a-time
-        tests on Opus, Sol and Astra recipes found. Both Neon recipes practised
+        tied for second). The last column shows what earlier one-at-a-time tests
+        on Opus, Sol and Astra recipes found. Both Neon recipes practised
         against past copies of themselves, which the earlier models had tried
         and dropped, and both used turn-based credit, the only change in either
         recipe that also held up in those tests.

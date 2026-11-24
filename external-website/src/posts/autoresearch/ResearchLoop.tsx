@@ -132,19 +132,21 @@ function Bill({ x, y, op = 1, sc = 1, seal }: { x: number; y: number; op?: numbe
 }
 function CashPile({ left, spending, x, cy, compact }: { left: number; spending: boolean; x: number; cy: number; compact: boolean }) {
   const exact = left * BILLS, stackDy = 3, rightEdge = x + 210, y = cy - BILL_H / 2;
+  // The pile sits centred between the "GPU budget" label and the amount below it.
+  const px = x + (rightEdge - x - BILL_W) / 2;
   const full = spending ? Math.floor(exact + 1e-6) : Math.round(exact), frac = spending ? exact - full : 0;
   const bills: JSX.Element[] = [];
-  for (let i = 0; i < full; i++) bills.push(<Bill key={i} x={x} y={y - i * stackDy} seal={i === full - 1} />);
+  for (let i = 0; i < full; i++) bills.push(<Bill key={i} x={px} y={y - i * stackDy} seal={i === full - 1} />);
   // The bill being spent leaves the top of the pile and shrinks toward the run-cost strip, fading as it goes.
   let flying: JSX.Element | null = null;
   if (frac > 0.001) {
     const k = ease(1 - frac), sc = 1 - k * 0.6, startY = y - full * stackDy;
     const endX = (compact ? rightEdge : rightEdge + 14) - BILL_W * sc;
-    flying = <Bill x={x + k * (endX - x)} y={startY + k * (cy - BILL_H * sc / 2 - startY)} sc={sc} op={1 - k * 0.85} seal />;
+    flying = <Bill x={px + k * (endX - px)} y={startY + k * (cy - BILL_H * sc / 2 - startY)} sc={sc} op={1 - k * 0.85} seal />;
   }
   return (
     <g>
-      <rect x={x} y={y} width={BILL_W} height={BILL_H} rx={3} fill="#f7faf8" stroke="#d8e6dd" strokeDasharray="3 2.5" />
+      <rect x={px} y={y} width={BILL_W} height={BILL_H} rx={3} fill="#f7faf8" stroke="#d8e6dd" strokeDasharray="3 2.5" />
       {bills}
       {flying}
       <text x={x} y={y + BILL_H + 15} className="rl-small">GPU budget</text>
