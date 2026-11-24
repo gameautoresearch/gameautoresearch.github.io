@@ -53,7 +53,7 @@ export default function AutoresearchPost() {
         empty file, Pokémon 3v3 from a working starter, Polytopia recipes
         written under varying research budgets, forecasting training run results
         based on previous data, and a Generals network trained from an empty
-        starter and ranked in a 19-network tournament.
+        starter and ranked in a 20-network tournament.
       </p>
       <Figure
         n={1}
@@ -61,8 +61,8 @@ export default function AutoresearchPost() {
         caption={
           <>
             Overall model scores on five tasks with normalized scores, ±1
-            standard error across tasks. Gemini 4 Carbon was not in the Generals
-            tournament; its score averages its four other tasks.
+            standard error across tasks. All ten models have results on all five
+            tasks, including the completed 20-network Generals tournament.
           </>
         }
       >

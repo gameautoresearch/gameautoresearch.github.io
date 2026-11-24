@@ -9,10 +9,10 @@ import generalsRaw from "./generals-tournament.json";
 import { starterHoursFor } from "./CostMultiplier";
 
 // Overall model score (Figure 1): the ten models with all four shared tasks (Polytopia empty file, Pokémon 3v3,
-// forecasting and the Polytopia research-budget recipes), plus the Generals tournament for every one of them that
-// played it (all but Gemini 4 Carbon, which was held out of that campaign). Task scores come from top-scores.json
-// (reports/top-level-score-2026-11-20/build.py), budget.json and generals-tournament.json
-// (reports/generals/slowsim-expansion-2026-11-24.md). Each task is standardized against the frozen scale below
+// forecasting and the Polytopia research-budget recipes), plus the Generals tournament for all ten.
+// Task scores come from top-scores.json
+// (reports/top-level-score-2026-11-20/build.py), budget.json and generals-tournament.json.
+// Each task is standardized against the frozen scale below
 // (50 = the reference models' average, 10 points = 1 SD) and a model's tasks are averaged; the whisker is ±1 standard
 // error of that average across its tasks (sample SD of its task scores / √n).
 
@@ -113,9 +113,10 @@ const taskValue = (id: string, v: number) =>
 //   CELL_OFFSETS: how each recipe budget cell went (log multiplier, 1 h and 8 h), from the least-squares fit above over
 //     the reference models. A model's recipe effect is the mean over the cells it ran of (its log multiplier - offset).
 //   NORMS: each task's mean and population SD across the reference models (recipe task on a log scale; Generals over
-//     the nine reference models in its tournament).
+//     all ten reference models in its tournament).
 // Both are what the live fit gave on 2026-11-23 (Generals: 2026-11-24). Models added later score against the same
-// constants and may land outside 35–65. Generals Elo is relative to its 19-network field (centered at 1000), so adding
+// constants and may land outside 35–65. Generals was explicitly re-normalized on 2026-11-24 after Carbon joined
+// the 20-network final. Other task constants remain unchanged. Generals Elo is relative (centered at 1000), so adding
 // entrants to that tournament re-fits everyone's Elo and needs new constants. To re-norm, compute new constants with
 // computeReference(); don't edit these silently.
 const REFERENCE_MODELS = [
@@ -151,7 +152,7 @@ const NORMS: Record<string, { mean: number; sd: number }> = {
   poke: { mean: 67.76, sd: 7.682994207989 },
   forecast: { mean: 0.2868, sd: 0.061315250958 },
   recipe8: { mean: -0.08217861795, sd: 0.239269587071 },
-  generals_t: { mean: 1135.477777777778, sd: 230.104400352815 },
+  generals_t: { mean: 1135.000000000000, sd: 221.360177087027 },
 };
 
 // Recompute the frozen constants from the data: the cell fit and task norms over the reference models only.
@@ -206,15 +207,15 @@ TASK_MAP.recipe8 = {
   scores: RECIPE_ALL,
 };
 
-// Generals: tournament Elo among the 19 networks of the Generals expansion (empty starter with an editable slow
-// simulator, network variant, 3 L40S-hours of research each; 4,608 games per network). Elo rather than the private
-// panel points, which bunch the top six within 89–93.
+// Generals: tournament Elo among the 20 networks of the Generals expansion (empty starter with an editable slow
+// simulator, network variant, 3 L40S-hours of research each; 4,864 games per network). Elo rather than the private
+// panel points, which bunch the leading networks on the scripted panel.
 const GENERALS = generalsRaw as unknown as {
   rows: { model: string; elo: number }[];
 };
 TASK_MAP.generals_t = {
   id: "generals_t",
-  name: "Generals, 19-network tournament",
+  name: "Generals, 20-network tournament",
   game: "Generals",
   unit: "tournament Elo (field centered at 1000)",
   sessions: 1,
