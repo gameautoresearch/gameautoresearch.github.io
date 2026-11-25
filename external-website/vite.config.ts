@@ -2,6 +2,7 @@ import { readdirSync, readFileSync } from "node:fs";
 import { defineConfig, type Plugin } from "vite";
 import react from "@vitejs/plugin-react";
 import { metaTags, PAGE } from "./src/meta";
+import { localHeroArt } from "./tools/heroArt";
 
 const pagesBase = process.env.PAGES_BASE_PATH;
 const vercelHost = process.env.VERCEL_PROJECT_PRODUCTION_URL;
@@ -50,7 +51,7 @@ function staticReplayPages(): Plugin {
 
 export default defineConfig({
   base: pagesBase ? `${pagesBase.replace(/\/$/, "")}/` : "/",
-  plugins: [react(), linkPreviews(), staticReplayPages()],
+  plugins: [react(), linkPreviews(), staticReplayPages(), localHeroArt()],
   // Pokémon Showdown's battle engine is one ~790 kB chunk, loaded only when a battle replay comes into view.
   build: { chunkSizeWarningLimit: 900 },
 });

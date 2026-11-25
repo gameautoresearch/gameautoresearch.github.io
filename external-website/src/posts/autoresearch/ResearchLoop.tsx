@@ -1,8 +1,11 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 import { useAgentView } from "../../view";
 import { modelStyle } from "./colors";
 import { useWidth } from "./Frontier13";
 import raw from "./polytopia13.json";
+import GpuCard from "./hero/GpuCard";
+import { artUrl, useHeroArt, type HeroArt, type PolyArt } from "./hero/art";
+import { drawPolytopiaBoard } from "./hero/polytopiaBoard";
 
 // Each scene opens with a quote from the session and shows its training runs and a match.
 //  - Polytopia: the empty-starter run (polytopia13.json, 20 models in one pooled fit; see Frontier13.tsx). Curves
@@ -128,13 +131,17 @@ function curve(x: number, y: number, w: number, h: number, a: number, b: number,
 // heatsink fins. Outside spending (and while the budget refills between scenes) the pile shows whole bills only.
 const BUDGET_USD = 14.5, BILLS = 15;
 const BILL_W = 72, BILL_H = 23;
-function Bill({ x, y, op = 1, sc = 1, seal }: { x: number; y: number; op?: number; sc?: number; seal?: boolean }) {
+function Bill({ x, y, op = 1, sc = 1, tilt = 0, curl = 0, seal }: {
+  x: number; y: number; op?: number; sc?: number; tilt?: number; curl?: number; seal?: boolean;
+}) {
   const w = BILL_W, h = BILL_H, g = "#2f9e5c";
   return (
-    <g transform={`translate(${x} ${y}) scale(${sc})`} opacity={op}>
-      <rect x={0} y={0} width={w} height={h} rx={2.6} fill="#e1f4e7" stroke={g} strokeWidth={1.05} />
+    <g transform={`translate(${x} ${y}) rotate(${tilt}) scale(${sc})`} opacity={op}>
+      {curl > 0
+        ? <path d={`M0 3Q0 0 3 0H53Q66 0 72 ${-curl}V${23 - curl * .7}Q64 23 53 23H3Q0 23 0 20Z`} fill="#e1f4e7" stroke={g} strokeWidth={1.05} strokeLinejoin="round" />
+        : <rect x={0} y={0} width={w} height={h} rx={2.6} fill="#e1f4e7" stroke={g} strokeWidth={1.05} /> }
       {seal && <>
-        <rect x={2.6} y={2.6} width={w - 5.2} height={h - 5.2} rx={1.4} fill="none" stroke={g} strokeWidth={0.75} opacity={0.75} />
+        <rect x={2.6} y={2.6} width={w - 5.2 - curl * 2} height={h - 5.2} rx={1.4} fill="none" stroke={g} strokeWidth={0.75} opacity={0.75} />
         <ellipse cx={w / 2} cy={h / 2} rx={11.5} ry={6.8} fill="none" stroke={g} strokeWidth={0.75} opacity={0.6} />
         <circle cx={w / 2} cy={h / 2} r={4.8} fill={g} />
         <text x={w / 2} y={h / 2 + 2.7} className="rl-seal" style={{ fontSize: 8 }}>$</text>
@@ -144,130 +151,38 @@ function Bill({ x, y, op = 1, sc = 1, seal }: { x: number; y: number; op?: numbe
   );
 }
 
-// Minimal line-art NVIDIA L40S PCIe card beside the budget stack: I/O bracket on the left, notched PCIe edge
-// connector underneath, clean shroud with L40S label, passive heatsink lines, and a status dot that lights up
-// while training runs are active.
-function GpuCard({ x, y, active, t, compact }: { x: number; y: number; active: boolean; t: number; compact: boolean }) {
-  const wave = (t / 520) % 1;
-  const fins = [20.5, 24.5, 28.5, 32.5, 36.5];
-  const pins = [36, 43, 50, 57, 64, 71];
-  const ink = "#5c5c57";
-  return (
-    <g transform={`translate(${x} ${y})`}>
-      {/* Minimal PCIe I/O bracket */}
-      <path
-        d="M1 4 H8.5 V48 H5.2 V6.6 H1 Z"
-        fill="#fff"
-        stroke={ink}
-        strokeWidth={1.05}
-        strokeLinejoin="round"
-      />
-
-      {/* Notched PCIe x16 edge connector */}
-      <rect x={18} y={43} width={10} height={5.5} rx={1} fill="#fff" stroke={ink} strokeWidth={1} />
-      <rect x={31} y={43} width={46} height={5.5} rx={1} fill="#fff" stroke={ink} strokeWidth={1} />
-      {pins.map((px) => (
-        <line key={px} x1={px} y1={44.5} x2={px} y2={48.2} stroke="#b6b6b0" strokeWidth={0.85} />
-      ))}
-
-      {/* Main line-art shroud */}
-      <rect
-        x={8.5}
-        y={7}
-        width={107}
-        height={36}
-        rx={2.5}
-        fill={active ? "#f6fbf7" : "#fafaf8"}
-        stroke={ink}
-        strokeWidth={1.05}
-      />
-      <line x1={8.5} y1={13.5} x2={115.5} y2={13.5} stroke="#ddddda" strokeWidth={0.9} />
-
-      {/* Passive heatsink lines */}
-      <rect x={70} y={17.5} width={40} height={21.5} rx={1.5} fill="#fff" stroke="#cfcfc9" strokeWidth={0.9} />
-      {fins.map((fy, i) => {
-        const dist = Math.abs(((i / fins.length) - wave + 1) % 1 - 0.5);
-        const lit = active ? Math.max(0, 1 - dist * 4) : 0;
-        return (
-          <line
-            key={fy}
-            x1={73.5}
-            y1={fy}
-            x2={106.5}
-            y2={fy}
-            stroke={lit > 0.2 ? "#2f9e5c" : "#c4c4be"}
-            strokeWidth={1}
-            opacity={lit > 0.2 ? 0.45 + lit * 0.55 : 0.9}
-          />
-        );
-      })}
-
-      {/* Shroud label */}
-      <text x={16} y={32} className="rl-gpu-model">L40S</text>
-
-      {/* Status LED */}
-      <circle
-        cx={108}
-        cy={10.3}
-        r={1.9}
-        fill={active ? "#2f9e5c" : "#fff"}
-        stroke={active ? "#2f9e5c" : "#a8a8a2"}
-        strokeWidth={1}
-      />
-
-      {/* Subtle compute pulses bridging from the GPU into the training runs column (wide layout only) */}
-      {!compact && active && [0, 1, 2].map((i) => {
-        const f = ((t / 520) + i / 3) % 1;
-        return (
-          <circle
-            key={i}
-            cx={122 + f * 12}
-            cy={29}
-            r={1.5}
-            fill="#2f9e5c"
-            opacity={Math.sin(f * Math.PI) * 0.8}
-          />
-        );
-      })}
-    </g>
-  );
-}
-
-function CashPile({ left, spending, x, cy, t, compact }: { left: number; spending: boolean; x: number; cy: number; t: number; compact: boolean }) {
-  // The pile sits a few px above the card centre so the spent bill drops into the GPU at a steeper angle.
+function CashPile({ left, spending, x, cy, t }: { left: number; spending: boolean; x: number; cy: number; t: number }) {
   const exact = left * BILLS, stackDy = 2.4, y = cy - BILL_H / 2 - 4;
   const px = x + 1;
-  const full = spending ? Math.floor(exact + 1e-6) : Math.round(exact), frac = spending ? exact - full : 0;
+  const full = spending ? Math.floor(exact + 1e-6) : Math.round(exact);
+  const progress = spending ? clamp(1 - (exact - full)) : 0;
   const bills: JSX.Element[] = [];
   for (let i = 0; i < full; i++) bills.push(<Bill key={i} x={px} y={y - i * stackDy} seal={i === full - 1} />);
-  // The bill being spent leaves the top of the pile, arcs right, and feeds directly into the NVIDIA L40S card.
-  let flying: JSX.Element | null = null;
-  if (frac > 0.001) {
-    const k = ease(1 - frac), sc = 1 - k * 0.55, startY = y - full * stackDy;
-    const endX = x + 114 - BILL_W * sc * 0.5;
-    const endY = cy - 12 - BILL_H * sc * 0.5;
-    const arcY = -Math.sin(k * Math.PI) * 7;
-    flying = (
-      <Bill
-        x={px + k * (endX - px)}
-        y={startY + k * (endY - startY) + arcY}
-        sc={sc}
-        op={Math.max(0, (1 - k) ** 1.15)}
-        seal
-      />
-    );
-  }
-  const labelY = 244;
+  const phase = progress ** 1.4;
+  const sc = 1 - phase * 0.70;
+  const startY = y - full * stackDy;
+  const endX = x + 128 - BILL_W * sc / 2, endY = 190 - BILL_H * sc / 2;
+  const intake = progress > .68 ? Math.sin(Math.PI * (progress - .68) / .32) : 0;
   return (
     <g>
       <rect x={px} y={y} width={BILL_W} height={BILL_H} rx={2.6} fill="#f7faf8" stroke="#d8e6dd" strokeDasharray="3 2.5" />
       {bills}
-      <GpuCard x={x + 92} y={175} active={spending} t={t} compact={compact} />
-      {flying}
-      <text x={px + BILL_W / 2} y={labelY} className="rl-small" textAnchor="middle">
+      <GpuCard x={x + 91} y={168} active={spending} t={t} intake={intake} />
+      {progress > 0 && progress < 1 && (
+        <Bill
+          x={px + phase * (endX - px)}
+          y={startY + phase * (endY - startY) - Math.sin(progress * Math.PI) * 21}
+          sc={sc}
+          tilt={Math.sin(progress * Math.PI) * (progress * 62 - 14)}
+          curl={Math.sin(progress * Math.PI) * 7}
+          op={1 - clamp((progress - .78) / .22)}
+          seal
+        />
+      )}
+      <text x={px + BILL_W / 2} y={244} className="rl-small" textAnchor="middle">
         budget <tspan className="rl-amount">${(BUDGET_USD * left).toFixed(2)}</tspan>
       </text>
-      <text x={x + 152} y={labelY} className="rl-small" textAnchor="middle">Modal NVIDIA L40S</text>
+      <text x={x + 152} y={244} className="rl-small" textAnchor="middle">Modal NVIDIA L40S</text>
     </g>
   );
 }
@@ -280,7 +195,23 @@ const shapeOf = (label: string): Shape => (/^GPT/.test(label) ? "blob" : /^Gemin
 type Mood = "talk" | "think" | "watch" | "happy" | "sad" | "frozen";
 const GAZE: Record<Mood, [number, number]> = { talk: [-0.35, -0.85], think: [0.55, -0.95], watch: [0.9, -0.15], happy: [0, 0], sad: [-0.15, 0.8], frozen: [0, 0] };
 
+// The prototype's short editorial cues lead into Neon's recorded breakthrough quote.
+const NEON_CUES: { at: number; text: string; mood: Mood }[] = [
+  { at: 0, text: "Baseline below the starter. Let’s run quick probes.", mood: "think" },
+  { at: 780, text: "Look for a stronger training recipe.", mood: "watch" },
+  { at: 1550, text: "Prune the weaker run.", mood: "sad" },
+  { at: 2160, text: "Commit the remaining budget to a long run.", mood: "watch" },
+];
+const NEON_REACTION = 3450;
+const neonCue = (t: number) => NEON_CUES.reduce((current, cue) => t >= cue.at ? cue : current);
+
 function moodAt(s: Scene, t: number): { mood: Mood; since: number; prev: Mood } {
+  if (s.key === "gem4n") {
+    if (t >= NEON_REACTION) return { mood: "happy", since: t - NEON_REACTION, prev: "watch" };
+    const cue = neonCue(t);
+    const since = t - cue.at;
+    return { mood: since < 235 && cue.at > 0 ? "talk" : cue.mood, since, prev: "watch" };
+  }
   const tm = timing(s);
   const seq: [number, Mood][] = [];
   const push = (at: number, mood: Mood) => {
@@ -318,13 +249,19 @@ function headPath(shape: Shape, R: number, t: number, mood: Mood) {
 }
 
 function Avatar({ s, t, color, x, y, R = 24, seed }: { s: Scene; t: number; color: string; x: number; y: number; R?: number; seed: number }) {
+  const gradient = useId();
   const shape = shapeOf(labelOf(s));
   const { mood, since, prev } = moodAt(s, t);
   const k = ease(clamp(since / 380));
   let gx = GAZE[prev][0] + (GAZE[mood][0] - GAZE[prev][0]) * k, gy = GAZE[prev][1] + (GAZE[mood][1] - GAZE[prev][1]) * k;
   if (mood === "watch") { gy += Math.sin(t / 650) * 0.25; gx += Math.sin(t / 1100 + seed) * 0.1; }
-  const blink = (t + seed * 977) % 3400 < 120 && mood !== "happy" && mood !== "frozen";
-  const bob = mood === "happy" ? -Math.abs(Math.sin(t / 220)) * 4 : mood === "sad" ? 3 : Math.sin(t / 650) * 1.5;
+  const blink = (t + 640 + seed * 977) % 3400 < 120 && mood !== "happy" && mood !== "frozen";
+  const bob = mood === "happy"
+    ? -2 - Math.abs(Math.sin(since / 128)) * 7 * Math.exp(-since / 1250)
+    : mood === "sad" ? 2 : Math.sin(t / 295) * 2;
+  const shake = mood === "sad" ? Math.sin(since / 21) * (1 - clamp(since / 420)) * 3 : 0;
+  const highlight = tint(color, .72);
+  const face = headPath(shape, R, t, mood);
   const fc: Record<Shape, [number, number, number]> = { blob: [0, 0, 0.95], hex: [0, 0, 0.95], pawn: [0, -R * 0.42, 0.72], monitor: [0, -R * 0.05, 0.95] };
   const [fx, fy, sc] = fc[shape];
   const ex = gx * R * 0.15, ey = gy * R * 0.1, dx = R * 0.33 * sc, w = R * 0.15 * sc, h = R * 0.23 * sc;
@@ -337,14 +274,27 @@ function Avatar({ s, t, color, x, y, R = 24, seed }: { s: Scene; t: number; colo
   });
   const my = R * 0.38 * sc + ey * 0.5, mx = ex * 0.5, mw = R * 0.12 * sc, lw = R * 0.065 * sc;
   const mouth = mood === "talk"
-    ? <ellipse cx={mx} cy={my} rx={mw} ry={Math.abs(Math.sin(t / 90)) * R * 0.08 * sc + 1} fill="#fff" />
+    ? <ellipse cx={mx} cy={my} rx={mw} ry={Math.abs(Math.sin(t / 45)) * R * 0.15 * sc + 1} fill="#fff" />
     : mood === "happy" ? <path d={`M${mx - mw * 1.4} ${my - 2}q${mw * 1.4} ${mw * 1.7} ${mw * 2.8} 0`} stroke="#fff" strokeWidth={lw} fill="none" strokeLinecap="round" />
     : mood === "sad" ? <path d={`M${mx - mw * 1.2} ${my + 3}q${mw * 1.2} ${-mw * 1.1} ${mw * 2.4} 0`} stroke="#fff" strokeWidth={lw} fill="none" strokeLinecap="round" />
     : <path d={`M${mx - mw} ${my}h${mw * 2}`} stroke="#fff" strokeWidth={lw} strokeLinecap="round" />;
   return (
     <g>
-      <g transform={`translate(${x} ${y + bob})`}>
-        <path d={headPath(shape, R, t, mood)} fill={color} fillRule="evenodd" />
+      <defs>
+        <linearGradient id={gradient} x1="12%" y1="0" x2="83%" y2="100%">
+          <stop stopColor={highlight} />
+          <stop offset=".5" stopColor={color} />
+          <stop offset="1" stopColor={color} stopOpacity=".83" />
+        </linearGradient>
+      </defs>
+      <ellipse cx={x} cy={y + R + 4} rx={R * .67 + bob * .3} ry={3} fill={color} opacity={.13 + bob * .008} />
+      {mood === "happy" && since < 1700 && [[-29, -8], [26, -22], [-20, 14], [1, -30]].map(([dx, dy], i) => {
+        const pop = ease(clamp(since / 330));
+        return <path key={i} d={star4(x + dx * pop, y + dy * pop, (3 + i % 2) * pop)} fill={i % 2 ? color : GOOD} opacity={1 - clamp((since - 700) / 1000)} />;
+      })}
+      <g transform={`translate(${x + shake} ${y + bob})`}>
+        <path d={face} fill={`url(#${gradient})`} fillRule="evenodd" />
+        <path d={face} fill="none" stroke="#fff" strokeWidth="1.15" opacity=".45" transform="scale(.91)" />
         <g transform={`translate(${fx} ${fy})`}>{eyes}{mouth}</g>
       </g>
       {mood === "think" && [0, 1, 2].map((i) => <circle key={i} cx={x + R * 1.3 + i * 6} cy={y - R * 0.9} r={2.2} fill="#b0b0ab" opacity={i < Math.floor(t / 300) % 4 ? 1 : 0.25} />)}
@@ -358,16 +308,23 @@ const tint = (hex: string, a: number) => {
   return `rgb(${[n >> 16, (n >> 8) & 255, n & 255].map((v) => Math.round(255 - (255 - v) * a)).join(",")})`;
 };
 
-function Agent({ s, t, color, compact, out }: { s: Scene; t: number; color: string; compact: boolean; out: number }) {
+function Agent({ s, t, color, out }: { s: Scene; t: number; color: string; out: number }) {
   const tm = timing(s);
-  const lines = wrap(`“${s.quote}”`, 28);
-  const typed = Math.max(2, Math.ceil(clamp(t / tm.say1) * lines.join(" ").length));
+  const isNeon = s.key === "gem4n";
+  const reaction = isNeon && t >= NEON_REACTION;
+  const cue = isNeon && !reaction ? neonCue(t) : null;
+  const lines = wrap(cue?.text ?? `“${s.quote}”`, 28);
+  const age = reaction ? t - NEON_REACTION : cue ? t - cue.at : t;
+  const fraction = cue?.at === 0 ? 1 : isNeon ? .46 + .54 * clamp(age / 370) : clamp(age / tm.say1);
+  const typed = Math.max(2, Math.ceil(fraction * lines.join(" ").length));
   let left = typed;
   const shown = lines.map((l) => { const part = l.slice(0, Math.max(0, left)); left -= l.length + 1; return part; });
   // Fit longer quotes above the same avatar and GPU budget area.
+  const pop = clamp(age / 250);
+  const bubbleScale = 1 - .065 * (1 - pop) ** 2 * Math.cos(pop * 5);
   const longQuote = lines.length > 3;
   const lh = longQuote ? 13 : 19;
-  const bh = Math.max(58, (longQuote ? 14 : 22) + lines.length * lh), by = 8;
+  const bh = isNeon ? 79 : Math.max(58, (longQuote ? 14 : 22) + lines.length * lh), by = 8;
   const textY0 = by + (bh - (lines.length - 1) * lh) / 2 + 5;
   const botY = by + bh + 14;
   const label = labelOf(s);
@@ -388,15 +345,17 @@ function Agent({ s, t, color, compact, out }: { s: Scene; t: number; color: stri
   return (
     <g>
       <g opacity={op}>
-        <rect x={0} y={by} width={214} height={bh} rx={12} fill={tint(color, 0.13)} />
-        <path d={`M30 ${by + bh - 1}l8 12l14-12z`} fill={tint(color, 0.13)} />
-        {shown.map((l, i) => (
-          <text key={i} x={14} y={textY0 + i * lh} className="rl-say" style={longQuote ? { fontSize: 13 } : undefined}>{l}</text>
-        ))}
+        <g transform={`translate(40 ${by + bh}) scale(${bubbleScale}) translate(-40 ${-by - bh})`}>
+          <path d={`M12 ${by}H202Q214 ${by} 214 ${by + 12}V${by + bh - 12}Q214 ${by + bh} 202 ${by + bh}H52L38 ${by + bh + 10}L30 ${by + bh}H12Q0 ${by + bh} 0 ${by + bh - 12}V${by + 12}Q0 ${by} 12 ${by}Z`}
+            fill={tint(color, .13)} stroke={tint(color, .21)} strokeWidth=".7" />
+          {shown.map((l, i) => (
+            <text key={i} x={14} y={textY0 + i * lh} className="rl-say" style={longQuote ? { fontSize: 13 } : undefined}>{l}</text>
+          ))}
+        </g>
         <Avatar s={s} t={t} color={color} x={40} y={botY + 26} R={25} seed={SCENES.indexOf(s)} />
         <text x={78} y={botY + 31} className="rl-name">{label}</text>
       </g>
-      <CashPile left={remain} spending={spending} x={0} cy={213} t={t} compact={compact} />
+      <CashPile left={remain} spending={spending} x={0} cy={213} t={t} />
     </g>
   );
 }
@@ -419,11 +378,15 @@ function RunMark({ x, y, ok, big }: { x: number; y: number; ok: boolean; big?: b
 }
 
 function Runs({ s, t, out, refOp }: { s: Scene; t: number; out: number; refOp: number }) {
+  const gradient = useId();
   const x = 0, y = 22, w = 196, h = 176;
   const p = plan(s);
   const tm = timing(s);
   const { y: yf, ref, base } = SCALE[s.game];
   const fadeOp = 1 - ease(out);
+  const area = (pts: string[], color: string) =>
+    <polygon points={`${pts.join(" ")} ${pts[pts.length - 1].split(",")[0]},${y + h} ${pts[0].split(",")[0]},${y + h}`}
+      fill={`url(#${gradient}-${color})`} />;
   const testDur = (tm.tests1 - tm.runs0) / p.tests.length;
   // Compare each run against the best score achieved before it (starting from the game's baseline).
   let bestSoFar = base;
@@ -442,6 +405,7 @@ function Runs({ s, t, out, refOp }: { s: Scene; t: number; out: number; refOp: n
     const stroke = done ? (ok ? GOOD : BAD) : "#8e8e89";
     return (
       <g key={i}>
+        {area(pts, done ? ok ? "good" : "bad" : "pending")}
         <polyline points={pts.join(" ")} fill="none" stroke={stroke} strokeWidth={1.7} strokeLinejoin="round" />
         {done ? <RunMark x={+end[0]} y={+end[1]} ok={ok} /> : <circle cx={end[0]} cy={end[1]} r={2.5} fill={stroke} />}
       </g>
@@ -456,7 +420,18 @@ function Runs({ s, t, out, refOp }: { s: Scene; t: number; out: number; refOp: n
   const barY = y + h + 8, barH = 18;
   return (
     <g>
+      <defs>
+        {[["good", GOOD], ["bad", BAD], ["pending", "#8e8e89"]].map(([name, color]) => (
+          <linearGradient key={name} id={`${gradient}-${name}`} x2="0" y2="100%">
+            <stop stopColor={color} stopOpacity=".22" />
+            <stop offset="1" stopColor={color} stopOpacity=".01" />
+          </linearGradient>
+        ))}
+      </defs>
       <text x={x} y={16} className="rl-small">policy strength</text>
+      {[.25, .5, .75, 1].map((step) => (
+        <path key={step} d={`M${x} ${y + h * (1 - step)}h${w}`} stroke="#efefec" />
+      ))}
       <line x1={x} y1={y + h} x2={x + w} y2={y + h} stroke="#d6d6d2" />
       <line x1={x} y1={y} x2={x} y2={y + h} stroke="#d6d6d2" />
       <g opacity={refOp}>
@@ -464,6 +439,7 @@ function Runs({ s, t, out, refOp }: { s: Scene; t: number; out: number; refOp: n
       </g>
       <g opacity={fadeOp}>
       {runs}
+      {hero && area(hero, heroDone ? heroOk ? "good" : "bad" : "pending")}
       {hero && <polyline points={hero.join(" ")} fill="none" stroke={heroStroke} strokeWidth={2.5} strokeLinejoin="round" />}
       {hero && (() => {
         const e = hero[hero.length - 1].split(",");
@@ -502,6 +478,11 @@ function Net({ x, y, color, state, spin }: { x: number; y: number; color: string
   return (
     <g transform={`translate(${x} ${y})`} opacity={op}>
       {E.map(([a, b], i) => <line key={i} x1={P[a][0]} y1={P[a][1]} x2={P[b][0]} y2={P[b][1]} stroke={color} strokeWidth={0.9} />)}
+      {state === "lit" && E.filter((_, i) => i % 2 === 0).map(([a, b], i) => {
+        const phase = (spin * 14 + i / 7) % 1;
+        return <circle key={i} cx={P[a][0] + (P[b][0] - P[a][0]) * phase} cy={P[a][1] + (P[b][1] - P[a][1]) * phase}
+          r="1.7" fill={color} opacity={Math.sin(phase * Math.PI)} />;
+      })}
       {P.map(([a, b], i) => <circle key={i} cx={a} cy={b} r={3.8} fill={state === "lit" && (i + Math.floor(spin * 6)) % 3 === 0 ? color : "#fff"} stroke={color} strokeWidth={1.5} />)}
       {state === "lit" && <circle cx={14} cy={18} r={24} fill="none" stroke={color} strokeWidth={1.2} strokeDasharray="3 4" transform={`rotate(${spin * 120} 14 18)`} />}
     </g>
@@ -620,6 +601,31 @@ function PolyBoard({ g, winner, pieces }: BoardProps) {
       <path d={`M${rx} ${midY}L${cx} ${botY}V${botY + slab}L${rx} ${midY + slab}Z`} fill="#dce3d6" />
       {tiles}
       {props.map(([, el]) => el)}
+    </g>
+  );
+}
+
+// Reuse the editorial animation's composed sprite board. It plays across both
+// training and evaluation, while the chart keeps the site's original session scores.
+function SpritePolyBoard({ art, t, opponentWins }: { art: PolyArt; t: number; opponentWins: boolean }) {
+  const board = useRef<SVGGElement>(null);
+  const shadowId = useId();
+  const frame = Math.round(t * 30) / 30;
+  useLayoutEffect(() => {
+    const root = board.current;
+    if (!root) return;
+    const next = document.createElementNS(root.namespaceURI, "g") as SVGGElement;
+    drawPolytopiaBoard(next, frame, art, opponentWins, shadowId);
+    root.replaceChildren(next);
+  }, [art, frame, opponentWins, shadowId]);
+  return (
+    <g transform="translate(85 107) scale(.317) translate(-1564 -532)">
+      <defs>
+        <filter id={shadowId} x="-30%" y="-35%" width="160%" height="170%">
+          <feDropShadow dx="0" dy="8" stdDeviation="12" floodColor="#1d2939" floodOpacity=".16" />
+        </filter>
+      </defs>
+      <g ref={board} />
     </g>
   );
 }
@@ -765,7 +771,10 @@ function HpBar({ x, y, v, label, dot }: { x: number; y: number; v: number; label
     </g>
   );
 }
-function PokeBoard({ g, winner, pieces }: BoardProps) {
+function PokeBoard({ g, winner, pieces, art, luna }: BoardProps & { art: boolean; luna: boolean }) {
+  const clip = useId();
+  const myName = luna ? "Entei" : "Houndoom";
+  const oppName = luna ? "Decidueye" : "Groudon";
   // Six exchanges; the side that loses an exchange takes the bigger hit. Health resets with `pieces` → 0.
   const turns = 6, k = g * turns, turn = Math.min(turns - 1, Math.floor(k)), within = k - turn;
   const dmg = (side: 1 | 2, upto: number) => {
@@ -789,25 +798,55 @@ function PokeBoard({ g, winner, pieces }: BoardProps) {
   return (
     <g>
       <rect x={8} y={84} width={154} height={142} rx={6} fill="#f4f8f5" stroke="#dce5d8" />
+      {art ? (
+        <>
+          <defs><clipPath id={clip}><rect x={8} y={84} width={154} height={142} rx={6} /></clipPath></defs>
+          <image data-board-art="pokemon" href={artUrl("pokemon", luna ? "bg-forest.jpg" : "bg-meadow.jpg")}
+            x={8} y={84} width={154} height={142} preserveAspectRatio="xMidYMid slice" clipPath={`url(#${clip})`} />
+        </>
+      ) : <>
       <path d="M8.5 148H161.5V220a5.5 5.5 0 0 1-5.5 5.5H14a5.5 5.5 0 0 1-5.5-5.5Z" fill="#ebf3e7" />
       <ellipse cx={120} cy={136} rx={29} ry={7.5} fill="#dbe7d2" stroke="#cddcc3" strokeWidth={0.7} />
       <ellipse cx={120} cy={135.5} rx={13} ry={3} fill="#bfd0b5" opacity={fainted(hpOpp)} />
       <ellipse cx={50} cy={204} rx={35} ry={8.5} fill="#dbe7d2" stroke="#cddcc3" strokeWidth={0.7} />
       <ellipse cx={50} cy={203.5} rx={16} ry={3.5} fill="#bfd0b5" opacity={fainted(hpMe)} />
-      <HpBar x={14} y={92} v={hpOpp} label="opponent" dot={M} />
-      <HpBar x={90} y={170} v={hpMe} label="trained policy" dot={C} />
-      <g opacity={fainted(hpOpp)}><Critter x={120} y={122} s={0.95} color={M} kind="bun" hurt={hurtOpp} attack={attackOpp} /></g>
-      <g opacity={fainted(hpMe)}><Critter x={50} y={187} s={1.15} color={C} kind="fox" flip hurt={hurtMe} attack={attackMe} /></g>
+      </>}
+      {art ? (
+        <>
+          <ShowdownSprite file={luna ? "decidueye.png" : "groudon.png"} x={91} y={92} size={61} side={2} hp={hpOpp} attack={attackOpp} hurt={hurtOpp} />
+          <ShowdownSprite file={luna ? "entei.png" : "houndoom-f.png"} x={10} y={144} size={81} side={1} hp={hpMe} attack={attackMe} hurt={hurtMe} />
+        </>
+      ) : (
+        <>
+          <g opacity={fainted(hpOpp)}><Critter x={120} y={122} s={0.95} color={M} kind="bun" hurt={hurtOpp} attack={attackOpp} /></g>
+          <g opacity={fainted(hpMe)}><Critter x={50} y={187} s={1.15} color={C} kind="fox" flip hurt={hurtMe} attack={attackMe} /></g>
+        </>
+      )}
+      <HpBar x={14} y={92} v={hpOpp} label={art ? oppName : "opponent"} dot={M} />
+      <HpBar x={90} y={189} v={hpMe} label={art ? myName : "trained policy"} dot={C} />
       {live && pieces > 0.5 && <AttackFx attacker={attacker} within={within} />}
     </g>
   );
+}
+
+function ShowdownSprite({ file, x, y, size, side, hp, attack, hurt }: {
+  file: string; x: number; y: number; size: number; side: 1 | 2; hp: number; attack: number; hurt: number;
+}) {
+  const step = Math.sin(attack * Math.PI) * (side === 1 ? 1 : -1);
+  const shake = hurt ? Math.sin(hurt * 55) * 3 : 0;
+  const alive = clamp(hp / .07);
+  return <image href={artUrl("pokemon", file)} x={x + 8 * step + shake} y={y - 5 * step + (1 - alive) * 7}
+    width={size} height={size} preserveAspectRatio="xMidYMax meet" opacity={(.16 + .84 * alive) * (hurt ? .8 : 1)} />;
 }
 
 // Generals-style grid: each side's land spreads from its general, army counts on its cells, mountains fixed.
 const GRID = { cols: 7, rows: 6, cell: 22, x: 8, y: 90 };
 const MOUNTAINS = new Set(["1,2", "2,4", "3,1", "4,3", "2,2"]);
 const CITIES = new Set(["1,5", "4,1"]);
-function GenBoard({ g, winner, pieces }: BoardProps) {
+function GenBoard({ g, winner, pieces, art }: BoardProps & { art: boolean }) {
+  const icon = (file: string, x: number, y: number) => (
+    <image href={artUrl("generals", file)} x={x} y={y} width={GRID.cell} height={GRID.cell} />
+  );
   const { cols, rows, cell, x: gx, y: gy } = GRID;
   const me: [number, number] = [rows - 1, 0], opp: [number, number] = [0, cols - 1];
   const e = ease(g) * pieces;
@@ -817,7 +856,8 @@ function GenBoard({ g, winner, pieces }: BoardProps) {
   for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) {
     const id = `${r},${c}`, x = gx + c * cell, y = gy + r * cell;
     if (MOUNTAINS.has(id)) {
-      cells.push(<g key={id}><rect x={x} y={y} width={cell} height={cell} fill="#e4e4e0" stroke="#fff" /><path d={`M${x + 4} ${y + cell - 5}l5.5 -9l5.5 9z`} fill="#b9b9b4" /></g>);
+      cells.push(<g key={id}><rect x={x} y={y} width={cell} height={cell} fill={art ? "#8d9295" : "#e4e4e0"} stroke="#fff" />
+        {art ? icon("mountainie.png", x, y) : <path d={`M${x + 4} ${y + cell - 5}l5.5 -9l5.5 9z`} fill="#b9b9b4" />}</g>);
       continue;
     }
     const dMe = Math.abs(r - me[0]) + Math.abs(c - me[1]), dOpp = Math.abs(r - opp[0]) + Math.abs(c - opp[1]);
@@ -829,7 +869,7 @@ function GenBoard({ g, winner, pieces }: BoardProps) {
     cells.push(
       <g key={id}>
         <rect x={x} y={y} width={cell} height={cell} fill={o === 1 ? "#cfeaf5" : o === 2 ? "#f8d3e5" : "#f1f1ee"} stroke="#fff" />
-        {CITIES.has(id) && <rect x={x + 4} y={y + 4} width={cell - 8} height={cell - 8} rx={1.5} fill="none" stroke={o === 1 ? C : o === 2 ? M : "#b9b9b4"} strokeWidth={1.2} />}
+        {CITIES.has(id) && (art ? <g opacity={o ? .65 : .95}>{icon("citie.png", x, y)}</g> : <rect x={x + 4} y={y + 4} width={cell - 8} height={cell - 8} rx={1.5} fill="none" stroke={o === 1 ? C : o === 2 ? M : "#b9b9b4"} strokeWidth={1.2} />)}
         {o > 0 && pieces > 0.05 && !(r === me[0] && c === me[1]) && !(r === opp[0] && c === opp[1]) && (
           <text x={x + cell / 2} y={y + cell / 2 + 3.5} className="rl-army" opacity={pieces} fill={o === 1 ? "#0b6f95" : "#a3125f"}>{army}</text>
         )}
@@ -840,6 +880,10 @@ function GenBoard({ g, winner, pieces }: BoardProps) {
   const lostMe = winner === 2 && g >= 1 && pieces > 0.5, lostOpp = winner === 1 && g >= 1 && pieces > 0.5;
   const crown = ([r, c]: [number, number], color: string, k: string) => {
     const x = gx + c * cell + cell / 2, y = gy + r * cell + cell / 2;
+    if (art) return <g key={k} data-board-art="generals">
+      <rect x={x - cell / 2} y={y - cell / 2} width={cell} height={cell} fill={color} stroke="#fff" />
+      {icon("crownie.png", x - cell / 2, y - cell / 2)}
+    </g>;
     return <path key={k} d={`M${x - 6} ${y + 4}l0 -7l3 3l3 -5l3 5l3 -3l0 7z`} fill={color} stroke="#fff" strokeWidth={0.8} />;
   };
   return (
@@ -852,17 +896,16 @@ function GenBoard({ g, winner, pieces }: BoardProps) {
   );
 }
 
-const BOARDS: Record<Game, (p: BoardProps) => JSX.Element> = { polytopia: PolyBoard, pokemon: PokeBoard, generals: GenBoard };
-
-function Match({ s, t, out, boardOp }: { s: Scene; t: number; out: number; boardOp: number }) {
+function Match({ s, t, out, boardOp, art }: { s: Scene; t: number; out: number; boardOp: number; art: HeroArt }) {
   const tm = timing(s);
   const g = clamp((t - tm.hero1) / (tm.game1 - tm.hero1));
-  const playing = g > 0 && out < 0.5;
+  const playing = t >= tm.runs0 && out < 0.5;
   const winner = s.strong ? 1 : s.mid ? 0 : 2;
   const pieces = 1 - ease(out);
   // While the scene ends the match runs backwards to its setup, so a following scene of the same game starts clean.
   const gEff = g * pieces;
-  const Board = BOARDS[s.game];
+  const board = { g: gEff, winner, pieces } as const;
+  const polyTime = (t < tm.hero1 ? 5.35 * clamp(t / tm.hero1) : 5.35 + 3.55 * g) * pieces;
   const resultOn = t > tm.hero1 + (tm.game1 - tm.hero1) * 0.7;
   const lines = wrap(s.result, 30);
   const spin = (t % 6800) / 6800;
@@ -871,8 +914,14 @@ function Match({ s, t, out, boardOp }: { s: Scene; t: number; out: number; board
       <text x={44} y={17} className="rl-head" textAnchor="middle">Trained policy</text>
       <text x={128} y={17} className="rl-head" textAnchor="middle">Opponent</text>
       <Net x={30} y={32} color={C} state={playing ? (s.strong || s.mid ? "lit" : "dim") : "idle"} spin={spin} />
-      <Net x={114} y={32} color={M} state={playing && !s.strong ? "lit" : "idle"} spin={spin} />
-      <g opacity={boardOp}><Board g={gEff} winner={winner} pieces={pieces} /></g>
+      <Net x={114} y={32} color={M} state={playing ? (g > .8 && s.strong ? "dim" : "lit") : "idle"} spin={spin} />
+      <g opacity={boardOp}>
+        {s.game === "polytopia" && (art.polytopia
+          ? <SpritePolyBoard art={art.polytopia} t={polyTime} opponentWins={winner === 2} />
+          : <PolyBoard {...board} />)}
+        {s.game === "pokemon" && <PokeBoard {...board} art={art.pokemon} luna={s.key === "luna-poke"} />}
+        {s.game === "generals" && <GenBoard {...board} art={art.generals} />}
+      </g>
       {!resultOn && (
         <text x={85} y={244} className="rl-small" textAnchor="middle" opacity={boardOp}>{GAME_NAME[s.game]}</text>
       )}
@@ -885,14 +934,17 @@ function Match({ s, t, out, boardOp }: { s: Scene; t: number; out: number; board
 
 export default function ResearchLoop() {
   const agent = useAgentView();
+  const art = useHeroArt(!agent);
   const ref = useRef<HTMLDivElement>(null);
   const W = useWidth(ref), narrow = W < 520;
   // ?rl=SCENE,MS freezes the loop at that scene and time (for reviewing frames).
-  const frozen = typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("rl")?.split(",").map(Number) : undefined;
-  const reduce = !!frozen || (typeof window !== "undefined" && !!window.matchMedia?.("(prefers-reduced-motion: reduce)").matches);
+  const checkpoint = typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("rl")?.split(",").map(Number) : undefined;
+  const frozen = checkpoint && Number.isInteger(checkpoint[0]) && checkpoint[0] >= 0 && checkpoint[0] < SCENES.length && Number.isFinite(checkpoint[1]);
+  const reduce = typeof window !== "undefined" && !!window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+  const [playing, setPlaying] = useState(!frozen && !reduce);
   const [{ scene, t }, setFrame] = useState({
-    scene: frozen ? frozen[0] % SCENES.length : 0,
-    t: frozen ? frozen[1] ?? 0 : reduce ? T.out : 0,
+    scene: frozen ? checkpoint[0] : 0,
+    t: frozen ? clamp(checkpoint[1], 0, SCENE_MS) : reduce ? T.out : 0,
   });
   const [visible, setVisible] = useState(true);
 
@@ -905,7 +957,7 @@ export default function ResearchLoop() {
   }, []);
 
   useEffect(() => {
-    if (reduce || !visible || agent) return;
+    if (!playing || !visible || agent) return;
     let raf = 0, last = performance.now();
     const tick = (now: number) => {
       const dt = Math.min(100, now - last);
@@ -919,7 +971,7 @@ export default function ResearchLoop() {
     };
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
-  }, [reduce, visible, agent]);
+  }, [playing, visible, agent]);
 
   if (agent) {
     return (
@@ -939,7 +991,7 @@ export default function ResearchLoop() {
   const boardOp = Math.min(prev.game === s.game ? 1 : into, next.game === s.game ? 1 : 1 - ease(out));
   const hasRef = (x: Scene) => (SCALE[x.game].ref === null ? 0 : 1);
   const refOp = hasRef(s) * Math.min(hasRef(prev) ? 1 : into, hasRef(next) ? 1 : 1 - ease(out));
-  const go = (i: number) => setFrame({ scene: i, t: reduce ? T.out : 0 });
+  const go = (i: number) => setFrame({ scene: i, t: playing ? 0 : T.out });
   const vb = narrow ? "0 0 388 518" : "0 0 632 262";
   const place = narrow
     ? { agent: "translate(85 0)", runs: "translate(6 258)", game: "translate(214 258)" }
@@ -948,10 +1000,17 @@ export default function ResearchLoop() {
     <div className="rl" ref={ref}>
       <svg viewBox={vb} role="img" aria-label={`${labelOf(s)} researching ${GAME_NAME[s.game]} on an NVIDIA L40S GPU rented from Modal: “${s.quote}” ${s.result}.`}
         onClick={() => go((scene + 1) % SCENES.length)}>
-        <g transform={place.agent}><Agent s={s} t={t} color={color} compact={narrow} out={out} /></g>
+        <g transform={place.agent}><Agent s={s} t={t} color={color} out={out} /></g>
         <g transform={place.runs}><Runs s={s} t={t} out={out} refOp={refOp} /></g>
-        <g transform={place.game}><Match s={s} t={t} out={out} boardOp={boardOp} /></g>
+        <g transform={place.game}><Match s={s} t={t} out={out} boardOp={boardOp} art={art} /></g>
       </svg>
+      <div className="rl-controls" aria-label="Hero animation controls" role="group">
+        <button type="button" onClick={() => setPlaying(!playing)}>{playing ? "Pause" : "Play"}</button>
+        {(Object.keys(GAME_NAME) as Game[]).map((game) => (
+          <button key={game} type="button" aria-pressed={s.game === game}
+            onClick={() => go(SCENES.findIndex((entry) => entry.game === game))}>{GAME_NAME[game]}</button>
+        ))}
+      </div>
     </div>
   );
 }
