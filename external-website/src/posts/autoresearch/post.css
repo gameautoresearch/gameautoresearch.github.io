@@ -121,9 +121,9 @@ html.agent-view .ar h2.ar-config { margin-top: 2em; padding-top: 0; border-top: 
   border-radius: 4px;
   background: #fff;
 }
-.ar-sf-model {
-  border-color: #c8e7f4;
-  background: #f8fcfe;
+.ar-sf-single {
+  max-width: 480px;
+  margin: 4px auto 20px;
 }
 .ar-sf-recipe {
   border-color: #f3cbe0;
@@ -307,7 +307,7 @@ html.agent-view .ar h2.ar-config { margin-top: 2em; padding-top: 0; border-top: 
 .fr { position: relative; }
 .fr svg { display: block; width: 100%; height: auto; overflow: visible; }
 .fr-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 6px 12px; margin-bottom: 8px; }
-.fr-title { font-size: 14px; font-weight: 600; color: var(--ink); line-height: 1.3; }
+.fr-title { font-size: 15px; font-weight: 600; color: var(--ink); line-height: 1.3; }
 .fr-pin-chip {
   display: inline-flex; align-items: center; gap: 6px;
   padding: 2px 8px; border: 1px solid #d8d8d3; border-radius: 999px;
@@ -321,7 +321,7 @@ html.agent-view .ar h2.ar-config { margin-top: 2em; padding-top: 0; border-top: 
 .fr-ref-line { stroke: #9d9d96; stroke-width: 1.1; stroke-dasharray: 4 3; }
 .fr-ref-lbl {
   fill: #4f4f4a;
-  font-size: 12px;
+  font-size: 13.5px;
   font-weight: 500;
   paint-order: stroke;
   stroke: #fff;
@@ -329,11 +329,12 @@ html.agent-view .ar h2.ar-config { margin-top: 2em; padding-top: 0; border-top: 
   stroke-linejoin: round;
 }
 .fr-direct-item { cursor: pointer; }
-.fr-lbl { font-size: 11.5px; font-variant-numeric: tabular-nums; }
-.fr-lbl-pct { fill: var(--secondary); font-size: 11px; font-weight: 500; }
-.fr-pack-lbl { fill: var(--secondary); font-size: 11px; font-weight: 500; }
-.fr-pack-sub { fill: var(--viz-axis); font-size: 10px; }
-.fr-compact-key { margin-bottom: 6px; gap: 4px 12px; font-size: 11.5px; }
+.fr-axis { fill: #6b6b66; font-size: 13px; font-variant-numeric: tabular-nums; }
+.fr-axis-title { fill: #3a3a36; font-size: 13.5px; font-weight: 500; }
+.fr-lbl { font-size: 13.5px; font-variant-numeric: tabular-nums; }
+.fr-pack-lbl { fill: var(--secondary); font-size: 13px; font-weight: 500; }
+.fr-pack-sub { fill: var(--viz-axis); font-size: 12px; }
+.fr-compact-key { margin-bottom: 6px; gap: 4px 12px; font-size: 13px; }
 .fr-compact-others { color: var(--viz-axis); }
 .fr-tip-head { display: flex !important; align-items: center; gap: 6px; }
 .fr-tip-head i { flex: none; width: 8px; height: 8px; border-radius: 2px; }
@@ -618,9 +619,6 @@ html.agent-view .ar-outlier-kicker { color: inherit; }
 .ar-nd-tail-label { grid-column: 2 / -1; padding: 3px 0 2px 14px; font-size: 11px; line-height: 1.2; color: var(--secondary); }
 
 .ar-nd-btag { display: none; }
-.ar-nd-legend { display: flex; flex-wrap: wrap; gap: 4px 16px; margin-top: 10px; font-size: 12px; color: var(--secondary); }
-.ar-nd-legend span { display: inline-flex; align-items: center; gap: 5px; }
-.ar-nd-legend i { display: inline-block; width: 9px; height: 9px; border-radius: 2px; }
 @media (max-width: 560px) {
   .ar-nd-wrap { overflow-x: visible; }
   .ar-nd-grid { min-width: 0; font-size: 13px; }
@@ -699,40 +697,6 @@ html.agent-view .ar-outlier-kicker { color: inherit; }
 
 /* Figure 6: historical model training capability over time (Feb–Nov 2026). */
 .ar-ct { font-variant-numeric: tabular-nums; }
-.ar-ct-head { margin-bottom: 6px; }
-.ar-ct-bar {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px 16px;
-}
-.ar-ct-bar .ar-tabs { margin-bottom: 0; }
-.ar-ct-legend {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 6px 14px;
-  font-size: 12px;
-  color: var(--secondary);
-}
-.ar-ct-legend span {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-}
-.ar-ct-legend i.dot {
-  display: inline-block;
-  width: 9px;
-  height: 9px;
-  border-radius: 50%;
-}
-.ar-ct-legend i.dia {
-  display: inline-block;
-  width: 8px;
-  height: 8px;
-  transform: rotate(45deg);
-}
 .ar-ct-plot { position: relative; }
 .ar-ct-pt { cursor: pointer; }
 .ar-ct-pt:focus { outline: none; }
@@ -760,8 +724,7 @@ html.agent-view .ar-outlier-kicker { color: inherit; }
   pointer-events: none;
 }
 .ar-ct-lbl-margin { font-size: 11px; }
-.ar-ct-lbl-work { fill: var(--m-deep, #9a125c); }
 .ar-ct-lbl-val { font-weight: 400; fill: var(--secondary); }
-.ar-ct-tip { width: 236px; max-width: 236px; }
+.ar-ct-tip { width: 224px; max-width: 224px; }
 .ar-ct-tip b { font-weight: 600; color: var(--ink); }
 .ar-ct-tip-meta { color: var(--secondary); font-size: 11.5px; margin-bottom: 3px; }

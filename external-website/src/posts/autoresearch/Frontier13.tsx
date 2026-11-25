@@ -26,14 +26,14 @@ const fmtWin = (elo: number) => {
 const REFS = [
   {
     id: "tuned",
-    label: "Tuned baseline (36 min)",
-    shortLabel: "Tuned baseline (36m)",
+    label: "36-min baseline",
+    shortLabel: "36-min baseline",
     elo: DATA.refs["starter-200m"],
     align: "left" as const,
   },
   {
     id: "base15",
-    label: "15-min baseline (50%)",
+    label: "15-min baseline",
     shortLabel: "15-min baseline",
     elo: 0,
     align: "right" as const,
@@ -41,6 +41,7 @@ const REFS = [
 ];
 const signed = (v: number) => (v > 0 ? `+${v}` : v < 0 ? `−${-v}` : "0");
 const gpuText = (h: number) => (h < 1 ? `${Math.round(h * 60)} min` : `${h.toFixed(2)} GPU-h`);
+const hourText = (h: number) => (h < 1 ? `${Math.round(h * 60)} min` : `${h.toFixed(1)}h`);
 
 // Label every model that reaches >10% win rate and runs for most of the session (>=3h) directly on the right margin
 // (12 models), giving a strict 1-to-1 match between colored curves and right-margin labels. The remaining 8 models
@@ -183,8 +184,8 @@ export function ResearchRace() {
     );
   }
 
-  const H = narrow ? 320 : 428;
-  const m = { l: 42, r: narrow ? 14 : 162, t: 26, b: 40 };
+  const H = narrow ? 340 : 450;
+  const m = { l: 48, r: narrow ? 14 : 156, t: 32, b: 50 };
   const plotW = W - m.l - m.r;
   const plotH = H - m.t - m.b;
   const xMax = 5;
@@ -210,7 +211,7 @@ export function ResearchRace() {
   const topModels = labeledModels.filter((model) => TOP_KEYS.has(model.key));
   const labelYMap = layoutLabels(
     labeledModels.map((model) => ({ key: model.key, targetY: sy(winPct(model.best.elo)) })),
-    16,
+    18,
     m.t + 6,
     sy(10),
   );
@@ -353,7 +354,7 @@ export function ResearchRace() {
     return ra - rb || a.best.elo - b.best.elo;
   });
 
-  const tipW = narrow ? 215 : 245;
+  const tipW = 190;
   const tipLeft = hover
     ? Math.max(4, Math.min(W - tipW - 4, hover.cx + 14 + tipW > W - 4 ? hover.cx - tipW - 14 : hover.cx + 14))
     : 0;
@@ -413,7 +414,7 @@ export function ResearchRace() {
                 y2={sy(t)}
                 className={t === 0 ? "viz-zero" : "viz-grid"}
               />
-              <text x={m.l - 8} y={sy(t)} className="viz-axis" textAnchor="end" dominantBaseline="middle">
+              <text x={m.l - 8} y={sy(t)} className="fr-axis" textAnchor="end" dominantBaseline="middle">
                 {t}%
               </text>
             </g>
@@ -423,18 +424,18 @@ export function ResearchRace() {
           {xTicks.map((t) => (
             <g key={t}>
               <line x1={sx(t)} x2={sx(t)} y1={m.t} y2={H - m.b} className="viz-grid" />
-              <text x={sx(t)} y={H - m.b + 16} className="viz-axis" textAnchor="middle">
+              <text x={sx(t)} y={H - m.b + 19} className="fr-axis" textAnchor="middle">
                 {t}h
               </text>
             </g>
           ))}
 
           {/* Axis titles */}
-          <text x={m.l} y={m.t - 10} className="viz-axis">
-            Win % vs. 15-minute PPO baseline
+          <text x={m.l - 8} y={m.t - 14} className="fr-axis-title">
+            Win rate vs. 15-min baseline
           </text>
-          <text x={W - m.r} y={H - 4} className="viz-axis" textAnchor="end">
-            research budget spent (GPU-hours)
+          <text x={m.l + plotW / 2} y={H - 6} className="fr-axis-title" textAnchor="middle">
+            Research time (GPU-hours)
           </text>
 
           {/* PPO baseline reference lines */}
@@ -446,7 +447,7 @@ export function ResearchRace() {
                 <line x1={m.l} x2={W - m.r} y1={ry} y2={ry} className="fr-ref-line" />
                 <text
                   x={isLeft ? m.l + 6 : W - m.r - 6}
-                  y={isLeft ? ry - 6 : ry + 13}
+                  y={isLeft ? ry - 7 : ry + 16}
                   textAnchor={isLeft ? "start" : "end"}
                   className="fr-ref-lbl"
                 >
@@ -584,9 +585,6 @@ export function ResearchRace() {
                       <tspan style={{ fill: textCol, fontWeight: isFocus ? 700 : isTop ? 600 : 500 }}>
                         {model.label}
                       </tspan>
-                      <tspan className="fr-lbl-pct" dx={4}>
-                        {fmtWin(model.best.elo)}
-                      </tspan>
                     </text>
                   </g>
                 );
@@ -594,11 +592,11 @@ export function ResearchRace() {
 
               {/* Quiet right-margin summary for the remaining unlabeled models */}
               <g opacity={activeKey && LABELED_KEYS.has(activeKey) ? 0.2 : 1}>
-                <text x={W - m.r + 12} y={sy(2.5) - 5} className="fr-pack-lbl" dominantBaseline="middle">
+                <text x={W - m.r + 12} y={sy(2.5) - 6} className="fr-pack-lbl" dominantBaseline="middle">
                   {otherCount} other models
                 </text>
-                <text x={W - m.r + 12} y={sy(2.5) + 8} className="fr-pack-sub" dominantBaseline="middle">
-                  Hover or click any line
+                <text x={W - m.r + 12} y={sy(2.5) + 10} className="fr-pack-sub" dominantBaseline="middle">
+                  Hover any line
                 </text>
               </g>
             </g>
@@ -619,45 +617,17 @@ export function ResearchRace() {
               <i style={{ background: curveColor(activeModel.label) }} />
               {activeModel.label}
             </strong>
-            {hover.point && !hover.point.isFrontier ? (
-              <>
-                <span>
-                  Run <b>{hover.point.run}</b>: {fmtWin(hover.point.elo)} ({signed(hover.point.elo)} Elo) at{" "}
-                  {gpuText(hover.point.x)}
-                </span>
-                <span>
-                  Did not beat best so far ({fmtWin(hover.point.bestAtTime)}) · session peak{" "}
-                  {fmtWin(activeModel.best.elo)}
-                </span>
-              </>
-            ) : hover.point && hover.point.elo !== activeModel.best.elo ? (
-              <>
-                <span>
-                  New best <b>{hover.point.run}</b>: <b>{fmtWin(hover.point.elo)}</b> (
-                  {signed(hover.point.elo)} Elo) at {gpuText(hover.point.x)}
-                </span>
-                <span>
-                  Session peak: {fmtWin(activeModel.best.elo)} at {gpuText(activeModel.best.gpu)} ·{" "}
-                  {activeModel.nets.length} runs total
-                </span>
-              </>
-            ) : (
-              <>
-                <span>
-                  Best network: <b>{fmtWin(activeModel.best.elo)}</b> ({signed(activeModel.best.elo)}{" "}
-                  Elo) · {activeModel.best.run} at {gpuText(activeModel.best.gpu)}
-                </span>
-                <span>
-                  {activeModel.nets.length} training runs · fresh 15-min retrain:{" "}
-                  {fmtWin(activeModel.final.elo)} ({signed(activeModel.final.elo)} Elo)
-                </span>
-              </>
-            )}
-            {activeModel.gpu < 4.0 ? (
-              <em>Ended at {gpuText(activeModel.gpu)} of 5h budget</em>
-            ) : (
-              !pinnedKey && <em>Solid dots = new best · open dots = other runs (click to pin)</em>
-            )}
+            <span>
+              {hover.fromDot && hover.point ? (
+                <>
+                  <b>{fmtWin(hover.point.elo)}</b> win rate at {hourText(hover.point.x)}
+                </>
+              ) : (
+                <>
+                  Best: <b>{fmtWin(activeModel.best.elo)}</b> win rate
+                </>
+              )}
+            </span>
           </div>
         )}
       </div>

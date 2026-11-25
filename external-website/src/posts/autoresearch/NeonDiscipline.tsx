@@ -108,13 +108,6 @@ const ROWS: Row[] = [
   },
 ];
 
-const LEGEND = [
-  { key: "ab", label: "5 A/B tests ($5.81)", color: "#4a71d2" },
-  { key: "dbg", label: "CPU debug ($0.04)", color: "#d4a000" },
-  { key: "val", label: "1 h validation ($2.73)", color: "#19337d" },
-  { key: "left", label: "Unused ($0.12)", color: "#dcdbd5" },
-];
-
 function fmtBranch(br: Branch) {
   if (br.delta)
     return `${br.label} (${br.delta.dir === "up" ? "▲" : "▼"} ${br.delta.text})`;
@@ -305,14 +298,6 @@ export default function NeonDiscipline() {
             </div>
           </div>
         </div>
-      </div>
-      <div className="ar-nd-legend" aria-label="Budget bar key">
-        {LEGEND.map((item) => (
-          <span key={item.key}>
-            <i style={{ background: item.color }} aria-hidden="true" />
-            {item.label}
-          </span>
-        ))}
       </div>
     </div>
   );

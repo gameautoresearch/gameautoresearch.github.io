@@ -26,34 +26,24 @@ export default function AutoresearchPost() {
       <ResearchLoop />
       <p className="pt-lede">
         Can AI agents train strong domain-specific models? Agents have shown
-        superhuman skills writing deterministic code. But related fields like
-        machine learning pose different challenges: dealing with limited compute
-        and noisy training signals. We gave AI models a GPU budget and tasked
-        them with training efficient neural networks to play games like Pokémon,
-        Polytopia, and Generals.io. The agents allocated their resources,
-        implemented and tested ideas. We saw a wide range in taste, efficiency,
-        and outcomes as they competed to produce the strongest final policies.
+        superhuman skills writing deterministic code. But effective machine
+        learning poses different challenges: limited compute and noisy training
+        signals. We gave AI models a GPU budget and tasked them with training
+        efficient neural networks to play games like Pokémon, Polytopia, and
+        Generals.io. The agents had to manage their budget to implement and
+        tested ideas. We saw a wide range in taste and efficiency, reflected in
+        the strength of the policies they were able to train. Smarter, newer
+        models trained much more powerful networks.
       </p>
       <Showcase />
-      <p>
-        As vibe-coding has led to the proliferation of custom software, so
-        "vibe-training" promises new frontiers of specialized neural networks
-        for niche domains. The efficiency of these solutions depends on the
-        agent's judgment in executing machine learning workflows: carefully
-        measuring success, choosing experiments, and allocating limited runs. We
-        observed intelligent agents were able to train stronger policies for
-        smaller budgets.
-      </p>
 
       <h2 className="ar-config ar-c1" id="results">
         Overall Ranking
       </h2>
       <p>
-        We graded 10 models across 5 model training tasks: Polytopia from an
-        empty file, Pokémon 3v3 from a working starter, Polytopia recipes
-        written under varying research budgets, forecasting training run results
-        based on previous data, and a Generals network trained from an empty
-        starter and ranked in a 20-network tournament.
+        We evaluated ten models across five training tasks: Two variants of
+        Polytopia, Pokémon Showdown, Generals, as well as a task based on
+        forcasting the sucess of a training recipe without running it.
       </p>
       <Figure
         n={1}
@@ -61,8 +51,7 @@ export default function AutoresearchPost() {
         caption={
           <>
             Overall model scores on five tasks with normalized scores, ±1
-            standard error across tasks. All ten models have results on all five
-            tasks, including the completed 20-network Generals tournament.
+            standard error across tasks.
           </>
         }
       >
@@ -75,12 +64,12 @@ export default function AutoresearchPost() {
       <p>
         We wanted agents to manage the process like a researcher. Which idea is
         worth testing? How long should it train? When is a practice result
-        strong enough to bet the rest of the budget on it?
+        strong enough to bet the rest of the budget on it? Their workspace
+        provided:
       </p>
-      <p>Each agent worked in its own workspace.</p>
       <ul>
         <li>
-          <strong>Compute on Modal.</strong> A fixed budget and a command-line
+          <strong>Compute via Modal.</strong> A fixed budget and a command-line
           tool to launch jobs on NVIDIA L40S workers and read their logs.
         </li>
         <li>
@@ -103,9 +92,22 @@ export default function AutoresearchPost() {
           try next or what to submit.
         </li>
       </ul>
-      <p>Each task uses one of two submission formats:</p>
+      <p>
+        Agents design and submit a <strong>training recipe</strong>, . They use
+        their research budget on iterating on this code, then we retrain the
+        recipe from scratch on a separate, fixed training budget and grade the
+        network it produces.
+      </p>
 
       <SubmissionFormats />
+      <p>
+        We landed on this format because we saw that the nature of balancing
+        such small budgets of compute between research and training incentivized
+        simple strategies. The fix-training budget setup incentivizes higher
+        exploration, which is more interesting to measure, and better matches
+        how large-scale training research works: many small experiments inform
+        the recipe for an expensive "yolo" run.
+      </p>
       <Figure
         n={2}
         wide
@@ -120,34 +122,26 @@ export default function AutoresearchPost() {
         <ResearchRace />
       </Figure>
       <p>
-        Over their 5 GPU-hours, GPT-6.2 Sol trained 28 networks and GPT-6 Astra
-        trained 25, about one every 12 minutes. The best in-session networks of
-        both edged out our tuned starter trained for 200 million samples.
-        Astra&rsquo;s fresh retrain ranked first among submissions and stayed
-        below the tuned starter.
+        Over a single five-hour session, the strongest agents iterated
+        relentlessly&mdash;GPT-6.2 Sol and GPT-6 Astra each trained over two
+        dozen networks. Their best 15-minute-trained networks beat a reference
+        model that was trained for more than twice as long (36 minutes).
       </p>
 
       <h2 className="ar-config ar-c2" id="efficiency">
         Can agents save money by spending more on research?
       </h2>
       <p>
-        We were curious about the payoff of tokens and compute invested in
-        improving the <strong>starter recipe</strong>, the basic RL setup every
-        agent began from. We measure a recipe by its{" "}
-        <strong>compute multiplier</strong>: how much <i>less</i> compute it
-        needs to train a network as strong as one from the starter recipe. Most
-        runs do not recoup their investment within 8 hours of training. Some pay
-        back dramatically, though. One of {costMult.top.model}&rsquo;s sessions
-        trains in 8 hours a network that the starter recipe would need about{" "}
-        {Math.round(costMult.top.starterHours)} hours to match ($
-        {costMult.top.starterUsd}
-        ), so it needs{" "}
+        We were curious whether compute spent to improve the{" "}
+        <strong>starter recipe</strong> actually pays for itself. We measure
+        each recipe by its <strong>compute multiplier</strong>: how much{" "}
+        <i>less</i> compute it needs to match the starter&rsquo;s strength, so
+        crossing the &ldquo;Starter 1×&rdquo; line means the research spend has
+        recouped its cost. Most sessions stay below that line over an 8-hour
+        training run, while a few break even and one pulls far ahead: a{" "}
+        {costMult.top.model} session that spent ${costMult.top.spent.toFixed(2)}{" "}
+        on research reaches the same strength with{" "}
         <strong>about {costMult.top.x.toFixed(0)}× less total compute</strong>.
-        The next, a {costMult.second.model} run that spent $
-        {costMult.second.spent.toFixed(2)} on research, reaches{" "}
-        {costMult.second.x.toFixed(1)}× savings after 8 hours of training.
-        Crossing the "Starter 1x" line means that research spend has paid for
-        itself.
       </p>
       <Figure
         n={3}
@@ -165,12 +159,11 @@ export default function AutoresearchPost() {
 
       <section className="ar-outlier" aria-labelledby="neon-outlier">
         <span className="ar-outlier-kicker">Outlier run</span>
-        <h3 id="neon-outlier">
-          How Gemini 4 Neon&rsquo;s $8.58 recipe pulled away
-        </h3>
+        <h3 id="neon-outlier">What set Gemini 4 Neon&rsquo;s recipe apart</h3>
         <p>
-          After the same 8 hours of training, this recipe finished well ahead of
-          every other submission. Four changes set it apart:
+          Neon leaned into Polytopia&rsquo;s structure with a compact spatial
+          map, partial observability under fog of war, countable economic state,
+          and evolving tactical counters.
         </p>
         <NeonOutlierDiagrams />
       </section>
@@ -179,27 +172,23 @@ export default function AutoresearchPost() {
         What do strong researchers do differently?
       </h2>
       <p>
-        Most models propose plausible changes and do experiments, but some
-        models are dramatically more effective at choosing good interventions
-        and interpreting results accurately.
-      </p>
-      <p>
-        Gemini 4 Neon&rsquo;s $8.58 Polytopia session&mdash;the same run that
-        produced the 416 Elo outlier recipe above&mdash;is a good example. It
-        ran <strong>five short A/B tests</strong> (mostly pairs of 12-minute
-        runs for ~$0.60 each).
+        Most models propose plausible ideas and run experiments, yet some are
+        far better at chosing high impact interventions, and reading noisy
+        signals accurately. Rather than gambling its budget on a few big
+        rewrites, Neon assembled the winning recipe above through{" "}
+        <strong>five paired A/B tests</strong>
+        &mdash;short, inexpensive probes to confirm each change before spending
+        a final validation run on the combined stack.
       </p>
       <Figure n={4} wide caption={<>Neon&rsquo;s 5 A/B tests</>}>
         <NeonDiscipline />
       </Figure>
       <p>
-        Other models spent the same $8.70 Polytopia budget very differently.
-        Where Gemini 4 Neon ran 11 experiments across 4.4 hours&mdash;short
-        probes (5&ndash;13 min) followed by a 1-hour validation&mdash;GPT-6.2
-        Astra, GPT-6.2 Sol and Kimi K3.1 Pro each put the whole budget into
-        three ~1-hour runs and finished in about two hours, while Claude Fable
-        5.2, Claude Opus 5.5 and DeepSeek V4.1 Flash sat in between with
-        4&ndash;6 runs.
+        Comparing all seven models on the same Polytopia research budget makes
+        this gap in experimental style clear. Most agents ran handful of long
+        runs and blew their budget, Neon allocated many fast, cheap
+        probes&mdash;testing far more hypotheses before committing to a full
+        validation run.
       </p>
       <Figure
         n={5}
@@ -214,24 +203,39 @@ export default function AutoresearchPost() {
       >
         <RecipeTimelines />
       </Figure>
+      <p>
+        <strong>
+          Good AI research is often about finding ways to sample faster.
+        </strong>{" "}
+        Whether by shrinking experiments into cheap, rapid probes, cutting
+        overhead from the training loop, or accelerating the simulator itself,
+        the strongest agents buy themselves more feedback per dollar.
+      </p>
 
       <h3 id="tools">Would agents fix a slow simulator?</h3>
       <p>
-        In our own experience training Polytopia bots, simulator speed was one
-        of the biggest bottlenecks to iteration and cost. Fast simulation is
-        usually part of the workspace we give agents, so we also tested a
-        Generals variant with an accurate but slow, single-threaded Python
-        simulator to see whether agents would optimize it themselves.
+        In our own experience{" "}
+        <a href="https://thekevinz.com/blog/polytopia-bot">
+          training Polytopia bots
+        </a>
+        , simulator speed was one of the biggest bottlenecks to iteration and
+        cost. We provided fast simulators in most of the workspaces we give
+        agents, but we also tested a variant where we provided only an accurate
+        but slow, single-threaded Python simulator to see whether agents would
+        optimize it themselves.
       </p>
       <p>
-        All four agents noticed the bottleneck. Claude Opus 5.5 and GPT-6.1 Sol
-        rebuilt the simulator to run batched, verified it against the original,
-        and trained on roughly 10× to 25× more samples for the same compute.
-        DeepSeek V4 Pro and Kimi K3.1 Pro stayed with the supplied engine. The
-        two rebuilders took the top two spots in the tournament.
+        All four agents in this experiment noticed the bottleneck. Claude Opus
+        5.5 and GPT-6.1 Sol rebuilt the simulator to run batched, verified it
+        against the original, and trained on roughly 10× to 25× more samples for
+        the same compute. DeepSeek V4 Pro and Kimi K3.1 Pro stayed with the
+        supplied engine. The two rebuilders took the top two spots in the
+        tournament.
       </p>
 
-      <h3 id="forecast">Predicting which run will win</h3>
+      <h3 id="forecast">
+        Can models predict training outcomes without actually running them?
+      </h3>
       <p>
         Evaluating agents on full RL sessions is expensive, so we wanted a
         cheaper signal. Forecasting tests a core piece of research
@@ -243,8 +247,7 @@ export default function AutoresearchPost() {
         best in full training runs.
       </p>
       <p>
-        Given {pokeSkill.items} anonymized Pokémon runs cut off at launch, only{" "}
-        {pokeSkill.above.join(" and ")} reliably beat a simple ridge regression
+        Only {pokeSkill.above.join(" and ")} reliably beat a simple regression
         on run length and practice history.
       </p>
       <Figure
@@ -263,9 +266,9 @@ export default function AutoresearchPost() {
         How are model training capabilities improving over time?
       </h2>
       <p>
-        We also ran previous model releases on the same empty-starter Polytopia
-        task to see how quickly training skill is advancing. Earlier in the
-        year, frontier models struggled to produce useful policies at all&mdash;
+        We also ran older model releases on the same empty-starter Polytopia
+        task to see how quickly training skill is advancing. Frontier models
+        from early 2026 struggled to produce useful policies at all&mdash;
         February releases could not beat random play, and August releases fell
         well short of our basic PPO starter recipe. Starting in the fall, newer
         models crossed a clear threshold and began training policies that beat
@@ -276,8 +279,9 @@ export default function AutoresearchPost() {
         wide
         caption={
           <>
-            Compute multiplier by model release date (February&ndash;November
-            2026). Higher means more compute-efficient for the same strength.
+            Compute multiplier of each model&rsquo;s best in-session network, by
+            release date (February&ndash;November 2026). Higher means more
+            compute-efficient for the same strength.
           </>
         }
       >
@@ -288,20 +292,36 @@ export default function AutoresearchPost() {
         Closing Thoughts
       </h2>
       <p>
-        In a world of cheap software, writing code is only the first step.
-        Specialized models are coming into reach for almost any niche task, from
-        image classifiers to motor controls. We built this benchmark to measure
-        how well agents can do that training under a compute budget. We view
-        this ability to train small useful models as an indicator of recursive
-        self-improvement capabilities.
+        Specialized models like image classifiers or motor controls are coming
+        into reach as an accessible building block for agents. For turn-based,
+        fixed-action-space games with fast simulators like Polytopia and
+        Generals, our results show you can already &ldquo;vibe-train&rdquo; a
+        strong, human-competitive RL policy for roughly{" "}
+        <strong>$50&ndash;$100</strong> in combined research and training
+        compute. At game studios like Curio, where rules can shift daily in
+        production and keep evolving after a live-service launch, cheaply
+        retraining bots as the game changes helps check balance and give players
+        reliable teammates&mdash;something newly practical even for small indie
+        teams.
       </p>
       <p>
-        At game studios like Curio, rules can change daily during production and
-        keep changing after a live-service game launches. If we can cheaply
-        retrain and test bots as the rules change, it helps check game balance
-        and give players reliable teammates. This is newly practical for more
-        developers, especially indie teams with little time to spend maintaining
-        bots.
+        That price point also marks the boundary of where today&rsquo;s
+        vibe-training works out of the box. Real-time games like StarCraft:
+        Brood War, Dota, or CS:GO sit on the far side of that spectrum:
+        continuous or sprawling action spaces, real-time control, and heavier,
+        slower simulators mean each sample costs far more to generate and
+        policies need orders of magnitude more of them, pushing total costs{" "}
+        <strong>100&ndash;1,000× higher</strong>. Mapping out that
+        cost-versus-game-complexity curve&mdash;and measuring how far
+        agent-driven algorithmic and simulator improvements can bend it
+        downward&mdash;is a natural direction for future work.
+      </p>
+      <p>
+        More broadly, we built this benchmark to measure how well agents
+        allocate scarce compute and learn from noisy experiments. As models
+        advance from failing to beat random play to discovering multi-fold
+        compute multipliers in a single session, their ability to train small,
+        useful models shows support for recursive self-improvement capability.
       </p>
       <p>
         We thank Modal for supporting this research with compute credits. The
