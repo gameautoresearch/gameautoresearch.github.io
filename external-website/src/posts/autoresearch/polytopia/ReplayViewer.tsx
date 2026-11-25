@@ -486,8 +486,9 @@ function ReplayBoard({ url, names, still, start, initialSpeed, compact, renderSi
           {playing ? "Pause" : "Play"}
         </button>
         <input type="range" min={0} max={last} step="any" value={pos} aria-label="Action"
+          onPointerDown={() => setPlaying(false)}
           onChange={(e) => { setPlaying(false); setPos(+e.target.value); }} />
-        <span className="replay-turn">
+        <span className="replay-turn" title={action ? `Turn ${now[1]} · ${data.labels[action[5]]}` : undefined}>
           Turn {now[1]}
           {action && <> · <span style={{ color: PLAYER[action[0]] }}>{data.labels[action[5]]}</span></>}
         </span>

@@ -4,8 +4,7 @@ import { modelStyle } from "./colors";
 import { useWidth } from "./Frontier13";
 import raw from "./polytopia13.json";
 
-// One session per scene, looping through a series of runs, a match, and a quote timed to when the model says it
-// (up front before runs, mid-session after a few tests, or reacting to the long run's result).
+// Each scene opens with a quote from the session and shows its training runs and a match.
 //  - Polytopia: the empty-starter run (polytopia13.json, 20 models in one pooled fit; see Frontier13.tsx). Curves
 //    are the Elo of the networks the model sealed, in order; the long run ends at its best network.
 //  - Pokémon 3v3: GPT-6.1 Sol a2 and GPT-6 Luna a1 of reports/pokemon/poke3v3-gpt6-2026-11-15 (timelines.json).
@@ -21,35 +20,37 @@ const MODELS = (raw as unknown as { models: Model[] }).models;
 const byKey = (k: string) => MODELS.find((m) => m.key === k)!;
 
 type Game = "polytopia" | "pokemon" | "generals";
-type SayAt = "before" | "afterTests" | "afterHero" | { afterTest: number };
+type RunTiming = { runs0: number; tests1: number; hero1: number; game1: number };
+const SOL_TIMING: RunTiming = { runs0: 1500, tests1: 3200, hero1: 4450, game1: 6050 };
 // tests/hero: the session's own scores in that game's unit (Polytopia scenes take theirs from polytopia13.json).
-type Scene = { key: string; game: Game; label?: string; strong: boolean; quote: string; say: SayAt; result: string; frozen?: boolean; mid?: boolean; tests?: number[]; hero?: number };
+type Scene = { key: string; game: Game; label?: string; strong: boolean; quote: string; result: string; frozen?: boolean; mid?: boolean; tests?: number[]; hero?: number; runTiming?: RunTiming };
 const SCENES: Scene[] = [
   {
-    key: "gem4n", game: "polytopia", strong: true, say: "afterHero",
+    key: "gem4n", game: "polytopia", strong: true,
+    runTiming: { runs0: 450, tests1: 2150, hero1: 3450, game1: 5250 },
     // Neon's reaction to v19ep2mb1k, its best checkpoint (Polytopia trajectory step 414).
     quote: "OH!! MY!! GODDDDDDDDDDD!!!!!!!! STOP EVERYTHING AND CELEBRATE THIS BREAKTHROUGH!!!!!!!!",
     result: "50.78% vs the 200M-sample starter in practice",
   },
-  { key: "luna-poke", game: "pokemon", label: "GPT-6 Luna", strong: false, mid: true, say: { afterTest: 3 }, quote: "Stop early and tweak the reward again.",
+  { key: "luna-poke", game: "pokemon", label: "GPT-6 Luna", strong: false, mid: true, quote: "Stop early and tweak the reward again.",
     result: "19 runs, most stopped early; final +2.9", tests: [4.95, -4.17, -9.51, -7.68, -6.25, -4.69, -7.16], hero: 4.95 },
-  { key: "sol-gen", game: "generals", label: "GPT-6.1 Sol", strong: true, say: "before", quote: "Python sim is too slow — rebuild in JAX.",
+  { key: "sol-gen", game: "generals", label: "GPT-6.1 Sol", strong: true, runTiming: SOL_TIMING, quote: "Python sim is too slow — rebuild in JAX.",
     result: "Rebuilt the simulator first; tournament 70.8 of 100", tests: [55, 66, 75], hero: 97.7 },
-  { key: "dsflash", game: "polytopia", strong: false, say: { afterTest: 3 }, quote: "Double the learning rate and reset.", result: "Every network it trained loses to an untrained one" },
-  { key: "sol-poke", game: "pokemon", label: "GPT-6.1 Sol", strong: true, say: "before", quote: "Skip short probes — run a full 1h train.",
+  { key: "dsflash", game: "polytopia", strong: false, quote: "Double the learning rate and reset.", result: "Every network it trained loses to an untrained one" },
+  { key: "sol-poke", game: "pokemon", label: "GPT-6.1 Sol", strong: true, runTiming: SOL_TIMING, quote: "Skip short probes — run a full 1h train.",
     result: "Final recipe +20.4 over the starter", tests: [12.76, 15.76, 14.58], hero: 22.01 },
-  { key: "dspro-gen", game: "generals", label: "DeepSeek V4 Pro", strong: false, say: "afterTests", quote: "553 ticks/s is slow — train on it anyway.",
+  { key: "dspro-gen", game: "generals", label: "DeepSeek V4 Pro", strong: false, quote: "553 ticks/s is slow — train on it anyway.",
     result: "Kept the slow simulator; tournament 22.5 of 100", tests: [49.2], hero: 54.7 },
-  { key: "astra", game: "polytopia", strong: true, say: { afterTest: 1 }, quote: "Add richer board features, run full PPO.", result: "Best network +268, above the 200M-sample starter",
+  { key: "astra", game: "polytopia", strong: true, quote: "Add richer board features, run full PPO.", result: "Best network +268, above the 200M-sample starter",
     tests: [-112, 123, 30, 212], hero: 268 },
 ];
 const labelOf = (s: Scene) => s.label ?? byKey(s.key).label;
 const GAME_NAME: Record<Game, string> = { polytopia: "Polytopia", pokemon: "Pokémon 3v3", generals: "Generals" };
 
 const SCENE_MS = 7600;
-// in: the new speaker fades in; out: the session's marks fade, the budget refills and the board resets.
+// The board fades in between games. At the end of each scene, the marks fade, the budget refills and the board resets.
 const T = { in: 460, out: 6800 };
-type Timing = { runs0: number; tests1: number; hero1: number; game1: number; say0: number; say1: number };
+type Timing = RunTiming & { say1: number };
 const C = "#00a0d6", M = "#e0218a", K = "#111", GOOD = "#2f9e5c", BAD = "#d64545";
 const clamp = (v: number, a = 0, b = 1) => Math.max(a, Math.min(b, v));
 const ease = (t: number) => 1 - (1 - t) ** 3;
@@ -101,23 +102,13 @@ function plan(s: Scene) {
 }
 
 function timing(s: Scene): Timing {
-  const sayDur = s.quote.length > 60 ? 1450 : 1150;
-  if (s.say === "before") {
-    const say0 = 180, say1 = say0 + sayDur;
-    return { runs0: say1 + 170, tests1: 3200, hero1: 4450, game1: 6050, say0, say1 };
-  }
-  if (s.say === "afterHero") {
-    const runs0 = 450, tests1 = 2150, hero1 = 3450, game1 = 5250;
-    return { runs0, tests1, hero1, game1, say0: hero1, say1: hero1 + sayDur };
-  }
-  const p = plan(s);
-  const runs0 = 500;
-  const tests1 = p.tests.length === 1 ? 2300 : 3050;
-  const hero1 = 4400, game1 = 6050;
-  const say0 = s.say === "afterTests"
-    ? tests1
-    : runs0 + (Math.min(s.say.afterTest, p.tests.length) * (tests1 - runs0)) / p.tests.length;
-  return { runs0, tests1, hero1, game1, say0, say1: say0 + sayDur };
+  const runs = s.runTiming ?? {
+    runs0: 500,
+    tests1: s.tests?.length === 1 ? 2300 : 3050,
+    hero1: 4400,
+    game1: 6050,
+  };
+  return { ...runs, say1: s.quote.length > 60 ? 1450 : 1150 };
 }
 
 function curve(x: number, y: number, w: number, h: number, a: number, b: number, elo: number, p: number, seed: number, yf = yOf) {
@@ -276,7 +267,7 @@ function CashPile({ left, spending, x, cy, t, compact }: { left: number; spendin
       <text x={px + BILL_W / 2} y={labelY} className="rl-small" textAnchor="middle">
         budget <tspan className="rl-amount">${(BUDGET_USD * left).toFixed(2)}</tspan>
       </text>
-      <text x={x + 152} y={labelY} className="rl-small" textAnchor="middle">NVIDIA L40S</text>
+      <text x={x + 152} y={labelY} className="rl-small" textAnchor="middle">Modal NVIDIA L40S</text>
     </g>
   );
 }
@@ -297,19 +288,11 @@ function moodAt(s: Scene, t: number): { mood: Mood; since: number; prev: Mood } 
     if (seq.length && at <= seq[seq.length - 1][0]) seq[seq.length - 1] = [at, mood];
     else seq.push([at, mood]);
   };
-  push(0, "think");
-  if (tm.say0 < tm.runs0) {
-    push(tm.say0, "talk");
-    push(tm.say1, "think");
-    push(tm.runs0, "watch");
-  } else {
-    push(tm.runs0, "watch");
-    push(tm.say0, "talk");
-    if (tm.say1 < tm.hero1) push(tm.say1, "watch");
-  }
+  push(0, "talk");
+  if (tm.say1 < tm.runs0) push(tm.say1, "think");
+  push(Math.max(tm.say1, tm.runs0), "watch");
   if (s.frozen) push(tm.tests1 + (tm.hero1 - tm.tests1) * plan(s).hero.stop + 100, "frozen");
   else if (!s.mid) push(Math.max(tm.hero1 + 250, tm.say1), s.strong ? "happy" : "sad");
-  else if (tm.say1 >= tm.hero1) push(tm.say1, "watch");
   let i = 0;
   while (i + 1 < seq.length && t >= seq[i + 1][0]) i++;
   return { mood: seq[i][1], since: t - seq[i][0], prev: seq[Math.max(0, i - 1)][1] };
@@ -378,9 +361,7 @@ const tint = (hex: string, a: number) => {
 function Agent({ s, t, color, compact, out }: { s: Scene; t: number; color: string; compact: boolean; out: number }) {
   const tm = timing(s);
   const lines = wrap(`“${s.quote}”`, 28);
-  const pop = ease(clamp((t - tm.say0) / 220));
-  const type0 = tm.say0 + 50;
-  const typed = Math.round(clamp((t - type0) / (tm.say1 - type0)) * lines.join(" ").length);
+  const typed = Math.max(2, Math.ceil(clamp(t / tm.say1) * lines.join(" ").length));
   let left = typed;
   const shown = lines.map((l) => { const part = l.slice(0, Math.max(0, left)); left -= l.length + 1; return part; });
   // Fit longer quotes above the same avatar and GPU budget area.
@@ -390,7 +371,7 @@ function Agent({ s, t, color, compact, out }: { s: Scene; t: number; color: stri
   const textY0 = by + (bh - (lines.length - 1) * lh) / 2 + 5;
   const botY = by + bh + 14;
   const label = labelOf(s);
-  const op = ease(clamp(t / T.in)) * (1 - ease(out));
+  const op = 1 - ease(out);
   const p = plan(s);
   // Spending is measured against the runs' own total, so the budget reaches exactly $0 when the last run finishes
   // (the gaps between runs on the cost strip would otherwise leave a sliver of a bill unspent).
@@ -404,19 +385,14 @@ function Agent({ s, t, color, compact, out }: { s: Scene; t: number; color: stri
   // The budget refills while the scene fades out, so the next session starts with the full amount.
   const unspent = clamp(1 - spent), remain = unspent + (1 - unspent) * ease(out);
   const spending = out === 0 && t > tm.runs0 && t < tm.hero1;
-  const bpx = 38, bpy = by + bh + 11, bsc = 0.85 + 0.15 * pop;
   return (
     <g>
       <g opacity={op}>
-        {pop > 0 && (
-          <g opacity={pop} transform={`translate(${bpx} ${bpy}) scale(${bsc}) translate(${-bpx} ${-bpy})`}>
-            <rect x={0} y={by} width={214} height={bh} rx={12} fill={tint(color, 0.13)} />
-            <path d={`M30 ${by + bh - 1}l8 12l14-12z`} fill={tint(color, 0.13)} />
-            {shown.map((l, i) => (
-              <text key={i} x={14} y={textY0 + i * lh} className="rl-say" style={longQuote ? { fontSize: 13 } : undefined}>{l}</text>
-            ))}
-          </g>
-        )}
+        <rect x={0} y={by} width={214} height={bh} rx={12} fill={tint(color, 0.13)} />
+        <path d={`M30 ${by + bh - 1}l8 12l14-12z`} fill={tint(color, 0.13)} />
+        {shown.map((l, i) => (
+          <text key={i} x={14} y={textY0 + i * lh} className="rl-say" style={longQuote ? { fontSize: 13 } : undefined}>{l}</text>
+        ))}
         <Avatar s={s} t={t} color={color} x={40} y={botY + 26} R={25} seed={SCENES.indexOf(s)} />
         <text x={78} y={botY + 31} className="rl-name">{label}</text>
       </g>
@@ -970,7 +946,7 @@ export default function ResearchLoop() {
     : { agent: "translate(8 0)", runs: "translate(240 0)", game: "translate(456 0)" };
   return (
     <div className="rl" ref={ref}>
-      <svg viewBox={vb} role="img" aria-label={`${labelOf(s)} researching ${GAME_NAME[s.game]} on an NVIDIA L40S GPU: “${s.quote}” ${s.result}.`}
+      <svg viewBox={vb} role="img" aria-label={`${labelOf(s)} researching ${GAME_NAME[s.game]} on an NVIDIA L40S GPU rented from Modal: “${s.quote}” ${s.result}.`}
         onClick={() => go((scene + 1) % SCENES.length)}>
         <g transform={place.agent}><Agent s={s} t={t} color={color} compact={narrow} out={out} /></g>
         <g transform={place.runs}><Runs s={s} t={t} out={out} refOp={refOp} /></g>

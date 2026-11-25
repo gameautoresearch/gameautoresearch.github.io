@@ -75,11 +75,34 @@ export default function AutoresearchPost() {
       <p>
         We wanted agents to manage the process like a researcher. Which idea is
         worth testing? How long should it train? When is a practice result
-        strong enough to bet the rest of the budget on it? Each agent got a
-        workspace with a game rulebook, simulator code, editable training code
-        and configs, and a command-line tool to launch experiments on an NVIDIA
-        L40S and read logs.
+        strong enough to bet the rest of the budget on it?
       </p>
+      <p>Each agent worked in its own workspace.</p>
+      <ul>
+        <li>
+          <strong>Compute on Modal.</strong> A fixed budget and a command-line
+          tool to launch jobs on NVIDIA L40S workers and read their logs.
+        </li>
+        <li>
+          <strong>A game rulebook.</strong> The rules, legal moves, and scoring
+          for the task.
+        </li>
+        <li>
+          <strong>A simulator.</strong> Most tasks came with an optimized
+          simulator. In one Generals variant, agents got a slow, single-threaded
+          simulator they could improve themselves.
+        </li>
+        <li>
+          <strong>Editable training code and configs.</strong> Depending on the
+          task, agents started with a working training recipe or a scaffold
+          without learning code.
+        </li>
+        <li>
+          <strong>A practice suite.</strong> Agents could evaluate their
+          checkpoints during the session and use the results to decide what to
+          try next or what to submit.
+        </li>
+      </ul>
       <p>Each task uses one of two submission formats:</p>
 
       <SubmissionFormats />
@@ -264,8 +287,10 @@ export default function AutoresearchPost() {
         bots.
       </p>
       <p>
-        We thank Modal for providing compute and services that made this
-        research possible.
+        We thank Modal for supporting this research with compute credits. The
+        project used about 3,000 GPU-hours and an estimated 30,000 CPU core-hours.
+        Adjusting GPU and CPU allocations on demand let us test and refine our
+        benchmark tasks quickly.
       </p>
       <a
         className="ar-sponsor"

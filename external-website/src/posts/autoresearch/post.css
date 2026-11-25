@@ -258,13 +258,14 @@ html.agent-view .ar h2.ar-config { margin-top: 2em; padding-top: 0; border-top: 
 .sc-stage .psr-bar { flex: none; margin-top: 6px; }
 .sc-controls-stub { height: 36px; }
 .sc-stage .gr-controls > button, .sc-stage .replay-controls button { min-width: 54px; padding: 3px 10px; border: 1px solid #e2e2de; border-radius: 4px; background: #fff; color: var(--ink); font-size: 12px; }
+.sc-stage .replay-controls button { flex: 0 0 54px; }
 .sc-stage .gr-controls > button:hover, .sc-stage .replay-controls button:hover { border-color: #111; }
 .sc-stage .gr-speed { gap: 2px; }
 .sc-stage .gr-speed button { padding: 3px 7px; border: 0; border-radius: 4px; background: transparent; color: var(--secondary); font-size: 12px; }
 .sc-stage .gr-speed button:hover { color: var(--ink); }
 .sc-stage .gr-speed button[aria-pressed="true"] { background: #e8e8e3; color: var(--ink); font-weight: 600; }
 .sc-stage .gr-tick { min-width: 82px; font-size: 11.5px; }
-.sc-stage .replay-turn { min-width: 124px; font-size: 11.5px; }
+.sc-stage .replay-turn { flex: 0 0 174px; min-width: 0; overflow: hidden; text-overflow: ellipsis; font-size: 11.5px; }
 .sc-wait { display: grid; place-items: center; color: var(--secondary); font-size: 13px; }
 .sc-matchups { display: flex; flex-wrap: wrap; gap: 4px 6px; margin-top: 10px; }
 .sc-matchups button { padding: 5px 10px; border: 0; border-radius: 4px; background: transparent; color: var(--secondary); font: inherit; font-size: 12.5px; line-height: 1.3; cursor: pointer; transition: color 120ms ease, background-color 120ms ease; }
