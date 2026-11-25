@@ -648,37 +648,99 @@ export function ForecastLead() {
     );
   }
   const narrow = W < 480, HI = 0.55, FIT = DATA.pokeSkill.rule;
-  const row = narrow ? 42 : 30, m = { l: narrow ? 10 : 150, r: narrow ? 46 : 52, t: 22, b: 40 };
+  const row = narrow ? 46 : 32;
+  const m = { l: narrow ? 10 : 162, r: narrow ? 46 : 50, t: 28, b: 44 };
   const H = m.t + m.b + SKILL.length * row;
   const sx = (v: number) => m.l + (Math.max(0, Math.min(HI, v)) / HI) * (W - m.l - m.r);
+  const fmtSkill = (v: number) => v.toFixed(2);
   return (
-    <div className="viz" ref={ref}>
-      <div className="viz-legend">
-        {pokeSkill.above.length > 0 && <span><i style={{ background: SKILL_TONE.above }} />Reliably better than the curve fit</span>}
-        <span><i style={{ background: SKILL_TONE.same }} />Cannot be told apart from it</span>
-        {pokeSkill.below.length > 0 && <span><i style={{ background: SKILL_TONE.below }} />Reliably worse than the curve fit</span>}
+    <div className="viz ar-fc" ref={ref}>
+      <div className="viz-legend ar-fc-legend">
+        {pokeSkill.above.length > 0 && <span><i style={{ background: SKILL_TONE.above }} />Beats baseline</span>}
+        <span><i style={{ background: SKILL_TONE.same }} />Tied</span>
+        {pokeSkill.below.length > 0 && <span><i style={{ background: SKILL_TONE.below }} />Below baseline</span>}
       </div>
-      <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label="Each model's relative forecast skill against a blind guess, with 90% intervals, and the curve fit's skill as a dotted line">
+      <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label="Each model's forecast skill against a simple baseline, with 90% intervals">
         {[0, 0.1, 0.2, 0.3, 0.4, 0.5].map((t) => (
           <g key={t}>
-            <line x1={sx(t)} x2={sx(t)} y1={t === 0 ? m.t - 6 : m.t} y2={H - m.b} className={t === 0 ? undefined : "viz-grid"} stroke={t === 0 ? CMYK.k : undefined} />
-            <text x={sx(t)} y={H - m.b + 16} className="viz-axis" textAnchor="middle">{t === 0 ? "0" : f2(t)}</text>
+            <line
+              x1={sx(t)}
+              x2={sx(t)}
+              y1={t === 0 ? m.t - 4 : m.t}
+              y2={H - m.b}
+              className={t === 0 ? undefined : "viz-grid"}
+              stroke={t === 0 ? CMYK.k : undefined}
+              strokeWidth={t === 0 ? 1.4 : undefined}
+            />
+            <text x={sx(t)} y={H - m.b + 20} className="ar-fc-tick" textAnchor="middle">
+              {t === 0 ? "0" : t.toFixed(1)}
+            </text>
           </g>
         ))}
-        <line x1={sx(FIT)} x2={sx(FIT)} y1={m.t - 6} y2={H - m.b} stroke={CMYK.k} strokeDasharray="1 4" strokeLinecap="round" />
-        <text x={sx(0)} y={m.t - 10} className="viz-axis">blind guess</text>
-        <text x={sx(FIT)} y={m.t - 10} className="viz-axis" textAnchor="middle">the curve fit {f2(FIT)}</text>
-        <text x={(sx(0) + sx(HI)) / 2} y={H - 4} className="viz-axis" textAnchor="middle">relative forecast skill (0 = blind guess, 1 = perfect)</text>
+        <line
+          x1={sx(FIT)}
+          x2={sx(FIT)}
+          y1={m.t - 4}
+          y2={H - m.b}
+          stroke="#444"
+          strokeWidth={1.5}
+          strokeDasharray="3 4"
+          strokeLinecap="round"
+        />
+        <text x={sx(FIT)} y={m.t - 11} className="ar-fc-ref" textAnchor="middle">
+          Baseline ({fmtSkill(FIT)})
+        </text>
+        <text x={(sx(0) + sx(HI)) / 2} y={H - 4} className="ar-fc-axis-title" textAnchor="middle">
+          Forecast skill
+        </text>
         {SKILL.map((mo, i) => {
-          const y = m.t + i * row + row / 2 + (narrow ? 7 : 0), c = SKILL_TONE[skillTone(mo)];
+          const y = m.t + i * row + row / 2 + (narrow ? 8 : 0);
+          const tone = skillTone(mo);
+          const c = SKILL_TONE[tone];
+          const isTop = tone === "above";
           return (
             <g key={mo.model}>
-              {narrow
-                ? <text x={m.l + 6} y={y - 13} className="viz-label" style={{ paintOrder: "stroke", stroke: "#fff", strokeWidth: 3.5, strokeLinejoin: "round" }}>{mo.model}</text>
-                : <text x={m.l - 12} y={y} className="viz-label" textAnchor="end" dominantBaseline="middle">{mo.model}</text>}
-              <line x1={sx(mo.skillCi[0])} x2={sx(mo.skillCi[1])} y1={y} y2={y} stroke={c} strokeOpacity={0.35} strokeWidth={4} strokeLinecap="round" />
-              <circle cx={sx(mo.skill)} cy={y} r={5.5} fill={c} stroke="#fff" strokeWidth={1.5} />
-              <text x={sx(mo.skillCi[1]) + 9} y={y} className="viz-axis" dominantBaseline="middle" style={{ fill: "var(--ink)", paintOrder: "stroke", stroke: "#fff", strokeWidth: 4 }}>{f2(mo.skill)}</text>
+              {narrow ? (
+                <text
+                  x={m.l + 6}
+                  y={y - 14}
+                  className="ar-fc-model"
+                  style={{ fontWeight: isTop ? 650 : 500 }}
+                >
+                  {mo.model}
+                </text>
+              ) : (
+                <text
+                  x={m.l - 14}
+                  y={y}
+                  className="ar-fc-model"
+                  textAnchor="end"
+                  dominantBaseline="middle"
+                  style={{ fontWeight: isTop ? 650 : 500 }}
+                >
+                  {mo.model}
+                </text>
+              )}
+              <line
+                x1={sx(mo.skillCi[0])}
+                x2={sx(mo.skillCi[1])}
+                y1={y}
+                y2={y}
+                stroke={c}
+                strokeOpacity={0.38}
+                strokeWidth={5}
+                strokeLinecap="round"
+              />
+              <circle cx={sx(mo.skill)} cy={y} r={6} fill={c} stroke="#fff" strokeWidth={1.6} />
+              <text
+                x={sx(mo.skillCi[1]) + 9}
+                y={y}
+                className="ar-fc-val"
+                dominantBaseline="middle"
+                style={{ fontWeight: isTop ? 700 : 600 }}
+              >
+                {fmtSkill(mo.skill)}
+              </text>
             </g>
           );
         })}

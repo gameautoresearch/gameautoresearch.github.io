@@ -49,23 +49,20 @@ const LAB_NAME: Record<LabKey, string> = {
   thinking: "Thinking Machines",
 };
 
-// Right-margin labels for the late-2026 frontier cluster (stacked collision-free).
-const MARGIN_KEYS = new Set(["sol62", "gem4n", "astra62", "fable"]);
+// Right-margin labels for the November frontier leaders (one per lab).
+const MARGIN_KEYS = new Set(["sol62", "gem4n", "fable"]);
 
 type InlineCfg = {
   dx: number;
   dy: number;
   anchor: "start" | "middle" | "end";
-  narrowHide?: boolean;
+  narrowOnly?: boolean;
 };
 
-// Minimal inline callouts for key inflection points.
+// Minimal inline callouts in open space to the left of key dots.
 const INLINE_LABELS: Record<string, InlineCfg> = {
-  opus5: { dx: 0, dy: -11, anchor: "middle" },
-  astra: { dx: -10, dy: 4, anchor: "end" },
-  sol: { dx: 10, dy: 4, anchor: "start", narrowHide: true },
-  opus: { dx: -8, dy: -9, anchor: "end", narrowHide: true },
-  terra: { dx: 0, dy: -11, anchor: "middle", narrowHide: true },
+  astra: { dx: -11, dy: 4, anchor: "end" },
+  sol62: { dx: -11, dy: 4, anchor: "end", narrowOnly: true },
 };
 
 const parseUtc = (iso: string) => {
@@ -174,8 +171,8 @@ export default function CapabilityTimeline() {
     );
   }
 
-  const H = narrow ? 296 : 344;
-  const m = { l: 38, r: narrow ? 16 : 132, t: 24, b: 52 };
+  const H = narrow ? 300 : 350;
+  const m = { l: 42, r: narrow ? 18 : 138, t: 28, b: 36 };
   const plotW = W - m.l - m.r;
   const plotH = H - m.t - m.b;
 
@@ -189,8 +186,7 @@ export default function CapabilityTimeline() {
   const monthTicks = narrow
     ? [
         { t: Date.UTC(2026, 1, 1), label: "Feb" },
-        { t: Date.UTC(2026, 3, 1), label: "Apr" },
-        { t: Date.UTC(2026, 5, 1), label: "Jun" },
+        { t: Date.UTC(2026, 4, 1), label: "May" },
         { t: Date.UTC(2026, 7, 1), label: "Aug" },
         { t: Date.UTC(2026, 10, 18), label: "Nov 2026" },
       ]
@@ -202,13 +198,6 @@ export default function CapabilityTimeline() {
         { t: Date.UTC(2026, 9, 1), label: "Oct" },
         { t: Date.UTC(2026, 10, 18), label: "Nov 2026" },
       ];
-
-  const relTicks = [
-    { t: Date.UTC(2026, 1, 18), label: "9 mo ago" },
-    { t: Date.UTC(2026, 4, 18), label: "6 mo ago" },
-    { t: Date.UTC(2026, 7, 18), label: "3 mo ago" },
-    { t: Date.UTC(2026, 10, 18), label: "Now" },
-  ];
 
   const yTicks = [0, 1, 2, 3, 4, 5];
 
@@ -230,10 +219,13 @@ export default function CapabilityTimeline() {
     .filter((row) => MARGIN_KEYS.has(row.key))
     .sort((a, b) => valOf(b) - valOf(a));
   const marginY = layoutLabels(
-    marginModels.map((row) => ({ key: row.key, targetY: sy(valOf(row)) })),
-    16,
-    m.t + 14,
-    sy(0) - 18,
+    marginModels.map((row) => ({
+      key: row.key,
+      targetY: sy(valOf(row)) + (row.key === "fable" ? 20 : 0),
+    })),
+    24,
+    m.t + 12,
+    sy(0) - 20,
   );
 
   const hovered = hoverKey ? sortedModels.find((r) => r.key === hoverKey) ?? null : null;
@@ -248,7 +240,6 @@ export default function CapabilityTimeline() {
   ];
 
   const yOne = sy(1);
-  const yFloor = sy(DATA.floorMult);
 
   return (
     <div className="ar-ct" ref={ref}>
@@ -263,15 +254,6 @@ export default function CapabilityTimeline() {
           {/* Whisper-light tint above 1x (beats the unmodified PPO starter) */}
           <rect x={m.l} y={m.t} width={plotW} height={yOne - m.t} fill="#f4fafd" />
 
-          {/* Subtle band below 0.43x where models are too weak to place precisely on the starter curve */}
-          <rect
-            x={m.l}
-            y={yFloor}
-            width={plotW}
-            height={sy(0) - yFloor}
-            fill="#f6f6f3"
-          />
-
           {/* Horizontal gridlines & Y-axis */}
           {yTicks.map((v) => {
             const y = sy(v);
@@ -284,14 +266,25 @@ export default function CapabilityTimeline() {
                   y2={y}
                   className={v === 0 ? "viz-zero" : "viz-grid"}
                 />
-                <text x={m.l - 8} y={y + 4} textAnchor="end" className="viz-axis">
+                <text
+                  x={m.l - 8}
+                  y={y}
+                  textAnchor="end"
+                  dominantBaseline="middle"
+                  className="viz-axis"
+                  style={
+                    v === 1
+                      ? { fill: CMYK.cDeep, fontWeight: 600 }
+                      : undefined
+                  }
+                >
                   {v}×
                 </text>
               </g>
             );
           })}
-          <text x={m.l} y={m.t - 9} className="viz-axis">
-            Compute multiplier of best in-session network vs. 15-min starter
+          <text x={m.l} y={m.t - 11} className="ar-ct-axis-title">
+            Compute multiplier
           </text>
 
           {/* 1x baseline reference */}
@@ -301,26 +294,12 @@ export default function CapabilityTimeline() {
             y1={yOne}
             y2={yOne}
             stroke={CMYK.cDeep}
-            strokeOpacity={0.55}
-            strokeWidth={1.15}
+            strokeOpacity={0.65}
+            strokeWidth={1.3}
             strokeDasharray="5 4"
           />
-          <text x={m.l + 6} y={yOne - 6} className="ar-ct-ref ar-ct-ref-main">
-            1× — unmodified PPO starter
-          </text>
-
-          {/* Subtle <0.43x floor label */}
-          <line
-            x1={m.l}
-            x2={m.l + plotW}
-            y1={yFloor}
-            y2={yFloor}
-            stroke="#dcdcd6"
-            strokeWidth={1}
-            strokeDasharray="2 3"
-          />
-          <text x={m.l + 6} y={yFloor - 4} className="ar-ct-ref">
-            {narrow ? "<0.43× floor" : "<0.43× — weaker than 5-min starter"}
+          <text x={m.l + 8} y={yOne - 8} className="ar-ct-ref-main">
+            Starter 1×
           </text>
 
           {/* Running-best frontier step curve */}
@@ -329,11 +308,11 @@ export default function CapabilityTimeline() {
             d={stepPath.line}
             fill="none"
             stroke={CMYK.cDeep}
-            strokeWidth={1.9}
-            strokeOpacity={0.85}
+            strokeWidth={2.2}
+            strokeOpacity={0.9}
           />
 
-          {/* X-axis ticks + relative-time anchors */}
+          {/* X-axis ticks */}
           {monthTicks.map(({ t, label }) => {
             const x = sx(t);
             return (
@@ -341,7 +320,7 @@ export default function CapabilityTimeline() {
                 <line x1={x} x2={x} y1={sy(0)} y2={sy(0) + 5} stroke="#cfcfca" />
                 <text
                   x={x}
-                  y={sy(0) + 18}
+                  y={sy(0) + 21}
                   textAnchor={label.includes("2026") ? "end" : "middle"}
                   className="viz-axis"
                 >
@@ -350,17 +329,6 @@ export default function CapabilityTimeline() {
               </g>
             );
           })}
-          {relTicks.map(({ t, label }) => (
-            <text
-              key={label}
-              x={sx(t)}
-              y={sy(0) + 34}
-              textAnchor={label === "Now" ? "end" : "middle"}
-              className="ar-ct-rel"
-            >
-              {label}
-            </text>
-          ))}
 
           {/* Model points */}
           {drawOrder.map((row) => {
@@ -369,8 +337,8 @@ export default function CapabilityTimeline() {
             const mult = multOf(row);
             const beatsStarter = (mult ?? 0) >= 1;
             const isHovered = hoverKey === row.key;
-            const fill = beatsStarter ? CMYK.cDeep : "#989892";
-            const r = isHovered ? 6.5 : beatsStarter ? 5 : 4;
+            const fill = beatsStarter ? CMYK.cDeep : "#9a9a94";
+            const r = isHovered ? 7 : beatsStarter ? 5.5 : 4.5;
 
             return (
               <g
@@ -390,10 +358,10 @@ export default function CapabilityTimeline() {
                   <circle
                     cx={cx}
                     cy={cy}
-                    r={9.5}
+                    r={10}
                     fill="none"
                     stroke={fill}
-                    strokeWidth={1.5}
+                    strokeWidth={1.6}
                     strokeOpacity={0.55}
                   />
                 )}
@@ -413,11 +381,9 @@ export default function CapabilityTimeline() {
           {/* Minimal inline labels */}
           {sortedModels.map((row) => {
             const cfg = INLINE_LABELS[row.key];
-            if (!cfg || (narrow && cfg.narrowHide)) return null;
+            if (!cfg || (cfg.narrowOnly && !narrow)) return null;
             const cx = sx(parseUtc(row.date));
             const cy = sy(valOf(row));
-            const mult = multOf(row);
-            const multStr = mult != null ? ` ${fmtMult(mult)}` : "";
             return (
               <text
                 key={`lbl-${row.key}`}
@@ -426,31 +392,33 @@ export default function CapabilityTimeline() {
                 textAnchor={cfg.anchor}
                 className="ar-ct-lbl"
               >
-                {row.short}
-                {multStr && <tspan className="ar-ct-lbl-val">{multStr}</tspan>}
+                {row.model}
               </text>
             );
           })}
 
-          {/* Right-margin stacked labels for the November frontier cluster */}
+          {/* Right-margin stacked labels for the November frontier leaders */}
           {!narrow &&
             marginModels.map((row) => {
               const cx = sx(parseUtc(row.date));
               const cy = sy(valOf(row));
               const ly = marginY.get(row.key) ?? cy;
-              const xLabel = m.l + plotW + 12;
+              const xLabel = m.l + plotW + 14;
+              const leader =
+                row.key === "fable"
+                  ? `M${cx.toFixed(1)},${(cy + 7).toFixed(1)}V${ly.toFixed(1)}H${(xLabel - 5).toFixed(1)}`
+                  : `M${(cx + 7).toFixed(1)},${cy.toFixed(1)}L${(xLabel - 5).toFixed(1)},${ly.toFixed(1)}`;
               return (
                 <g key={`mlbl-${row.key}`}>
                   <path
-                    d={`M${(cx + 6).toFixed(1)},${cy.toFixed(1)}L${(xLabel - 4).toFixed(1)},${ly.toFixed(1)}`}
+                    d={leader}
                     fill="none"
                     stroke={CMYK.cDeep}
-                    strokeWidth={0.9}
-                    strokeOpacity={0.4}
+                    strokeWidth={1.1}
+                    strokeOpacity={0.45}
                   />
-                  <text x={xLabel} y={ly + 3.5} className="ar-ct-lbl ar-ct-lbl-margin">
-                    {row.short}{" "}
-                    <tspan className="ar-ct-lbl-val">{fmtMult(multOf(row))}</tspan>
+                  <text x={xLabel} y={ly} dominantBaseline="middle" className="ar-ct-lbl">
+                    {row.model}
                   </text>
                 </g>
               );

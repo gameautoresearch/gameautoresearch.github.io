@@ -297,43 +297,37 @@ html.agent-view .ar h2.ar-config { margin-top: 2em; padding-top: 0; border-top: 
 .gr-speed button[aria-pressed="true"] { background: #111; border-color: #111; color: #fff; }
 @media (max-width: 520px) { .gr-speed { display: none; } .gr-tick { min-width: 0; } }
 
-/* Polytopia, 13 models: best-so-far race and Elo leaderboard. */
+/* Polytopia, 20 models: best-so-far race and Elo leaderboard. */
 .fr { position: relative; }
 .fr svg { display: block; width: 100%; height: auto; overflow: visible; }
-@media (prefers-reduced-motion: no-preference) {
-  .fr-run-dot { opacity: 0; transition: opacity 320ms ease-out; }
-  .fr-runs-seen .fr-run-dot { opacity: 1; }
-}
-.fr-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 6px 12px; margin-bottom: 8px; }
-.fr-title { font-size: 15px; font-weight: 600; color: var(--ink); line-height: 1.3; }
+.fr-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 6px 12px; margin-bottom: 6px; }
 .fr-pin-chip {
   display: inline-flex; align-items: center; gap: 6px;
-  padding: 2px 8px; border: 1px solid #d8d8d3; border-radius: 999px;
-  background: #fafaf8; color: var(--ink); font: inherit; font-size: 11.5px; font-weight: 500;
+  padding: 2px 9px; border: 1px solid #d8d8d3; border-radius: 999px;
+  background: #fafaf8; color: var(--ink); font: inherit; font-size: 12px; font-weight: 500;
   cursor: pointer; font-variant-numeric: tabular-nums;
 }
 .fr-pin-chip:hover { border-color: #111; background: #fff; }
 .fr-pin-chip i { width: 7px; height: 7px; border-radius: 50%; }
 .fr-controls { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 6px 12px; }
 .fr-ref { fill: var(--viz-axis); font-size: 10.5px; }
-.fr-ref-line { stroke: #9d9d96; stroke-width: 1.1; stroke-dasharray: 4 3; }
+.fr-ref-line { stroke: #9d9d96; stroke-width: 1.2; stroke-dasharray: 4 3; }
 .fr-ref-lbl {
-  fill: #4f4f4a;
+  fill: #3d3d39;
   font-size: 13.5px;
-  font-weight: 500;
+  font-weight: 600;
   paint-order: stroke;
   stroke: #fff;
   stroke-width: 4px;
   stroke-linejoin: round;
 }
 .fr-direct-item { cursor: pointer; }
-.fr-axis { fill: #6b6b66; font-size: 13px; font-variant-numeric: tabular-nums; }
-.fr-axis-title { fill: #3a3a36; font-size: 13.5px; font-weight: 500; }
-.fr-lbl { font-size: 13.5px; font-variant-numeric: tabular-nums; }
-.fr-pack-lbl { fill: var(--secondary); font-size: 13px; font-weight: 500; }
-.fr-pack-sub { fill: var(--viz-axis); font-size: 12px; }
-.fr-compact-key { margin-bottom: 6px; gap: 4px 12px; font-size: 13px; }
-.fr-compact-others { color: var(--viz-axis); }
+.fr-axis { fill: #5e5e59; font-size: 13px; font-variant-numeric: tabular-nums; }
+.fr-axis-title { fill: #5e5e59; font-size: 13px; font-weight: 500; }
+.fr-lbl { font-size: 14px; font-variant-numeric: tabular-nums; }
+.fr-pack-lbl { fill: #7a7a74; font-size: 13px; font-weight: 500; }
+.fr-compact-key { margin-bottom: 10px; gap: 6px 14px; font-size: 13px; color: var(--ink); }
+.fr-compact-others { color: #7a7a74; }
 .fr-tip-head { display: flex !important; align-items: center; gap: 6px; }
 .fr-tip-head i { flex: none; width: 8px; height: 8px; border-radius: 2px; }
 .fr-legend { display: flex; flex-wrap: wrap; gap: 4px 6px; margin-top: 8px; }
@@ -699,36 +693,56 @@ html.agent-view .ar-outlier-kicker { color: inherit; }
   .ar .ar-sponsor { flex-direction: column; align-items: flex-start; gap: 14px; padding: 18px; }
 }
 
-/* Figure 6: historical model training capability over time (Feb–Nov 2026). */
+/* Figure 6: forecasting skill. */
+.ar-fc { font-variant-numeric: tabular-nums; }
+.ar-fc-legend { margin-bottom: 12px; gap: 6px 18px; font-size: 13.5px; font-weight: 500; color: var(--ink); }
+.ar-fc-legend i { width: 14px; height: 4px; border-radius: 2px; }
+.ar-fc-ref { fill: var(--ink); font-size: 13.5px; font-weight: 650; }
+.ar-fc-tick { fill: #3d3d39; font-size: 13px; font-weight: 500; }
+.ar-fc-axis-title { fill: #3d3d39; font-size: 13.5px; font-weight: 600; }
+.ar-fc-model {
+  fill: var(--ink);
+  font-size: 13.5px;
+  paint-order: stroke;
+  stroke: #fff;
+  stroke-width: 4px;
+  stroke-linejoin: round;
+}
+.ar-fc-val {
+  fill: var(--ink);
+  font-size: 13px;
+  paint-order: stroke;
+  stroke: #fff;
+  stroke-width: 4px;
+  stroke-linejoin: round;
+}
+
+/* Figure 7: historical model training capability over time (Feb–Nov 2026). */
 .ar-ct { font-variant-numeric: tabular-nums; }
 .ar-ct-plot { position: relative; }
 .ar-ct-pt { cursor: pointer; }
 .ar-ct-pt:focus { outline: none; }
-.ar-ct-ref {
-  fill: #8a8a85;
-  font-size: 10.5px;
-}
+.ar-ct .viz-axis { font-size: 13px; fill: #5e5e59; }
+.ar-ct-axis-title { font-size: 13px; fill: #5e5e59; font-weight: 500; }
 .ar-ct-ref-main {
   fill: var(--c-deep);
-  font-weight: 600;
-}
-.ar-ct-rel {
-  fill: #8a8a85;
-  font-size: 10px;
-  letter-spacing: 0.01em;
-}
-.ar-ct-lbl {
-  fill: #242422;
-  font-size: 11px;
+  font-size: 13.5px;
   font-weight: 600;
   paint-order: stroke;
   stroke: #fff;
-  stroke-width: 3.5px;
+  stroke-width: 4px;
+  stroke-linejoin: round;
+}
+.ar-ct-lbl {
+  fill: var(--ink);
+  font-size: 13.5px;
+  font-weight: 600;
+  paint-order: stroke;
+  stroke: #fff;
+  stroke-width: 4px;
   stroke-linejoin: round;
   pointer-events: none;
 }
-.ar-ct-lbl-margin { font-size: 11px; }
-.ar-ct-lbl-val { font-weight: 400; fill: var(--secondary); }
 .ar-ct-tip { width: 224px; max-width: 224px; }
 .ar-ct-tip b { font-weight: 600; color: var(--ink); }
 .ar-ct-tip-meta { color: var(--secondary); font-size: 11.5px; margin-bottom: 3px; }

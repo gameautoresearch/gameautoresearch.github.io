@@ -43,19 +43,16 @@ const signed = (v: number) => (v > 0 ? `+${v}` : v < 0 ? `−${-v}` : "0");
 const gpuText = (h: number) => (h < 1 ? `${Math.round(h * 60)} min` : `${h.toFixed(2)} GPU-h`);
 const hourText = (h: number) => (h < 1 ? `${Math.round(h * 60)} min` : `${h.toFixed(1)}h`);
 
-// Label every model that reaches >10% win rate and runs for most of the session (>=3h) directly on the right margin
-// (12 models), giving a strict 1-to-1 match between colored curves and right-margin labels. The remaining 8 models
-// (7 clustered under 6%, plus GPT-6.2 Astra which broke its env at 1.1h) stay quiet grey and light up in color on hover.
+// Highlight the top 4 full-session models in color with clear right-margin labels; keep the remaining 16 models
+// quiet grey until hovered or clicked so the frontier reads immediately without visual clutter.
 const LABELED_KEYS = new Set(
-  MODELS.filter((model) => winPct(model.best.elo) >= 10 && model.gpu >= 3.0).map((model) => model.key),
-);
-const TOP_KEYS = new Set(
   [...MODELS]
-    .filter((model) => LABELED_KEYS.has(model.key))
+    .filter((model) => model.gpu >= 3.0)
     .sort((a, b) => b.best.elo - a.best.elo)
     .slice(0, 4)
     .map((model) => model.key),
 );
+const TOP_KEYS = LABELED_KEYS;
 
 function curveColor(label: string) {
   const c = modelStyle(label).color;
@@ -169,23 +166,6 @@ export function ResearchRace() {
   const narrow = W < 540;
   const [hover, setHover] = useState<HoverState | null>(null);
   const [pinnedKey, setPinnedKey] = useState<string | null>(null);
-  const [seen, setSeen] = useState(false);
-
-  useEffect(() => {
-    const el = ref.current;
-    if (!el || agent || seen) return;
-    if (typeof IntersectionObserver === "undefined") {
-      setSeen(true);
-      return;
-    }
-    const observer = new IntersectionObserver(([entry]) => {
-      if (entry.intersectionRatio < 0.2) return;
-      setSeen(true);
-      observer.disconnect();
-    }, { threshold: 0.2 });
-    observer.observe(el);
-    return () => observer.disconnect();
-  }, [agent, seen]);
 
   if (agent) {
     return (
@@ -201,8 +181,8 @@ export function ResearchRace() {
     );
   }
 
-  const H = narrow ? 340 : 450;
-  const m = { l: 48, r: narrow ? 14 : 156, t: 32, b: 50 };
+  const H = narrow ? 320 : 390;
+  const m = { l: 48, r: narrow ? 16 : 154, t: 28, b: 48 };
   const plotW = W - m.l - m.r;
   const plotH = H - m.t - m.b;
   const xMax = 5;
@@ -225,12 +205,12 @@ export function ResearchRace() {
   const labeledModels = MODELS.filter((model) => LABELED_KEYS.has(model.key)).sort(
     (a, b) => b.best.elo - a.best.elo,
   );
-  const topModels = labeledModels.filter((model) => TOP_KEYS.has(model.key));
+  const topModels = labeledModels;
   const labelYMap = layoutLabels(
     labeledModels.map((model) => ({ key: model.key, targetY: sy(winPct(model.best.elo)) })),
-    18,
-    m.t + 6,
-    sy(10),
+    24,
+    m.t + 10,
+    sy(15),
   );
 
   const hitAt = (px: number, py: number): HoverState | null => {
@@ -380,10 +360,9 @@ export function ResearchRace() {
   const otherCount = MODELS.length - labeledModels.length;
 
   return (
-    <div className={`viz fr${seen ? " fr-runs-seen" : ""}`} ref={ref}>
-      <div className="fr-head">
-        <div className="fr-title">Best 15-minute network found over 5 hours of research</div>
-        {pinnedKey && activeModel && (
+    <div className="viz fr" ref={ref}>
+      {pinnedKey && activeModel && (
+        <div className="fr-head">
           <button
             type="button"
             className="fr-pin-chip"
@@ -395,8 +374,8 @@ export function ResearchRace() {
             <i style={{ background: curveColor(activeModel.label) }} />
             {activeModel.label} ({activeModel.nets.length} runs) ×
           </button>
-        )}
-      </div>
+        </div>
+      )}
       {narrow && (
         <div className="viz-legend fr-compact-key">
           {topModels.map((model) => (
@@ -407,7 +386,7 @@ export function ResearchRace() {
           ))}
           <span className="fr-compact-others">
             <i style={{ background: "#c8c8c2" }} />
-            +{MODELS.length - topModels.length} models
+            +{otherCount} others
           </span>
         </div>
       )}
@@ -448,11 +427,11 @@ export function ResearchRace() {
           ))}
 
           {/* Axis titles */}
-          <text x={m.l - 8} y={m.t - 14} className="fr-axis-title">
-            Win rate vs. 15-min baseline
+          <text x={m.l} y={m.t - 11} className="fr-axis-title">
+            Win rate
           </text>
-          <text x={m.l + plotW / 2} y={H - 6} className="fr-axis-title" textAnchor="middle">
-            Research time (GPU-hours)
+          <text x={m.l + plotW / 2} y={H - 5} className="fr-axis-title" textAnchor="middle">
+            Research time
           </text>
 
           {/* PPO baseline reference lines */}
@@ -463,8 +442,8 @@ export function ResearchRace() {
               <g key={r.id}>
                 <line x1={m.l} x2={W - m.r} y1={ry} y2={ry} className="fr-ref-line" />
                 <text
-                  x={isLeft ? m.l + 6 : W - m.r - 6}
-                  y={isLeft ? ry - 7 : ry + 16}
+                  x={isLeft ? m.l + 8 : W - m.r - 8}
+                  y={isLeft ? ry - 8 : ry + 17}
                   textAnchor={isLeft ? "start" : "end"}
                   className="fr-ref-lbl"
                 >
@@ -478,31 +457,6 @@ export function ResearchRace() {
             <rect x={m.l - 4} y={m.t - 4} width={plotW + 8} height={plotH + 8} />
           </clipPath>
           <g clipPath={`url(#${plotId})`}>
-            <g pointerEvents="none" aria-hidden="true">
-              {MODELS.map((model) => {
-                const colored = isColored(model);
-                const color = colored ? curveColor(model.label) : "#989891";
-                const opacity = activeKey === model.key ? 0 : activeKey ? 0.08 : colored ? 0.28 : 0.2;
-                return (
-                  <g key={model.key} opacity={opacity}>
-                    {MODEL_POINTS.get(model.key)?.map((p) => (
-                      <circle
-                        key={p.run}
-                        className="fr-run-dot"
-                        cx={sx(p.x)}
-                        cy={sy(p.y)}
-                        r={p.isFrontier ? 2.6 : 2.3}
-                        fill={p.isFrontier ? color : "none"}
-                        stroke={p.isFrontier ? "none" : color}
-                        strokeWidth={1.1}
-                        style={{ transitionDelay: `${(Math.min(xMax, Math.max(0, p.x)) / xMax) * 1000}ms` }}
-                      />
-                    ))}
-                  </g>
-                );
-              })}
-            </g>
-
             {/* Frontier step curves and highlighted experiment runs */}
             {drawOrder.map((model) => {
               const isTop = TOP_KEYS.has(model.key);
@@ -510,14 +464,11 @@ export function ResearchRace() {
               const isFocus = model.key === activeKey;
               const dimmed = activeKey !== null && !isFocus;
               const col = curveColor(model.label);
-              const stroke = isFocus || colored ? col : "#c2c2bc";
-              const isSol61 = model.key === "sol";
-              const strokeWidth = isFocus ? 2.6 : isTop ? 2.0 : colored ? 1.55 : 1.1;
-              const baseOpacity = isTop ? 0.95 : isSol61 ? 0.65 : colored ? 0.8 : 0.45;
-              const opacity = isFocus ? 1 : dimmed ? (colored ? 0.14 : 0.08) : baseOpacity;
+              const stroke = isFocus || colored ? col : "#c4c4bd";
+              const strokeWidth = isFocus ? 2.8 : isTop ? 2.3 : 1.25;
+              const baseOpacity = isTop ? 0.95 : 0.6;
+              const opacity = isFocus ? 1 : dimmed ? (colored ? 0.16 : 0.14) : baseOpacity;
               const points = MODEL_POINTS.get(model.key) ?? [];
-              const endX = sx(model.gpu);
-              const endY = sy(winPct(model.best.elo));
 
               return (
                 <g key={model.key}>
@@ -529,18 +480,6 @@ export function ResearchRace() {
                     strokeLinejoin="miter"
                     opacity={opacity}
                   />
-                  {/* Mark early-stopped colored curves subtly so it's clear where their session ended */}
-                  {colored && model.gpu < 4.75 && !isFocus && (
-                    <circle
-                      cx={endX}
-                      cy={endY}
-                      r={2.3}
-                      fill={col}
-                      stroke="#fff"
-                      strokeWidth={1}
-                      opacity={opacity}
-                    />
-                  )}
                   {/* When highlighted, show every experiment run: open dots for sub-frontier/failed runs, solid dots on the frontier */}
                   {isFocus &&
                     points.map((p, idx) => {
@@ -576,22 +515,20 @@ export function ResearchRace() {
             })}
           </g>
 
-          {/* Direct right-margin labels for all 12 models above 10% (plus quiet tail note) */}
+          {/* Direct right-margin labels for top 4 models + quiet summary of remaining models */}
           {!narrow && (
             <g className="fr-direct-labels">
               {labeledModels.map((model) => {
                 const col = curveColor(model.label);
                 const textCol = labelTextColor(model.label);
-                const isTop = TOP_KEYS.has(model.key);
                 const endX = sx(model.gpu);
                 const endY = sy(winPct(model.best.elo));
                 const ly = labelYMap.get(model.key) ?? endY;
                 const isFocus = activeKey === model.key;
                 const dimmed = activeKey !== null && !isFocus;
                 const rightEdge = W - m.r;
-                const labelX = rightEdge + 12;
-                const elbowX = rightEdge + 5;
-                const stoppedEarly = model.gpu < 4.75;
+                const labelX = rightEdge + 14;
+                const elbowX = rightEdge + 6;
                 return (
                   <g
                     key={model.key}
@@ -604,27 +541,15 @@ export function ResearchRace() {
                       togglePinLabel(model);
                     }}
                   >
-                    {stoppedEarly && (
-                      <line
-                        x1={endX + 3}
-                        x2={rightEdge}
-                        y1={endY}
-                        y2={endY}
-                        stroke={col}
-                        strokeWidth={1}
-                        strokeDasharray="1.5 3"
-                        opacity={isFocus ? 0.8 : 0.4}
-                      />
-                    )}
                     <path
-                      d={`M${(stoppedEarly ? rightEdge : endX + 2).toFixed(1)},${endY.toFixed(1)}L${elbowX.toFixed(1)},${ly.toFixed(1)}L${(labelX - 3).toFixed(1)},${ly.toFixed(1)}`}
+                      d={`M${(endX + 2).toFixed(1)},${endY.toFixed(1)}L${elbowX.toFixed(1)},${ly.toFixed(1)}L${(labelX - 4).toFixed(1)},${ly.toFixed(1)}`}
                       fill="none"
                       stroke={col}
-                      strokeWidth={isFocus ? 1.5 : 1}
-                      opacity={isFocus ? 0.95 : 0.65}
+                      strokeWidth={isFocus ? 1.6 : 1.15}
+                      opacity={isFocus ? 0.95 : 0.7}
                     />
                     <text x={labelX} y={ly} dominantBaseline="middle" className="fr-lbl">
-                      <tspan style={{ fill: textCol, fontWeight: isFocus ? 700 : isTop ? 600 : 500 }}>
+                      <tspan style={{ fill: textCol, fontWeight: isFocus ? 700 : 600 }}>
                         {model.label}
                       </tspan>
                     </text>
@@ -632,15 +557,16 @@ export function ResearchRace() {
                 );
               })}
 
-              {/* Quiet right-margin summary for the remaining unlabeled models */}
-              <g opacity={activeKey && LABELED_KEYS.has(activeKey) ? 0.2 : 1}>
-                <text x={W - m.r + 12} y={sy(2.5) - 6} className="fr-pack-lbl" dominantBaseline="middle">
-                  {otherCount} other models
-                </text>
-                <text x={W - m.r + 12} y={sy(2.5) + 10} className="fr-pack-sub" dominantBaseline="middle">
-                  Hover any line
-                </text>
-              </g>
+              {/* Quiet right-margin summary for the remaining models */}
+              <text
+                x={W - m.r + 14}
+                y={sy(28)}
+                className="fr-pack-lbl"
+                dominantBaseline="middle"
+                opacity={activeKey && LABELED_KEYS.has(activeKey) ? 0.25 : 1}
+              >
+                +{otherCount} other models
+              </text>
             </g>
           )}
         </svg>
