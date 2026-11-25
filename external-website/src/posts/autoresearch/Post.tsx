@@ -101,12 +101,12 @@ export default function AutoresearchPost() {
 
       <SubmissionFormats />
       <p>
-        We landed on this format because we saw that the nature of balancing
-        such small budgets of compute between research and training incentivized
-        simple strategies. The fix-training budget setup incentivizes higher
-        exploration, which is more interesting to measure, and better matches
-        how large-scale training research works: many small experiments inform
-        the recipe for an expensive "yolo" run.
+        We landed on this format because we saw that balancing small compute
+        budgets between research and training incentivized very simple
+        strategies. Standardizing the training budget incentivized more
+        exploration, and is a better matche for how scaled up training works:
+        many small experiments which inform the recipe for an expensive "yolo"
+        run.
       </p>
       <Figure
         n={2}
