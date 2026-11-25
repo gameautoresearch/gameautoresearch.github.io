@@ -26,15 +26,15 @@ const fmtWin = (elo: number) => {
 const REFS = [
   {
     id: "tuned",
-    label: "Tuned PPO baseline (36 min, 80%)",
-    shortLabel: "Tuned PPO baseline (36 min)",
+    label: "Tuned baseline (36 min)",
+    shortLabel: "Tuned baseline (36m)",
     elo: DATA.refs["starter-200m"],
     align: "left" as const,
   },
   {
     id: "base15",
-    label: "15-min PPO baseline (50% = even)",
-    shortLabel: "15-min PPO baseline (even)",
+    label: "15-min baseline (50%)",
+    shortLabel: "15-min baseline",
     elo: 0,
     align: "right" as const,
   },

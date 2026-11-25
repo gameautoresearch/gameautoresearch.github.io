@@ -472,7 +472,7 @@ export function CostMultiplier() {
         </span>
       </div>
       <div className="ar-cost-pair">
-        <figure className="pt-figure ar-cost-fig">
+        <div className="ar-cost-fig">
           <div className="ar-cost-head">Research cost included (x offset)</div>
           <div className="viz ar-cost" ref={leftRef}>
             <div className="ar-cost-plot">
@@ -644,13 +644,13 @@ export function CostMultiplier() {
               )}
             </div>
           </div>
-        </figure>
-        <figure className="pt-figure ar-cost-fig">
+        </div>
+        <div className="ar-cost-fig">
           <div className="ar-cost-head">Training compute only</div>
           <div className="viz ar-cost" ref={rightRef}>
             <TrainBars W={WR} />
           </div>
-        </figure>
+        </div>
       </div>
     </div>
   );

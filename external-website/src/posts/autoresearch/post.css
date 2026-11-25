@@ -243,6 +243,7 @@ html.agent-view .ar h2.ar-config { margin-top: 2em; padding-top: 0; border-top: 
 .sc-stage .replay-board, .sc-stage .gr-board { flex: 1; min-height: 0; width: 100%; height: 100%; max-height: none; margin: 0; padding: 4px 6px 6px; object-fit: contain; }
 .sc-card { display: flex; flex-direction: column; min-width: 0; padding: 10px 11px; border: 1px solid #e6e6e1; border-radius: 6px; background: #fafaf8; }
 .sc-card-head { display: flex; flex-direction: column; gap: 2px; }
+.sc-card-role { font-size: 9.5px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: var(--secondary); line-height: 1.2; }
 .sc-card-name { display: inline-flex; align-items: center; gap: 6px; min-width: 0; }
 .sc-card-name i { flex: none; width: 8px; height: 8px; border-radius: 2px; }
 .sc-card-name strong { font-size: 13.5px; font-weight: 600; line-height: 1.2; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -319,8 +320,8 @@ html.agent-view .ar h2.ar-config { margin-top: 2em; padding-top: 0; border-top: 
 .fr-ref { fill: var(--viz-axis); font-size: 10.5px; }
 .fr-ref-line { stroke: #9d9d96; stroke-width: 1.1; stroke-dasharray: 4 3; }
 .fr-ref-lbl {
-  fill: #63635d;
-  font-size: 10.5px;
+  fill: #4f4f4a;
+  font-size: 12px;
   font-weight: 500;
   paint-order: stroke;
   stroke: #fff;
@@ -445,7 +446,7 @@ html.agent-view .ar .ar-setup { font-size: inherit; }
 .ar-v-down { background: #f8e3e3; color: #b02e2e; }
 html.agent-view .ar-chip { padding: 0; background: none; color: inherit; font-size: inherit; font-weight: inherit; }
 /* Elo against total cost: legend marks for the frontier ring, the 1 h final squares and the untrained network. */
-.ar-cost-wrap { margin-top: 28px; }
+.ar-cost-wrap { margin-top: 0; }
 .ar-cost-pair { display: grid; grid-template-columns: 2fr 1fr; gap: 20px; align-items: start; }
 .ar-cost-fig { margin: 0; min-width: 0; }
 .ar-cost-head { margin-bottom: 6px; font-size: 13px; font-weight: 600; color: var(--ink); }

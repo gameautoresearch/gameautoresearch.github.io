@@ -181,7 +181,7 @@
     "model": "Claude Opus 5.5",
     "outcome": "318 Elo (8 h)",
     "budget": "$8.70 · 7 h limit",
-    "summary": "Tested score-difference shaping, wider networks, and learning-rate ablations under the $8.70 budget (Figure 4).",
+    "summary": "Tested score-difference shaping, wider networks, and learning-rate ablations under the $8.70 budget (Figure 5).",
     "stats": {
       "steps": 150,
       "thinkingSteps": 0,
@@ -206,7 +206,7 @@
     "model": "GPT-6.2 Astra",
     "outcome": "316 Elo (8 h)",
     "budget": "$8.70 · 7 h limit",
-    "summary": "Explored additive action log-priors, tactical flags, and a 48-wide stem under the $8.70 budget (Figure 4).",
+    "summary": "Explored additive action log-priors, tactical flags, and a 48-wide stem under the $8.70 budget (Figure 5).",
     "stats": {
       "steps": 81,
       "thinkingSteps": 0,
@@ -231,7 +231,7 @@
     "model": "GPT-6.2 Sol",
     "outcome": "293 Elo (8 h)",
     "budget": "$8.70 · 7 h limit",
-    "summary": "Three ~1-hour experiments moving from shared-trunk 2×32 to spatial-v3 with turn-based GAE (Figure 4).",
+    "summary": "Three ~1-hour experiments moving from shared-trunk 2×32 to spatial-v3 with turn-based GAE (Figure 5).",
     "stats": {
       "steps": 80,
       "thinkingSteps": 0,

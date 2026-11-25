@@ -1,4 +1,11 @@
-import { lazy, Suspense, useEffect, useRef, useState, type ReactNode } from "react";
+import {
+  lazy,
+  Suspense,
+  useEffect,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 import { useAgentView } from "../../view";
 import ReplayViewer from "./polytopia/ReplayViewer";
 import GeneralsReplay from "./GeneralsReplay";
@@ -311,13 +318,21 @@ function SideCard({ card, accent }: { card: PolicyCard; accent: string }) {
   );
 }
 
-function Pokemon({ item, renderSide }: { item: Item; renderSide: (side: 0 | 1) => ReactNode }) {
+function Pokemon({
+  item,
+  renderSide,
+}: {
+  item: Item;
+  renderSide: (side: 0 | 1) => ReactNode;
+}) {
   const file = usePokemonReplay(item.id);
   const wait = (
     <div className="psr psr-flanked">
       <div className="sc-row">
         {renderSide(0)}
-        <div className="sc-center sc-wait">{file === "error" ? "This battle could not load." : "Loading battle…"}</div>
+        <div className="sc-center sc-wait">
+          {file === "error" ? "This battle could not load." : "Loading battle…"}
+        </div>
         {renderSide(1)}
       </div>
       <div className="psr-bar sc-controls-stub" aria-hidden="true" />
@@ -325,9 +340,18 @@ function Pokemon({ item, renderSide }: { item: Item; renderSide: (side: 0 | 1) =
   );
   return (
     <Suspense fallback={wait}>
-      {file && file !== "error" && file.id === item.id
-        ? <BattleReplay key={item.id} log={file.log} startTurn={item.start} initialSpeed="fast" cropSidebars renderSide={renderSide} />
-        : wait}
+      {file && file !== "error" && file.id === item.id ? (
+        <BattleReplay
+          key={item.id}
+          log={file.log}
+          startTurn={item.start}
+          initialSpeed="fast"
+          cropSidebars
+          renderSide={renderSide}
+        />
+      ) : (
+        wait
+      )}
     </Suspense>
   );
 }
@@ -337,7 +361,8 @@ function Stage({ item }: { item: Item }) {
   const renderSide = (side: 0 | 1) => (
     <SideCard card={item.cards[side]} accent={accents[side]} />
   );
-  if (item.game === "pokemon") return <Pokemon item={item} renderSide={renderSide} />;
+  if (item.game === "pokemon")
+    return <Pokemon item={item} renderSide={renderSide} />;
   if (item.game === "polytopia") {
     return (
       <ReplayViewer
@@ -367,7 +392,9 @@ export default function Showcase() {
   const agent = useAgentView();
   const [i, setI] = useState(0);
   const [touring, setTouring] = useState(
-    () => typeof window === "undefined" || !window.matchMedia?.("(prefers-reduced-motion: reduce)").matches,
+    () =>
+      typeof window === "undefined" ||
+      !window.matchMedia?.("(prefers-reduced-motion: reduce)").matches,
   );
   const [visible, setVisible] = useState(true);
   const root = useRef<HTMLDivElement>(null);
@@ -376,13 +403,18 @@ export default function Showcase() {
   useEffect(() => {
     const el = root.current;
     if (!el || typeof IntersectionObserver === "undefined") return;
-    const io = new IntersectionObserver(([e]) => setVisible(e.isIntersecting), { threshold: 0.3 });
+    const io = new IntersectionObserver(([e]) => setVisible(e.isIntersecting), {
+      threshold: 0.3,
+    });
     io.observe(el);
     return () => io.disconnect();
   }, []);
   useEffect(() => {
     if (!touring || !visible) return;
-    const t = window.setTimeout(() => setI((v) => (v + 1) % ITEMS.length), ROTATE_MS);
+    const t = window.setTimeout(
+      () => setI((v) => (v + 1) % ITEMS.length),
+      ROTATE_MS,
+    );
     return () => window.clearTimeout(t);
   }, [touring, visible, i]);
 
@@ -393,7 +425,8 @@ export default function Showcase() {
       <ul>
         {ITEMS.map((g) => (
           <li key={g.id}>
-            {GAMES.find((x) => x.id === g.game)!.label}: {describe(g.cards[0])} vs {describe(g.cards[1])}.
+            {GAMES.find((x) => x.id === g.game)!.label}: {describe(g.cards[0])}{" "}
+            vs {describe(g.cards[1])}.
           </li>
         ))}
       </ul>
@@ -401,10 +434,17 @@ export default function Showcase() {
   }
 
   const takeOver = () => setTouring(false);
-  const sameGame = ITEMS.map((g, j) => ({ g, j })).filter(({ g }) => g.game === item.game);
+  const sameGame = ITEMS.map((g, j) => ({ g, j })).filter(
+    ({ g }) => g.game === item.game,
+  );
 
   return (
-    <div className="sc" ref={root} onPointerDownCapture={takeOver} onKeyDownCapture={takeOver}>
+    <div
+      className="sc"
+      ref={root}
+      onPointerDownCapture={takeOver}
+      onKeyDownCapture={takeOver}
+    >
       <div className="sc-head">
         <div className="sc-games" role="tablist" aria-label="Game">
           {GAMES.map((g) => (
@@ -423,7 +463,10 @@ export default function Showcase() {
           <div
             className="sc-progress"
             key={`${i}-${visible}`}
-            style={{ animationDuration: `${ROTATE_MS}ms`, animationPlayState: visible ? "running" : "paused" }}
+            style={{
+              animationDuration: `${ROTATE_MS}ms`,
+              animationPlayState: visible ? "running" : "paused",
+            }}
           />
         ) : (
           <div className="sc-progress is-idle" aria-hidden="true" />
@@ -436,7 +479,13 @@ export default function Showcase() {
 
       <div className="sc-matchups" role="tablist" aria-label="Matchup">
         {sameGame.map(({ g, j }) => (
-          <button key={g.id} type="button" role="tab" aria-selected={i === j} onClick={() => setI(j)}>
+          <button
+            key={g.id}
+            type="button"
+            role="tab"
+            aria-selected={i === j}
+            onClick={() => setI(j)}
+          >
             {g.players[0]} vs {g.players[1]}
           </button>
         ))}

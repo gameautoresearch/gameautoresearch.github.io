@@ -146,8 +146,22 @@ export default function AutoresearchPost() {
         The next, a {costMult.second.model} run that spent $
         {costMult.second.spent.toFixed(2)} on research, reaches{" "}
         {costMult.second.x.toFixed(1)}× savings after 8 hours of training.
+        Crossing the "Starter 1x" line means that research spend has paid for
+        itself.
       </p>
-      <CostMultiplier />
+      <Figure
+        n={3}
+        wide
+        caption={
+          <>
+            Compute multiplier of researched Polytopia recipes relative to the
+            unmodified starter (1×), with research spend included on the left
+            and training compute only on the right.
+          </>
+        }
+      >
+        <CostMultiplier />
+      </Figure>
 
       <section className="ar-outlier" aria-labelledby="neon-outlier">
         <span className="ar-outlier-kicker">Outlier run</span>
@@ -175,7 +189,7 @@ export default function AutoresearchPost() {
         ran <strong>five short A/B tests</strong> (mostly pairs of 12-minute
         runs for ~$0.60 each).
       </p>
-      <Figure n={3} wide caption={<>Neon's 5 A/B tests</>}>
+      <Figure n={4} wide caption={<>Neon&rsquo;s 5 A/B tests</>}>
         <NeonDiscipline />
       </Figure>
       <p>
@@ -188,7 +202,7 @@ export default function AutoresearchPost() {
         4&ndash;6 runs.
       </p>
       <Figure
-        n={4}
+        n={5}
         wide
         caption={
           <>
@@ -203,26 +217,30 @@ export default function AutoresearchPost() {
 
       <h3 id="tools">Would agents fix a slow simulator?</h3>
       <p>
-        Fast simulation is usually part of the workspace we give agents. In some
-        tests, we supplied an accurate but single-threaded Python simulator.
+        In our own experience training Polytopia bots, simulator speed was one
+        of the biggest bottlenecks to iteration and cost. Fast simulation is
+        usually part of the workspace we give agents, so we also tested a
+        Generals variant with an accurate but slow, single-threaded Python
+        simulator to see whether agents would optimize it themselves.
       </p>
       <p>
         All four agents noticed the bottleneck. Claude Opus 5.5 and GPT-6.1 Sol
-        built batched simulators, checked their behavior against the supplied
-        implementation, and trained at roughly 14,600 and 5,400 game ticks per
-        second. DeepSeek V4 Pro and Kimi K3.1 Pro stayed with the supplied
-        engine at about 565 and 630 ticks per second. The two rebuilders took
-        the top two tournament spots. Their recipes differed in other ways too,
-        so the tournament shows how the whole strategy worked within the budget.
+        rebuilt the simulator to run batched, verified it against the original,
+        and trained on roughly 10× to 25× more samples for the same compute.
+        DeepSeek V4 Pro and Kimi K3.1 Pro stayed with the supplied engine. The
+        two rebuilders took the top two spots in the tournament.
       </p>
 
       <h3 id="forecast">Predicting which run will win</h3>
       <p>
-        Forecasting is a cheap microcosm of researchers&rsquo; ability: making
-        accurate predictions before buying compute. We sampled several
-        historical research runs, then showed forecasting agents only evidence
-        from up until each run launched, like the training recipe and results
-        from prior runs.
+        Evaluating agents on full RL sessions is expensive, so we wanted a
+        cheaper signal. Forecasting tests a core piece of research
+        judgment&mdash;predicting which experiment will pay off before buying
+        compute&mdash;without needing any GPUs at all. We took historical
+        research runs and showed each model only the evidence available before a
+        run launched, like its training recipe and prior results. Even at a
+        fraction of the cost, forecasting skill tracked which models performed
+        best in full training runs.
       </p>
       <p>
         Given {pokeSkill.items} anonymized Pokémon runs cut off at launch, only{" "}
@@ -230,7 +248,7 @@ export default function AutoresearchPost() {
         on run length and practice history.
       </p>
       <Figure
-        n={5}
+        n={6}
         caption={
           <>
             Forecast skill across {pokeSkill.items} Pokémon runs (0 = blind
@@ -254,7 +272,7 @@ export default function AutoresearchPost() {
         the starter on the same or much lower compute budget.
       </p>
       <Figure
-        n={6}
+        n={7}
         wide
         caption={
           <>
