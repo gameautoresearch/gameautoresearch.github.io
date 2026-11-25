@@ -323,20 +323,15 @@ export default function AutoresearchPost() {
         compute multipliers in a single session, their ability to train small,
         useful models shows support for recursive self-improvement capability.
       </p>
-      <p>
-        We thank Modal for supporting this research with compute credits. The
-        project used about 3,000 GPU-hours and an estimated 30,000 CPU
-        core-hours. Adjusting GPU and CPU allocations on demand let us test and
-        refine our benchmark tasks quickly.
-      </p>
-      <a
-        className="ar-sponsor"
-        href="https://modal.com"
-        target="_blank"
-        rel="noreferrer"
-      >
-        <img src={modalWordmark} alt="Modal" width={140} />
-      </a>
+      <aside className="ar-sponsor">
+        <a href="https://modal.com" target="_blank" rel="noreferrer">
+          <img src={modalWordmark} alt="Modal" width={120} />
+        </a>
+        <p>
+          We thank Modal for supporting this research. The evaluation used about
+          3,000 GPU-hours and an estimated 30,000 CPU core&#8209;hours.
+        </p>
+      </aside>
 
       <hr />
       <h3 id="related">Related work</h3>
