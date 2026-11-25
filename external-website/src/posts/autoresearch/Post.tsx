@@ -248,19 +248,18 @@ export default function AutoresearchPost() {
         We also ran previous model releases on the same empty-starter Polytopia
         task to see how quickly training skill is advancing. Earlier in the
         year, frontier models struggled to produce useful policies at all&mdash;
-        could not beat random play, and August releases fell well short of our
-        basic PPO starter recipe. Starting in the fall, newer models crossed a
-        clear threshold and began training policies that beat the starter on the
-        same compute budget.
+        February releases could not beat random play, and August releases fell
+        well short of our basic PPO starter recipe. Starting in the fall, newer
+        models crossed a clear threshold and began training policies that beat
+        the starter on the same or much lower compute budget.
       </p>
       <Figure
         n={6}
         wide
         caption={
           <>
-            Compute multiplier of each model&rsquo;s by release date
-            (February&ndash;November 2026). Higher means more compute effecient
-            for the same strength result; Each point is a single run;
+            Compute multiplier by model release date (February&ndash;November
+            2026). Higher means more compute-efficient for the same strength.
           </>
         }
       >
@@ -288,9 +287,9 @@ export default function AutoresearchPost() {
       </p>
       <p>
         We thank Modal for supporting this research with compute credits. The
-        project used about 3,000 GPU-hours and an estimated 30,000 CPU core-hours.
-        Adjusting GPU and CPU allocations on demand let us test and refine our
-        benchmark tasks quickly.
+        project used about 3,000 GPU-hours and an estimated 30,000 CPU
+        core-hours. Adjusting GPU and CPU allocations on demand let us test and
+        refine our benchmark tasks quickly.
       </p>
       <a
         className="ar-sponsor"
@@ -415,6 +414,13 @@ export default function AutoresearchPost() {
         Pokémon, The Battle of Polytopia and Generals.io are trademarks of their
         respective owners. This project is not affiliated with or endorsed by
         them.
+      </p>
+
+      <h3 id="trajectories">Agent trajectories</h3>
+      <p>
+        <a href={`${import.meta.env.BASE_URL}trajectories`}>
+          Browse the full trajectory viewer →
+        </a>{" "}
       </p>
     </div>
   );

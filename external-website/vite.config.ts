@@ -30,6 +30,11 @@ function staticReplayPages(): Plugin {
         for (const file of files.filter((name) => /^[\w-]+\.json$/.test(name))) {
           this.emitFile({ type: "asset", fileName: `replays/pokemon/${file.slice(0, -5)}/index.html`, source: page.source });
         }
+        this.emitFile({ type: "asset", fileName: "trajectories/index.html", source: page.source });
+        const trajs = readdirSync(new URL("./public/trajectories/", import.meta.url));
+        for (const file of trajs.filter((name) => /^[\w-]+\.json$/.test(name))) {
+          this.emitFile({ type: "asset", fileName: `trajectories/${file.slice(0, -5)}/index.html`, source: page.source });
+        }
         const notices = new URL("./src/showdown/licenses/", import.meta.url);
         for (const notice of readdirSync(notices)) {
           this.emitFile({

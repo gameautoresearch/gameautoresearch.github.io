@@ -1,5 +1,5 @@
 {
-  "source": "Pooled Polytopia empty-starter checkpoint Elo (2,499,920 games, 865 entrants, poly-fill-pooled-20261122) mapped onto the unmodified PPO starter compute curve (reports/polytopia/compute-multipliers-2026-11-20/curve.json). finalMult is null below the 0.43x measured floor (starter-20m, -215 Elo); plotMult gives the curve's raw extrapolation for visual placement within the <0.43x band.",
+  "source": "Pooled Polytopia empty-starter checkpoint Elo (2,499,920 games, 865 entrants, poly-fill-pooled-20261122) across all 30 counted models, mapped onto the unmodified PPO starter compute curve (reports/polytopia/compute-multipliers-2026-11-20/curve.json). finalMult and bestMult are null below the 0.43x measured floor (starter-20m, -215 Elo); plotMult and bestPlotMult give the curve's raw extrapolation for visual placement within the <0.43x band.",
   "floorMult": 0.43,
   "models": [
     {
@@ -12,6 +12,9 @@
       "finalElo": -2461,
       "finalMult": null,
       "plotMult": 0.01,
+      "bestElo": -954,
+      "bestMult": null,
+      "bestPlotMult": 0.06,
       "note": "Final retrain loses to random play (1.2% of games)."
     },
     {
@@ -24,6 +27,9 @@
       "finalElo": -1838,
       "finalMult": null,
       "plotMult": 0.01,
+      "bestElo": -1844,
+      "bestMult": null,
+      "bestPlotMult": 0.01,
       "note": "Preview release; final retrain loses to random play (2.7% of games)."
     },
     {
@@ -35,7 +41,10 @@
       "grade": 6.8,
       "finalElo": -1622,
       "finalMult": null,
-      "plotMult": 0.02
+      "plotMult": 0.02,
+      "bestElo": -1112,
+      "bestMult": null,
+      "bestPlotMult": 0.05
     },
     {
       "key": "opus48",
@@ -46,7 +55,10 @@
       "grade": 24.5,
       "finalElo": -1275,
       "finalMult": null,
-      "plotMult": 0.03
+      "plotMult": 0.03,
+      "bestElo": -856,
+      "bestMult": null,
+      "bestPlotMult": 0.08
     },
     {
       "key": "fable5",
@@ -57,7 +69,10 @@
       "grade": 22.1,
       "finalElo": -1236,
       "finalMult": null,
-      "plotMult": 0.04
+      "plotMult": 0.04,
+      "bestElo": -1067,
+      "bestMult": null,
+      "bestPlotMult": 0.05
     },
     {
       "key": "sol56",
@@ -68,7 +83,24 @@
       "grade": 30.0,
       "finalElo": -1162,
       "finalMult": null,
-      "plotMult": 0.04
+      "plotMult": 0.04,
+      "bestElo": -756,
+      "bestMult": null,
+      "bestPlotMult": 0.1
+    },
+    {
+      "key": "kimik3",
+      "model": "Kimi K3",
+      "short": "Kimi K3",
+      "lab": "moonshot",
+      "date": "2026-07-16",
+      "grade": 25.6,
+      "finalElo": -1271,
+      "finalMult": null,
+      "plotMult": 0.03,
+      "bestElo": -928,
+      "bestMult": null,
+      "bestPlotMult": 0.07
     },
     {
       "key": "opus5",
@@ -80,7 +112,52 @@
       "finalElo": -622,
       "finalMult": null,
       "plotMult": 0.13,
+      "bestElo": -416,
+      "bestMult": null,
+      "bestPlotMult": 0.23,
       "note": "Ran at medium reasoning effort (high effort was refused on the route)."
+    },
+    {
+      "key": "dsflash",
+      "model": "DeepSeek V4 Flash",
+      "short": "DeepSeek V4 Flash",
+      "lab": "deepseek",
+      "date": "2026-07-31",
+      "grade": 7.6,
+      "finalElo": -1574,
+      "finalMult": null,
+      "plotMult": 0.02,
+      "bestElo": -1571,
+      "bestMult": null,
+      "bestPlotMult": 0.02
+    },
+    {
+      "key": "ds4pro",
+      "model": "DeepSeek V4 Pro",
+      "short": "DeepSeek V4 Pro",
+      "lab": "deepseek",
+      "date": "2026-08-13",
+      "grade": 26.9,
+      "finalElo": -966,
+      "finalMult": null,
+      "plotMult": 0.06,
+      "bestElo": -748,
+      "bestMult": null,
+      "bestPlotMult": 0.1
+    },
+    {
+      "key": "glm",
+      "model": "GLM-5.3",
+      "short": "GLM-5.3",
+      "lab": "zai",
+      "date": "2026-08-14",
+      "grade": 27.7,
+      "finalElo": -717,
+      "finalMult": null,
+      "plotMult": 0.11,
+      "bestElo": -647,
+      "bestMult": null,
+      "bestPlotMult": 0.12
     },
     {
       "key": "gem38f",
@@ -91,7 +168,10 @@
       "grade": 15.9,
       "finalElo": -960,
       "finalMult": null,
-      "plotMult": 0.06
+      "plotMult": 0.06,
+      "bestElo": -852,
+      "bestMult": null,
+      "bestPlotMult": 0.08
     },
     {
       "key": "astra",
@@ -102,7 +182,24 @@
       "grade": 77.4,
       "finalElo": 217,
       "finalMult": 3.02,
-      "plotMult": 3.02
+      "plotMult": 3.02,
+      "bestElo": 283,
+      "bestMult": 4.59,
+      "bestPlotMult": 4.59
+    },
+    {
+      "key": "luna",
+      "model": "GPT-6 Luna",
+      "short": "GPT-6 Luna",
+      "lab": "openai",
+      "date": "2026-09-22",
+      "grade": 8.9,
+      "finalElo": -1510,
+      "finalMult": null,
+      "plotMult": 0.02,
+      "bestElo": -1433,
+      "bestMult": null,
+      "bestPlotMult": 0.03
     },
     {
       "key": "sol6",
@@ -114,7 +211,10 @@
       "finalElo": -1249,
       "finalMult": null,
       "plotMult": 0.04,
-      "note": "Counted second attempt; an uncounted first attempt also finished below 0.43×."
+      "bestElo": -1024,
+      "bestMult": null,
+      "bestPlotMult": 0.05,
+      "note": "Counted second attempt; an uncounted first attempt also finished below 0.43\u00d7."
     },
     {
       "key": "opus",
@@ -125,7 +225,10 @@
       "grade": 57.5,
       "finalElo": 18,
       "finalMult": 1.08,
-      "plotMult": 1.08
+      "plotMult": 1.08,
+      "bestElo": 30,
+      "bestMult": 1.14,
+      "bestPlotMult": 1.14
     },
     {
       "key": "sol",
@@ -136,7 +239,24 @@
       "grade": 70.7,
       "finalElo": 145,
       "finalMult": 2.02,
-      "plotMult": 2.02
+      "plotMult": 2.02,
+      "bestElo": 192,
+      "bestMult": 2.61,
+      "bestPlotMult": 2.61
+    },
+    {
+      "key": "muse",
+      "model": "Meta Muse Wonder",
+      "short": "Muse Wonder",
+      "lab": "meta",
+      "date": "2026-10-12",
+      "grade": 34.2,
+      "finalElo": -350,
+      "finalMult": null,
+      "plotMult": 0.28,
+      "bestElo": -284,
+      "bestMult": null,
+      "bestPlotMult": 0.34
     },
     {
       "key": "argon",
@@ -148,7 +268,81 @@
       "finalElo": -97,
       "finalMult": 0.67,
       "plotMult": 0.67,
+      "bestElo": -52,
+      "bestMult": 0.8,
+      "bestPlotMult": 0.8,
       "note": "Run through the Antigravity CLI with tools disabled."
+    },
+    {
+      "key": "ds41flash",
+      "model": "DeepSeek V4.1 Flash",
+      "short": "DeepSeek V4.1 Fl.",
+      "lab": "deepseek",
+      "date": "2026-10-17",
+      "grade": 48.2,
+      "finalElo": -213,
+      "finalMult": 0.44,
+      "plotMult": 0.44,
+      "bestElo": -39,
+      "bestMult": 0.85,
+      "bestPlotMult": 0.85,
+      "note": "Updated Oct 17 checkpoint (1017); best in-session network reached 0.85\u00d7."
+    },
+    {
+      "key": "kimi",
+      "model": "Kimi K3.1 Pro",
+      "short": "Kimi K3.1 Pro",
+      "lab": "moonshot",
+      "date": "2026-10-23",
+      "grade": 56.8,
+      "finalElo": -35,
+      "finalMult": 0.86,
+      "plotMult": 0.86,
+      "bestElo": -55,
+      "bestMult": 0.79,
+      "bestPlotMult": 0.79
+    },
+    {
+      "key": "terra",
+      "model": "GPT-6.1 Terra",
+      "short": "GPT-6.1 Terra",
+      "lab": "openai",
+      "date": "2026-10-26",
+      "grade": 65.1,
+      "finalElo": 31,
+      "finalMult": 1.15,
+      "plotMult": 1.15,
+      "bestElo": 54,
+      "bestMult": 1.28,
+      "bestPlotMult": 1.28
+    },
+    {
+      "key": "hy4",
+      "model": "Tencent Hy4",
+      "short": "Tencent Hy4",
+      "lab": "tencent",
+      "date": "2026-11-04",
+      "grade": 27.7,
+      "finalElo": -499,
+      "finalMult": null,
+      "plotMult": 0.18,
+      "bestElo": -496,
+      "bestMult": null,
+      "bestPlotMult": 0.18
+    },
+    {
+      "key": "inkling2s",
+      "model": "Inkling 2 Small",
+      "short": "Inkling 2 Small",
+      "lab": "thinking",
+      "date": "2026-11-05",
+      "grade": 24.4,
+      "finalElo": -1372,
+      "finalMult": null,
+      "plotMult": 0.03,
+      "bestElo": -1363,
+      "bestMult": null,
+      "bestPlotMult": 0.03
     },
     {
       "key": "fable",
@@ -159,7 +353,10 @@
       "grade": 67.8,
       "finalElo": 180,
       "finalMult": 2.44,
-      "plotMult": 2.44
+      "plotMult": 2.44,
+      "bestElo": 220,
+      "bestMult": 3.08,
+      "bestPlotMult": 3.08
     },
     {
       "key": "gem4c",
@@ -170,7 +367,10 @@
       "grade": 61.5,
       "finalElo": -1,
       "finalMult": 1.0,
-      "plotMult": 1.0
+      "plotMult": 1.0,
+      "bestElo": 5,
+      "bestMult": 1.02,
+      "bestPlotMult": 1.02
     },
     {
       "key": "gem4h",
@@ -181,7 +381,10 @@
       "grade": 35.5,
       "finalElo": -338,
       "finalMult": null,
-      "plotMult": 0.29
+      "plotMult": 0.29,
+      "bestElo": -122,
+      "bestMult": 0.61,
+      "bestPlotMult": 0.61
     },
     {
       "key": "astra62",
@@ -193,7 +396,10 @@
       "finalElo": -284,
       "finalMult": null,
       "plotMult": 0.34,
-      "note": "Used 22% of its GPU budget after a script bug; best in-session network reached 3.2×."
+      "bestElo": 224,
+      "bestMult": 3.15,
+      "bestPlotMult": 3.15,
+      "note": "Used 22% of its GPU budget after a script bug; best in-session network reached 3.2\u00d7."
     },
     {
       "key": "sol62",
@@ -204,7 +410,10 @@
       "grade": 71.9,
       "finalElo": 197,
       "finalMult": 2.69,
-      "plotMult": 2.69
+      "plotMult": 2.69,
+      "bestElo": 292,
+      "bestMult": 4.88,
+      "bestPlotMult": 4.88
     },
     {
       "key": "gem4n",
@@ -215,7 +424,192 @@
       "grade": 73.2,
       "finalElo": 186,
       "finalMult": 2.52,
-      "plotMult": 2.52
+      "plotMult": 2.52,
+      "bestElo": 240,
+      "bestMult": 3.48,
+      "bestPlotMult": 3.48
+    }
+  ],
+  "workingStarter": [
+    {
+      "key": "astra",
+      "model": "GPT-6 Astra",
+      "short": "GPT-6 Astra",
+      "lab": "openai",
+      "date": "2026-09-04",
+      "mult1h": 0.89,
+      "seeds": [
+        0.89,
+        0.89
+      ],
+      "mult8h": 0.73,
+      "extrap8h": false,
+      "broken": false
+    },
+    {
+      "key": "opus",
+      "model": "Claude Opus 5.5",
+      "short": "Opus 5.5",
+      "lab": "anthropic",
+      "date": "2026-09-22",
+      "mult1h": 0.75,
+      "seeds": [
+        0.73,
+        0.76
+      ],
+      "mult8h": 1.37,
+      "extrap8h": false,
+      "broken": false
+    },
+    {
+      "key": "sol",
+      "model": "GPT-6.1 Sol",
+      "short": "GPT-6.1 Sol",
+      "lab": "openai",
+      "date": "2026-09-29",
+      "mult1h": 0.84,
+      "seeds": [
+        0.74,
+        0.95
+      ],
+      "mult8h": 0.76,
+      "extrap8h": false,
+      "broken": false
+    },
+    {
+      "key": "ds41flash",
+      "model": "DeepSeek V4.1 Flash",
+      "short": "DeepSeek V4.1 Fl.",
+      "lab": "deepseek",
+      "date": "2026-10-17",
+      "mult1h": 1.37,
+      "seeds": [
+        1.57,
+        1.19
+      ],
+      "mult8h": 1.32,
+      "extrap8h": false,
+      "broken": false
+    },
+    {
+      "key": "kimi",
+      "model": "Kimi K3.1 Pro",
+      "short": "Kimi K3.1 Pro",
+      "lab": "moonshot",
+      "date": "2026-10-23",
+      "mult1h": 1.15,
+      "seeds": [
+        1.23,
+        1.08
+      ],
+      "mult8h": 0.98,
+      "extrap8h": false,
+      "broken": false
+    },
+    {
+      "key": "inkling2s",
+      "model": "Inkling 2 Small",
+      "short": "Inkling 2 Small",
+      "lab": "thinking",
+      "date": "2026-11-05",
+      "mult1h": 0.91,
+      "seeds": [
+        0.91
+      ],
+      "mult8h": null,
+      "extrap8h": false,
+      "broken": false,
+      "note": "1 of 2 seeds submitted (host refused the second finished seed); no 8 h curve."
+    },
+    {
+      "key": "fable",
+      "model": "Claude Fable 5.2",
+      "short": "Fable 5.2",
+      "lab": "anthropic",
+      "date": "2026-11-09",
+      "mult1h": 0.92,
+      "seeds": [
+        1.01,
+        0.83
+      ],
+      "mult8h": 0.95,
+      "extrap8h": false,
+      "broken": false
+    },
+    {
+      "key": "gem4c",
+      "model": "Gemini 4 Carbon",
+      "short": "Gemini 4 Carbon",
+      "lab": "google",
+      "date": "2026-11-10",
+      "mult1h": 1.09,
+      "seeds": [
+        1.11,
+        1.08
+      ],
+      "mult8h": 0.95,
+      "extrap8h": false,
+      "broken": false,
+      "note": "Ran via agy proxy; proxy errors left 0% of the $8.70 GPU budget spent."
+    },
+    {
+      "key": "gem4h",
+      "model": "Gemini 4 Hydrogen",
+      "short": "Gemini 4 Hydrogen",
+      "lab": "google",
+      "date": "2026-11-12",
+      "mult1h": null,
+      "seeds": [],
+      "mult8h": null,
+      "extrap8h": false,
+      "broken": true,
+      "note": "Submitted recipe crashed in its trainer on both seeds."
+    },
+    {
+      "key": "sol62",
+      "model": "GPT-6.2 Sol",
+      "short": "GPT-6.2 Sol",
+      "lab": "openai",
+      "date": "2026-11-17",
+      "mult1h": 0.95,
+      "seeds": [
+        0.96,
+        0.94
+      ],
+      "mult8h": 1.04,
+      "extrap8h": false,
+      "broken": false
+    },
+    {
+      "key": "astra62",
+      "model": "GPT-6.2 Astra",
+      "short": "GPT-6.2 Astra",
+      "lab": "openai",
+      "date": "2026-11-17",
+      "mult1h": 1.15,
+      "seeds": [
+        1.06,
+        1.25
+      ],
+      "mult8h": 1.34,
+      "extrap8h": false,
+      "broken": false
+    },
+    {
+      "key": "gem4n",
+      "model": "Gemini 4 Neon",
+      "short": "Gemini 4 Neon",
+      "lab": "google",
+      "date": "2026-11-18",
+      "mult1h": 1.53,
+      "seeds": [
+        1.36,
+        1.72
+      ],
+      "mult8h": 13.49,
+      "extrap8h": true,
+      "broken": false,
+      "note": "Same $8.58 recipe that reached ~13.5\u00d7 training efficiency (416 Elo) after 8 h."
     }
   ]
 }
