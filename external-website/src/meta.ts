@@ -10,7 +10,12 @@ export const PAGE = {
   ],
   description:
     "We gave AI agents a GPU budget and had them train reinforcement learning bots for Pokémon, Polytopia and Generals: how well they do it, which models are best, and what separates good research from bad.",
+  ogImage: "/og.png",
+  ogImageAlt:
+    "Game Autoresearch Bench: AI agents given a $14.50 NVIDIA L40S GPU budget iterate on reinforcement learning training runs and evaluate policies across Polytopia, Pokémon 3v3, and Generals.io.",
 };
+
+const DEFAULT_SITE_URL = "https://gameautoresearch.github.io";
 
 const escape = (s: string) =>
   s
@@ -20,7 +25,8 @@ const escape = (s: string) =>
     .replace(/>/g, "&gt;");
 
 export function metaTags(siteUrl: string) {
-  const { title, description } = PAGE;
+  const { title, description, ogImage, ogImageAlt } = PAGE;
+  const imageUrl = `${siteUrl || DEFAULT_SITE_URL}${ogImage}`;
   return [
     `<meta name="description" content="${escape(description)}" />`,
     ...(siteUrl
@@ -32,8 +38,15 @@ export function metaTags(siteUrl: string) {
     `<meta property="og:type" content="article" />`,
     `<meta property="og:title" content="${escape(title)}" />`,
     `<meta property="og:description" content="${escape(description)}" />`,
-    `<meta name="twitter:card" content="summary" />`,
+    `<meta property="og:image" content="${imageUrl}" />`,
+    `<meta property="og:image:type" content="image/png" />`,
+    `<meta property="og:image:width" content="1200" />`,
+    `<meta property="og:image:height" content="630" />`,
+    `<meta property="og:image:alt" content="${escape(ogImageAlt)}" />`,
+    `<meta name="twitter:card" content="summary_large_image" />`,
     `<meta name="twitter:title" content="${escape(title)}" />`,
     `<meta name="twitter:description" content="${escape(description)}" />`,
+    `<meta name="twitter:image" content="${imageUrl}" />`,
+    `<meta name="twitter:image:alt" content="${escape(ogImageAlt)}" />`,
   ].join("\n    ");
 }
