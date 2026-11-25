@@ -740,7 +740,7 @@ const ITEMS = [
   {
     key: "scoreboard",
     title: "Explicit scoreboard summaries",
-    text: "Tallies of the visible board (cities, units, HP, territory) and each side's relative lead, fed in as direct inputs.",
+    text: "Tallies of the visible board (cities, units, HP, territory) and deltas, fed in as direct inputs.",
     Diagram: ScoreboardDiagram,
   },
   {

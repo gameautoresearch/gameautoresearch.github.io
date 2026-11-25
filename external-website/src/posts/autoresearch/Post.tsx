@@ -135,10 +135,10 @@ export default function AutoresearchPost() {
         We were curious whether compute spent to improve the{" "}
         <strong>starter recipe</strong> actually pays for itself. We measure
         each recipe by its <strong>compute multiplier</strong>: how much{" "}
-        <i>less</i> compute it needs to match the starter&rsquo;s strength, so
-        crossing the &ldquo;Starter 1×&rdquo; line means the research spend has
+        <i>less</i> compute it needs to match the starter&rsquo;s strength.
+        Crossing the &ldquo;Starter 1×&rdquo; line means the research spend has
         recouped its cost. Most sessions stay below that line over an 8-hour
-        training run, a few break even and one pulls far ahead: a{" "}
+        training run, some beat it modestly, and one pulls far ahead: a{" "}
         {costMult.top.model} session that spent ${costMult.top.spent.toFixed(2)}{" "}
         on research reaches the same strength with{" "}
         <strong>about {costMult.top.x.toFixed(0)}× less total compute</strong>.
@@ -158,8 +158,7 @@ export default function AutoresearchPost() {
       </Figure>
 
       <section className="ar-outlier" aria-labelledby="neon-outlier">
-        <span className="ar-outlier-kicker">Outlier run</span>
-        <h3 id="neon-outlier">What set Gemini 4 Neon&rsquo;s recipe apart</h3>
+        <h3 id="neon-outlier">Gemini 4 Neon&rsquo;s outlier recipe</h3>
         <p>
           Neon leaned into Polytopia&rsquo;s structure with a compact spatial
           map, partial observability under fog of war, countable economic state,
@@ -178,9 +177,8 @@ export default function AutoresearchPost() {
         Most models propose plausible ideas and run experiments, but some are
         far better at choosing interventions and reading noisy signals. Rather
         than gambling its budget on a few big rewrites, Neon found the winning
-        recipe above through <strong>five paired A/B tests</strong>
-        &mdash; to confirm each change before spending a final validation run on
-        the combined stack.
+        recipe above through <strong>five paired A/B tests</strong> followed by
+        a final validation run on the combined stack.
       </p>
       <Figure n={4} wide caption={<>Neon&rsquo;s 5 A/B tests</>}>
         <NeonDiscipline />
@@ -233,9 +231,8 @@ export default function AutoresearchPost() {
         All four agents in this experiment noticed the bottleneck. Claude Opus
         5.5 and GPT-6.1 Sol rebuilt the simulator to run batched, verified it
         against the original, and trained on roughly 10× to 25× more samples for
-        the same compute. DeepSeek V4 Pro and Kimi K3.1 Pro stayed with the
-        supplied engine. The two rebuilders took the top two spots in the
-        tournament.
+        the same compute. DeepSeek V4 Pro and Kimi K3.1 Pro worked with the slow
+        engine. The two rebuilders took the top two spots in the tournament.
       </p>
 
       <h3 id="forecast">
