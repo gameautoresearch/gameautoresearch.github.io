@@ -12,6 +12,7 @@ export function localHeroArt(): Plugin {
     name: "local-hero-art",
     apply: "serve",
     configureServer(server) {
+      if (existsSync(resolve(server.config.publicDir, "hero-art/manifest.json"))) return;
       const repo = process.env.GAB_HERO_ART_ROOT || resolve(site, "..");
       const poly = resolve(repo, "simulators/polytopia/artifacts/mobile-assets/game");
       const generals = resolve(repo, "vendor/engines/generals-bots/generals/assets/images");
@@ -52,7 +53,7 @@ export function localHeroArt(): Plugin {
         generals: generalFiles.every((file) => files.has(`generals/${file}`)),
         pokemon: pokemonFiles.every((file) => files.has(`pokemon/${file}`)),
       });
-      const prefix = `${server.config.base}__hero-art/`;
+      const prefix = `${server.config.base}hero-art/`;
       server.middlewares.use((req, res, next) => {
         const url = req.url?.split("?", 1)[0];
         if (!url?.startsWith(prefix)) return next();

@@ -7,7 +7,7 @@ type Manifest = { polytopia: PolyManifest | null; generals: boolean; pokemon: bo
 export type PolyArt = PolyManifest & { urls: Record<string, string>; tinted: Record<string, string> };
 export type HeroArt = { polytopia: PolyArt | null; generals: boolean; pokemon: boolean };
 const EMPTY_ART: HeroArt = { polytopia: null, generals: false, pokemon: false };
-const base = `${import.meta.env.BASE_URL}__hero-art/`;
+const base = `${import.meta.env.BASE_URL}hero-art/`;
 
 export const artUrl = (game: string, file: string) => `${base}${game}/${encodeURIComponent(file)}`;
 
@@ -54,7 +54,7 @@ export function useHeroArt(enabled: boolean) {
   const [art, setArt] = useState(EMPTY_ART);
 
   useEffect(() => {
-    if (!import.meta.env.DEV || !enabled) return;
+    if (!enabled) return;
     const controller = new AbortController();
     async function load() {
       const response = await fetch(`${base}manifest.json`, { signal: controller.signal });
@@ -67,7 +67,7 @@ export function useHeroArt(enabled: boolean) {
         if (!controller.signal.aborted) setArt({ ...manifest, polytopia });
       }
     }
-    void load().catch(() => { /* The illustrative boards are available without the local art files. */ });
+    void load().catch(() => { /* The illustrative boards are available if an art file fails to load. */ });
     return () => controller.abort();
   }, [enabled]);
 
