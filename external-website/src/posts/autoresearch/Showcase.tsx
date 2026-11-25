@@ -10,23 +10,25 @@ import {
 import { useAgentView } from "../../view";
 import ReplayViewer from "./polytopia/ReplayViewer";
 import GeneralsReplay from "./GeneralsReplay";
+import HexReplay from "./HexReplay";
 import { usePokemonReplay } from "./pokemonReplay";
 import { parsePokemonTimeline, PokemonSideIO } from "./NetworkIO";
 import { CMYK } from "./colors";
 
-// The post's opening showcase: recorded games between trained RL policies in three games.
-// Game tabs above, full-width live replay stage in the center, condensed policy notes and matchup switcher below.
+// The post's opening showcase: recorded games between trained RL policies in four games.
+// Game tabs above, side-by-side live Network I/O + replay stage in the center, matchup switcher below.
 // Tours on its own until the reader interacts.
 // Sources for policy notes (all NVIDIA L40S):
-// - Pokémon 3v3: Nov 14–15 recipes/configs & cost_effectiveness.json (fresh ~55 min final retrains at $2.903/h).
 // - Polytopia: Nov 15 recipe suite finals (2 h L40S at $2.903/h), Nov 14 Astra `refined` (shaped + refine leases),
 //   and the 200M-sample starter baseline (~0.7 h on L40S).
+// - Pokémon 3v3: Nov 14–15 recipes/configs & cost_effectiveness.json (fresh ~55 min final retrains at $2.903/h).
 // - Generals: Nov 20 slow-simulator campaign (slowsim-2026-11-20.md & trajectory ledger, cumulative training GPU time).
+// - Hex 13×13: Nov 23–24 recipe finals (fresh 1 h L40S retrains at $2.903/h, hex13-recipe-20261123 & carbon rerun).
 
 const BattleReplay = lazy(() => import("../../showdown/react/BattleReplay"));
 const ROTATE_MS = 4000;
 
-type Game = "pokemon" | "polytopia" | "generals";
+type Game = "polytopia" | "pokemon" | "generals" | "hex";
 type PolicyCard = {
   name: string;
   meta: string;
@@ -41,9 +43,10 @@ type Item = {
 };
 
 const SIDE_COLORS: Record<Game, [string, string]> = {
-  pokemon: [CMYK.cDeep, CMYK.m],
   polytopia: ["#2f95e0", "#eb6834"],
+  pokemon: [CMYK.cDeep, CMYK.m],
   generals: [CMYK.c, CMYK.m],
+  hex: [CMYK.c, CMYK.m],
 };
 
 const CARDS = {
@@ -122,6 +125,26 @@ const CARDS = {
     meta: "630/s · $7.11",
     summary: "5×64 ResNet on slow Python sim; PPO + reward tuning.",
   },
+  hexNeon: {
+    name: "Gemini 4 Neon",
+    meta: "825K · $2.90",
+    summary: "8×128/64 ResNet + global pool; KataGo-style PUCT AlphaZero.",
+  },
+  hexFable: {
+    name: "Claude Fable 5.2",
+    meta: "684K · $2.90",
+    summary: "8×64 ResNet + TTA; Gumbel top-k 1-ply lookahead self-play.",
+  },
+  hexCarbon: {
+    name: "Gemini 4 Carbon",
+    meta: "799K · $2.90",
+    summary: "8×64 SE-ResNet w/ bridge planes; Gumbel 2-ply AlphaZero.",
+  },
+  hexAstra62: {
+    name: "GPT-6.2 Astra",
+    meta: "106K · $2.90",
+    summary: "4×32 ResNet w/ bitboard features; learned minimax lookahead.",
+  },
 } satisfies Record<string, PolicyCard>;
 
 const ITEMS: Item[] = [
@@ -147,6 +170,13 @@ const ITEMS: Item[] = [
     start: 0.76358,
   },
   {
+    game: "hex",
+    id: "hex13-neon-vs-fable",
+    players: ["Gemini 4 Neon", "Claude Fable 5.2"],
+    cards: [CARDS.hexNeon, CARDS.hexFable],
+    start: 0.58,
+  },
+  {
     game: "polytopia",
     id: "polytopia-v3a-astra-vs-starter",
     players: ["GPT-6 Astra", "Starter"],
@@ -166,6 +196,13 @@ const ITEMS: Item[] = [
     players: ["GPT-6.1 Sol", "DeepSeek V4 Pro"],
     cards: [CARDS.genSol, CARDS.genDeepSeek],
     start: 0.81033,
+  },
+  {
+    game: "hex",
+    id: "hex13-carbon-vs-neon",
+    players: ["Gemini 4 Carbon", "Gemini 4 Neon"],
+    cards: [CARDS.hexCarbon, CARDS.hexNeon],
+    start: 0.55,
   },
   {
     game: "polytopia",
@@ -188,11 +225,19 @@ const ITEMS: Item[] = [
     cards: [CARDS.genOpus, CARDS.genKimi],
     start: 0.73141,
   },
+  {
+    game: "hex",
+    id: "hex13-fable-vs-astra62",
+    players: ["Claude Fable 5.2", "GPT-6.2 Astra"],
+    cards: [CARDS.hexFable, CARDS.hexAstra62],
+    start: 0.55,
+  },
 ];
 const GAMES: { id: Game; label: string }[] = [
   { id: "polytopia", label: "Polytopia" },
   { id: "pokemon", label: "Pokémon" },
   { id: "generals", label: "Generals" },
+  { id: "hex", label: "Hex" },
 ];
 
 function SideColumn({
@@ -290,6 +335,18 @@ function Stage({ item, accents }: { item: Item; accents: [string, string] }) {
         start={item.start}
         initialSpeed={4}
         compact
+        renderSide={renderSide}
+      />
+    );
+  }
+  if (item.game === "hex") {
+    return (
+      <HexReplay
+        key={item.id}
+        src={`${import.meta.env.BASE_URL}hex/${item.id}.json`}
+        names={item.players}
+        start={item.start}
+        initialSpeed={2}
         renderSide={renderSide}
       />
     );

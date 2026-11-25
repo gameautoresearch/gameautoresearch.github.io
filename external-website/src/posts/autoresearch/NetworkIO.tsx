@@ -1205,3 +1205,211 @@ export function PokemonSideIO({
     </div>
   );
 }
+
+/* -------------------------------------------------------------------------- */
+/*                                   HEX IO                                   */
+/* -------------------------------------------------------------------------- */
+
+export interface HexMoveEntry {
+  p: 0 | 1;
+  cell: number;
+  opening?: boolean;
+  top?: [number, number][];
+  v?: number;
+}
+
+const HEX_COLS = "abcdefghijklm";
+function hexCoord(cell: number, size: number): string {
+  const r = Math.floor(cell / size),
+    c = cell % size;
+  return `${HEX_COLS[c] ?? c}${r + 1}`;
+}
+
+export function HexSideIO({
+  side,
+  size,
+  boardBefore,
+  move,
+  isActing,
+  accents,
+}: {
+  side: 0 | 1;
+  size: number;
+  boardBefore: Uint8Array;
+  move: HexMoveEntry | null;
+  isActing: boolean;
+  accents: [string, string];
+}) {
+  const accent = accents[side];
+  const oppAccent = accents[1 - side];
+  const ownVal = side + 1;
+  const oppVal = 2 - side;
+
+  const data = useMemo(() => {
+    const n = size * size;
+    // Canonical frame: White (side 1) transposes (r, c) -> (c, r) so both networks always join top <-> bottom.
+    const toCan = (cell: number) => {
+      const r = Math.floor(cell / size),
+        c = cell % size;
+      return side === 1 ? c * size + r : cell;
+    };
+    const own = new Uint8Array(n);
+    const foe = new Uint8Array(n);
+    const empty = new Uint8Array(n);
+    let legalCount = 0;
+
+    for (let i = 0; i < n; i++) {
+      const ci = toCan(i);
+      if (boardBefore[i] === ownVal) own[ci] = 1;
+      else if (boardBefore[i] === oppVal) foe[ci] = 1;
+      else {
+        empty[ci] = 1;
+        legalCount++;
+      }
+    }
+
+    const probMap = new Float32Array(n);
+    if (move?.top) {
+      for (const [cell, pr] of move.top) {
+        if (cell >= 0 && cell < n) probMap[toCan(cell)] = pr;
+      }
+    }
+    const chosenCan = move ? toCan(move.cell) : -1;
+    const chosenProb = chosenCan >= 0 ? probMap[chosenCan] : 0;
+
+    const unchosenTop: { cell: number; label: string; pct: string }[] = [];
+    if (move?.top) {
+      for (const [cell, pr] of move.top) {
+        if (cell === move.cell) continue;
+        if (unchosenTop.length >= 4) break;
+        const pct = pr >= 0.01 ? `${Math.round(pr * 100)}%` : "<1%";
+        unchosenTop.push({ cell, label: hexCoord(cell, size), pct });
+      }
+    }
+
+    return { own, foe, empty, probMap, chosenCan, chosenProb, unchosenTop, legalCount };
+  }, [boardBefore, move, side, size, ownVal, oppVal]);
+
+  const unchosenCount = Math.max(0, data.legalCount - (move ? 1 : 0));
+  const planes = [
+    { name: side === 1 ? "ownᵀ" : "own", values: data.own, color: accent },
+    { name: side === 1 ? "foeᵀ" : "foe", values: data.foe, color: oppAccent },
+    { name: "legal", values: data.empty, color: "#6b6b66" },
+  ];
+
+  const valStr =
+    move?.v !== undefined ? `${move.v >= 0 ? "+" : ""}${move.v.toFixed(2)}` : null;
+
+  return (
+    <div className={`sio${isActing ? " is-acting" : " is-waiting"}`}>
+      {/* INPUTS */}
+      <div className="sio-sec">
+        <div className="sio-hd">
+          <span>In</span>
+          <small>{side === 1 ? "2×13×13 (transp)" : "2×13×13 canon"}</small>
+        </div>
+        <div className="sio-planes-3">
+          {planes.map((pl) => (
+            <div key={pl.name} className="sio-plane">
+              <svg viewBox={`0 0 ${size} ${size}`} shapeRendering="crispEdges" aria-hidden="true">
+                <rect width={size} height={size} fill="#f1f1ec" />
+                {Array.from({ length: size * size }, (_, idx) => {
+                  if (!pl.values[idx]) return null;
+                  return (
+                    <rect
+                      key={idx}
+                      x={idx % size}
+                      y={Math.floor(idx / size)}
+                      width={1}
+                      height={1}
+                      fill={pl.color}
+                      fillOpacity={pl.name === "legal" ? 0.35 : 0.92}
+                    />
+                  );
+                })}
+              </svg>
+              <span>{pl.name}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* OUTPUTS */}
+      <div className="sio-sec sio-sec-out">
+        <div className="sio-hd">
+          <span>Out · 169 + v</span>
+          <small>{move ? `1 ch · ${unchosenCount} not ch` : `${data.legalCount} legal`}</small>
+        </div>
+        <div className="sio-gen-out">
+          <div className="sio-hex-map" title="13×13 policy distribution in canonical frame (chosen in color, runner-up candidates shaded)">
+            <svg viewBox={`0 0 ${size} ${size}`} shapeRendering="crispEdges" aria-label="169-cell policy output distribution">
+              <rect width={size} height={size} fill="#ecece6" />
+              {Array.from({ length: size * size }, (_, idx) => {
+                if (!data.empty[idx]) return null;
+                const isCh = idx === data.chosenCan;
+                const pr = data.probMap[idx];
+                const fill = isCh ? accent : pr > 0.002 ? "#222" : "#d4d4ce";
+                const opacity = isCh ? 1 : pr > 0.002 ? Math.min(0.85, 0.22 + Math.sqrt(pr) * 0.78) : 0.65;
+                return (
+                  <rect
+                    key={idx}
+                    x={idx % size}
+                    y={Math.floor(idx / size)}
+                    width={1}
+                    height={1}
+                    fill={fill}
+                    fillOpacity={opacity}
+                  />
+                );
+              })}
+            </svg>
+          </div>
+          <div className="sio-gen-col">
+            <div className="sio-chosen" style={{ borderColor: accent, background: `${accent}14` }}>
+              <strong style={{ color: accent }}>
+                {move ? `${hexCoord(move.cell, size)}${data.chosenProb >= 0.01 ? ` ${Math.round(data.chosenProb * 100)}%` : ""}` : "—"}
+              </strong>
+              {valStr && <small>v {valStr}</small>}
+            </div>
+            <div className="sio-chips">
+              {data.unchosenTop.map((u) => (
+                <span key={u.cell} className="sio-chip">
+                  {u.label} {u.pct}
+                </span>
+              ))}
+              {unchosenCount > data.unchosenTop.length && (
+                <span className="sio-chip is-more">+{unchosenCount - data.unchosenTop.length}</span>
+              )}
+            </div>
+          </div>
+        </div>
+        <div className="sio-bar" title="169-cell masked policy logits (canonical order)">
+          <svg viewBox={`0 0 ${size * size} 10`} preserveAspectRatio="none" aria-hidden="true">
+            <rect width={size * size} height={10} rx={1.2} fill="#ecece6" />
+            {Array.from({ length: size * size }, (_, idx) => {
+              if (!data.empty[idx]) return null;
+              const isCh = idx === data.chosenCan;
+              const pr = data.probMap[idx];
+              const h = isCh ? 10 : pr > 0.004 ? Math.max(3, Math.min(9, Math.round(Math.sqrt(pr) * 9))) : 2.5;
+              return (
+                <rect
+                  key={idx}
+                  x={idx}
+                  y={10 - h}
+                  width={isCh ? 2 : 0.85}
+                  height={h}
+                  fill={isCh ? accent : pr > 0.004 ? "#333" : "#9a9a94"}
+                />
+              );
+            })}
+          </svg>
+          <div className="sio-bar-lbl">
+            <span>a1</span>
+            <span>169 policy logits</span>
+            <span>m13</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
