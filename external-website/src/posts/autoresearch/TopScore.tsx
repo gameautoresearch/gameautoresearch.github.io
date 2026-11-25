@@ -6,12 +6,13 @@ import { useWidth } from "./Frontier13";
 import raw from "./top-scores.json";
 import budgetRaw from "./budget.json";
 import generalsRaw from "./generals-tournament.json";
+import hexRaw from "./hex13.json";
 import { starterHoursFor } from "./CostMultiplier";
 
 // Overall model score (Figure 1): the ten models with all four shared tasks (Polytopia empty file, Pokémon 3v3,
-// forecasting and the Polytopia research-budget recipes), plus the Generals tournament for all ten.
+// forecasting and the Polytopia research-budget recipes), plus the Generals tournament and Hex 13×13 for all ten.
 // Task scores come from top-scores.json
-// (reports/top-level-score-2026-11-20/build.py), budget.json and generals-tournament.json.
+// (reports/top-level-score-2026-11-20/build.py), budget.json, generals-tournament.json and hex13.json.
 // Each task is standardized against the frozen scale below
 // (50 = the reference models' average, 10 points = 1 SD) and a model's tasks are averaged; the whisker is ±1 standard
 // error of that average across its tasks (sample SD of its task scores / √n).
@@ -101,7 +102,7 @@ for (const r of [...BUDGET.recipes, ...(BUDGET.fill ?? [])]) {
 // Required for a place in the ranking.
 const RECIPE_TASKS = ["poly_empty", "poke", "forecast", "recipe8"];
 // Averaged in when the model has it.
-const OPTIONAL_TASKS = ["generals_t"];
+const OPTIONAL_TASKS = ["generals_t", "hex"];
 const SCORE_TASKS = [...RECIPE_TASKS, ...OPTIONAL_TASKS];
 // Value that gets standardized: the recipe multiplier on a log scale (it is a ratio), the others as reported.
 const taskValue = (id: string, v: number) =>
@@ -114,7 +115,7 @@ const taskValue = (id: string, v: number) =>
 //     the reference models. A model's recipe effect is the mean over the cells it ran of (its log multiplier - offset).
 //   NORMS: each task's mean and population SD across the reference models (recipe task on a log scale; Generals over
 //     all ten reference models in its tournament).
-// Both are what the live fit gave on 2026-11-23 (Generals: 2026-11-24). Models added later score against the same
+// Both are what the live fit gave on 2026-11-23 (Generals: 2026-11-24; Hex: 2026-11-25, all ten reference models). Models added later score against the same
 // constants and may land outside 35–65. Generals was explicitly re-normalized on 2026-11-24 after Carbon joined
 // the 20-network final. Other task constants remain unchanged. Generals Elo is relative (centered at 1000), so adding
 // entrants to that tournament re-fits everyone's Elo and needs new constants. To re-norm, compute new constants with
@@ -152,7 +153,8 @@ const NORMS: Record<string, { mean: number; sd: number }> = {
   poke: { mean: 67.76, sd: 7.682994207989 },
   forecast: { mean: 0.2868, sd: 0.061315250958 },
   recipe8: { mean: -0.08217861795, sd: 0.239269587071 },
-  generals_t: { mean: 1135.000000000000, sd: 221.360177087027 },
+  generals_t: { mean: 1135.0, sd: 221.360177087027 },
+  hex: { mean: -587.5, sd: 201.496029737561 },
 };
 
 // Recompute the frozen constants from the data: the cell fit and task norms over the reference models only.
@@ -222,6 +224,21 @@ TASK_MAP.generals_t = {
   scores: Object.fromEntries(GENERALS.rows.map((r) => [r.model, r.elo])),
 };
 
+// Hex 13×13: each model's submitted recipe from the working AlphaZero-style starter (1.5 GPU-hours of research, then a
+// 1 h retrain), graded on the fixed private panel (random, heuristic bots and MoHex at several strengths) over 64
+// held-out openings from both seats. Elo relative to MoHex at 50,000 simulations per move (0); random play ≈ −2,580.
+// Campaign hex13-recipe-20261123; Gemini 4 Carbon from its rerun hex13-recipe-carbon-20261124b after the agy proxy
+// fixes. Panel Elo is on a fixed scale, so adding models doesn't move anyone else's value.
+const HEX = hexRaw as unknown as { models: { model: string; elo: number }[] };
+TASK_MAP.hex = {
+  id: "hex",
+  name: "Hex 13×13, recipe from a working starter",
+  game: "Hex",
+  unit: "panel Elo vs MoHex at 50k simulations per move (0)",
+  sessions: 1,
+  scores: Object.fromEntries(HEX.models.map((r) => [r.model, r.elo])),
+};
+
 // Dev-only: warn if the reference data no longer reproduces the frozen constants (e.g. a reference model's run was
 // redone). Then decide deliberately whether to re-norm.
 if (import.meta.env?.DEV) {
@@ -248,12 +265,15 @@ if (import.meta.env?.DEV) {
 }
 
 // One task value on the frozen scale.
-const standardize = (id: string, raw: number) => 50 + (10 * (taskValue(id, raw) - NORMS[id].mean)) / NORMS[id].sd;
+const standardize = (id: string, raw: number) =>
+  50 + (10 * (taskValue(id, raw) - NORMS[id].mean)) / NORMS[id].sd;
 
 // Every model with all four required tasks, scored against the frozen scale; optional tasks join its average when
 // it ran them.
 export const RECIPE: Row[] = Object.keys(TASK_MAP.poly_empty.scores)
-  .filter((mo) => RECIPE_TASKS.every((id) => TASK_MAP[id].scores[mo] !== undefined))
+  .filter((mo) =>
+    RECIPE_TASKS.every((id) => TASK_MAP[id].scores[mo] !== undefined),
+  )
   .map((mo) => {
     const each = SCORE_TASKS.map((id) => {
       const v = TASK_MAP[id].scores[mo];
@@ -262,7 +282,9 @@ export const RECIPE: Row[] = Object.keys(TASK_MAP.poly_empty.scores)
     const have = each.filter((v): v is number => v !== null);
     const n = have.length;
     const score = mean(have);
-    const se = Math.sqrt(have.reduce((a, b) => a + (b - score) ** 2, 0) / (n - 1) / n);
+    const se = Math.sqrt(
+      have.reduce((a, b) => a + (b - score) ** 2, 0) / (n - 1) / n,
+    );
     return { model: mo, score, lo: score - se, hi: score + se, each };
   })
   .sort((a, b) => b.score - a.score);
@@ -273,25 +295,32 @@ const SHORT_TASK: Record<string, string> = {
   forecast: "Forecasting",
   recipe8: "Polytopia recipes",
   generals_t: "Generals",
+  hex: "Hex 13×13",
 };
 // Per-task cells in display order: the two Polytopia tasks sit side by side under one shared "Polytopia" head, so the
 // columns can stay narrow and leave the width to the dot plot. Indexes into SCORE_TASKS / Row.each.
-const CELL_ORDER = ["poly_empty", "recipe8", "poke", "forecast", "generals_t"].map(
-  (id) => SCORE_TASKS.indexOf(id),
-);
+const CELL_ORDER = [
+  "poly_empty",
+  "recipe8",
+  "poke",
+  "forecast",
+  "generals_t",
+  "hex",
+].map((id) => SCORE_TASKS.indexOf(id));
 // Two-line column heads; the Polytopia pair shares a spanning first line (drawn separately).
 const TASK_HEAD: Record<string, [string, string]> = {
   poly_empty: ["", "empty"],
-  recipe8: ["", "recipes"],
+  recipe8: ["", "starter"],
   poke: ["Pokémon", "3v3"],
   forecast: ["Fore-", "casting"],
   generals_t: ["Generals", "tourney"],
+  hex: ["Hex", "13×13"],
 };
 
 function fmtTaskScore(id: string, v: number) {
   if (id === "recipe8") return `${v.toFixed(2)}×`;
   if (id === "forecast") return `+${v.toFixed(2)}`;
-  if (id === "generals_t") return `${v.toFixed(0)} Elo`;
+  if (id === "generals_t" || id === "hex") return `${v.toFixed(0)} Elo`;
   return v.toFixed(1);
 }
 
@@ -344,8 +373,8 @@ export default function TopScore() {
     );
   }
 
-  // Wide: rank · name · dot plot · score · five per-task cells. Narrow: name above each dot, per-task cells dropped.
-  const narrow = W < 560;
+  // Wide: rank · name · dot plot · score · six per-task cells. Narrow: name above each dot, per-task cells dropped.
+  const narrow = W < 600;
   const LO = 35,
     HI = 65;
   const rowH = narrow ? 40 : 30;
@@ -379,7 +408,7 @@ export default function TopScore() {
       <svg
         viewBox={`0 0 ${W} ${H}`}
         role="img"
-        aria-label="Overall model scores across five research tasks"
+        aria-label="Overall model scores across six research tasks"
       >
         {/* Column heads */}
         <text
@@ -549,7 +578,7 @@ export default function TopScore() {
                       >
                         {v === null ? "—" : v.toFixed(0)}
                       </text>
-                      {v === null && <title>Not in the Generals tournament</title>}
+                      {v === null && <title>Not run</title>}
                     </g>
                   );
                 })}

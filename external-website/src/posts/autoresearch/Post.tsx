@@ -44,8 +44,8 @@ export default function AutoresearchPost() {
         Overall Ranking
       </h2>
       <p>
-        We evaluated ten models across five training tasks: Two variants of
-        Polytopia, Pokémon Showdown, Generals, as well as a task based on
+        We evaluated ten models across six training tasks: Two variants of
+        Polytopia, Pokémon Showdown, Generals, Hex, as well as a task based on
         forecasting the success of a training recipe without running it.
       </p>
       <Figure
@@ -53,7 +53,7 @@ export default function AutoresearchPost() {
         wide
         caption={
           <>
-            Overall model scores on five tasks with normalized scores, ±1
+            Overall model scores on six tasks with normalized scores, ±1
             standard error across tasks.
           </>
         }
