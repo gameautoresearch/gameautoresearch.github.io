@@ -138,7 +138,7 @@ export default function AutoresearchPost() {
         <i>less</i> compute it needs to match the starter&rsquo;s strength, so
         crossing the &ldquo;Starter 1×&rdquo; line means the research spend has
         recouped its cost. Most sessions stay below that line over an 8-hour
-        training run, while a few break even and one pulls far ahead: a{" "}
+        training run, a few break even and one pulls far ahead: a{" "}
         {costMult.top.model} session that spent ${costMult.top.spent.toFixed(2)}{" "}
         on research reaches the same strength with{" "}
         <strong>about {costMult.top.x.toFixed(0)}× less total compute</strong>.
@@ -175,11 +175,10 @@ export default function AutoresearchPost() {
         What do strong researchers do differently?
       </h2>
       <p>
-        Most models propose plausible ideas and run experiments, yet some are
-        far better at choosing high-impact interventions and reading noisy
-        signals accurately. Rather than gambling its budget on a few big
-        rewrites, Neon for assembled the winning recipe above through{" "}
-        <strong>five paired A/B tests</strong>
+        Most models propose plausible ideas and run experiments, but some are
+        far better at choosing interventions and reading noisy signals. Rather
+        than gambling its budget on a few big rewrites, Neon found the winning
+        recipe above through <strong>five paired A/B tests</strong>
         &mdash; to confirm each change before spending a final validation run on
         the combined stack.
       </p>
@@ -273,11 +272,11 @@ export default function AutoresearchPost() {
       <p>
         We also ran older model releases on the same empty-starter Polytopia
         task to see how quickly training skill is advancing. Frontier models
-        from early 2026 struggled to produce useful policies at all&mdash;
-        February releases could not beat random play, and August releases fell
-        well short of our basic PPO starter recipe. Starting in the fall, newer
-        models crossed a clear threshold and began training policies that beat
-        the starter on the same or much lower compute budget.
+        from early 2026 struggled to produce useful policies at all: February
+        releases could not beat random play, and August releases fell well short
+        of our basic PPO starter recipe. Starting in the fall, newer models
+        crossed a clear threshold and began training policies that beat the
+        starter on the same or much lower compute budget.
       </p>
       <Figure
         n={7}
@@ -315,15 +314,13 @@ export default function AutoresearchPost() {
       </p>
       <p>
         That price point also marks the boundary of where today&rsquo;s
-        vibe-training works out of the box. Real-time games like StarCraft:
-        Brood War, Dota, or CS:GO sit on the far side of that spectrum:
-        continuous high dimensional action spaces, real-time control, and
-        heavier, slower simulators mean each sample costs far more to generate
-        and policies need orders of magnitude more of them, pushing total costs{" "}
+        vibe-training works out of the box. Real-time games like StarCraft,
+        Dota, or CS:GO continuous high dimensional action spaces with real-time
+        control, and heavier, slower simulators, pushing total costs{" "}
         <strong>100&ndash;1,000× higher</strong>. Mapping out that
         cost-versus-game-complexity curve&mdash;and measuring how far
-        agent-driven algorithmic and simulator improvements can bend it
-        downward&mdash;is a natural direction for future work.
+        agent-driven algorithmic and simulator improvements can pull it
+        downward&mdash;is a direction for future work.
       </p>
       <p>
         More broadly, we built this benchmark to measure how well agents
