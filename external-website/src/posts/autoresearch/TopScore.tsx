@@ -303,9 +303,9 @@ const CELL_ORDER = [
   "poly_empty",
   "recipe8",
   "poke",
-  "forecast",
   "generals_t",
   "hex",
+  "forecast",
 ].map((id) => SCORE_TASKS.indexOf(id));
 // Two-line column heads; the Polytopia pair shares a spanning first line (drawn separately).
 const TASK_HEAD: Record<string, [string, string]> = {
@@ -354,16 +354,19 @@ export default function TopScore() {
           "Model",
           "Overall score (50 = avg of the ten reference models, +10 = +1 SD)",
           "±1 standard error across tasks",
-          ...SCORE_TASKS.map((id) => `${SHORT_TASK[id]} (standardized; raw)`),
+          ...CELL_ORDER.map(
+            (j) => `${SHORT_TASK[SCORE_TASKS[j]]} (standardized; raw)`,
+          ),
         ]}
-        align={["r", "l", "r", "r", ...SCORE_TASKS.map(() => "r" as const)]}
+        align={["r", "l", "r", "r", ...CELL_ORDER.map(() => "r" as const)]}
         rows={rows.map((r, i) => [
           i + 1,
           r.model,
           r.score.toFixed(1),
           `${r.lo.toFixed(1)}–${r.hi.toFixed(1)}`,
-          ...SCORE_TASKS.map((id, k) => {
-            const v = r.each[k];
+          ...CELL_ORDER.map((j) => {
+            const id = SCORE_TASKS[j];
+            const v = r.each[j];
             return v === null
               ? "not run"
               : `${v.toFixed(0)} (${fmtTaskScore(id, TASK_MAP[id].scores[r.model])})`;
@@ -378,8 +381,8 @@ export default function TopScore() {
   const LO = 35,
     HI = 65;
   const rowH = narrow ? 40 : 30;
-  const cellW = 39,
-    cellGap = 2,
+  const cellW = 41,
+    cellGap = 3,
     cellsGap = 14;
   const cellsW = narrow
     ? 0
