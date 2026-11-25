@@ -271,9 +271,6 @@ export default function NeonDiscipline() {
                 scoreboard inputs, historical opponent pool, and fast 1-epoch
                 updates on smaller batches.
               </span>
-              <span className="ar-nd-sub">
-                Final submission · beat both starter benchmarks in practice
-              </span>
             </div>
             <div
               className="ar-nd-cell r ar-nd-strength ar-nd-final-val"

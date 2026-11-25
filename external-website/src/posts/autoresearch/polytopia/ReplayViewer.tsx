@@ -112,6 +112,7 @@ type ViewerProps = {
   start?: number;
   initialSpeed?: number;
   compact?: boolean;
+  showcase?: boolean;
   renderSide?: (side: 0 | 1) => ReactNode;
 };
 export default function ReplayViewer({ src, ...rest }: ViewerProps) {
@@ -122,7 +123,7 @@ export default function ReplayViewer({ src, ...rest }: ViewerProps) {
   );
 }
 
-function ReplayBoard({ url, names, still, start, initialSpeed, compact, renderSide }: Omit<ViewerProps, "src"> & { url: string }) {
+function ReplayBoard({ url, names, still, start, initialSpeed, compact, showcase, renderSide }: Omit<ViewerProps, "src"> & { url: string }) {
   const [data, setData] = useState<Replay | null>(null);
   const [pos, setPos] = useState(still ?? 0); // action index; the fraction is how far that action's animation has run
   // Plays on its own and loops, unless the reader prefers reduced motion. Play/Pause, the slider, the speed
@@ -233,6 +234,14 @@ function ReplayBoard({ url, names, still, start, initialSpeed, compact, renderSi
   }, [data]);
 
   if (!data || !geom) {
+    if (showcase) {
+      return (
+        <div className="replay replay-compact">
+          <div className="sc-board-stage sc-wait">Loading replay…</div>
+          <div className="replay-controls sc-controls-stub" aria-hidden="true" />
+        </div>
+      );
+    }
     if (renderSide) {
       return (
         <div className="replay replay-compact replay-flanked">
@@ -424,12 +433,54 @@ function ReplayBoard({ url, names, still, start, initialSpeed, compact, renderSi
     ].filter(Boolean).join(" · ");
   })();
 
+  const lastActionLabel: [string, string] = ["", ""];
+  for (let j = Math.min(last - 1, k); j >= 0 && (!lastActionLabel[0] || !lastActionLabel[1]); j--) {
+    const a = data.actions[j];
+    const sideIdx = a[0] - 1;
+    if ((sideIdx === 0 || sideIdx === 1) && !lastActionLabel[sideIdx]) {
+      lastActionLabel[sideIdx] = data.labels[a[5]] ?? "";
+    }
+  }
+
+  let actionOverlay: ReactNode = null;
+  if (action && showcase) {
+    const actColor = PLAYER[action[0]];
+    if ((kind === 1 || kind === 2) && src >= 0 && dst >= 0 && src !== dst) {
+      const s0 = at(src), d0 = at(dst);
+      const dx = d0.x - s0.x, dy = d0.y - s0.y, len = Math.hypot(dx, dy) || 1;
+      const ux = dx / len, uy = dy / len;
+      const padS = Math.min(12, len * 0.2), padE = Math.min(10, len * 0.18);
+      const sx = s0.x + ux * padS, sy = s0.y + uy * padS;
+      const ex = d0.x - ux * padE, ey = d0.y - uy * padE;
+      const px = -uy, py = ux;
+      const head = `${ex.toFixed(1)},${ey.toFixed(1)} ${(ex - ux * 10 + px * 5.5).toFixed(1)},${(ey - uy * 10 + py * 5.5).toFixed(1)} ${(ex - ux * 10 - px * 5.5).toFixed(1)},${(ey - uy * 10 - py * 5.5).toFixed(1)}`;
+      actionOverlay = (
+        <g pointerEvents="none" opacity={Math.max(0.25, 1 - p * 0.65)}>
+          <polygon points={diamond(dst)} fill={actColor} fillOpacity={0.14} stroke={actColor} strokeWidth={2.2} />
+          <line x1={sx} y1={sy} x2={ex - ux * 6} y2={ey - uy * 6} stroke="#fff" strokeWidth={5} strokeLinecap="round" opacity={0.85} />
+          <line x1={sx} y1={sy} x2={ex - ux * 6} y2={ey - uy * 6} stroke={actColor} strokeWidth={2.6} strokeLinecap="round"
+            strokeDasharray={kind === 2 ? "5 4" : undefined} />
+          <polygon points={head} fill={actColor} stroke="#fff" strokeWidth={1.3} strokeLinejoin="round" />
+        </g>
+      );
+    } else if (kind !== 10) {
+      const t = dst >= 0 ? dst : src;
+      if (t >= 0) {
+        actionOverlay = (
+          <polygon points={diamond(t)} fill={actColor} fillOpacity={0.16} stroke={actColor} strokeWidth={2.2}
+            pointerEvents="none" opacity={Math.max(0.25, 1 - p * 0.5)} />
+        );
+      }
+    }
+  }
+
   const sideMeta = (side: 1 | 2) =>
     `${score[side - 1].toLocaleString()} pts · ${cityCount[side]} cities · ${unitCount[side]} units`;
   const boardSvg = (
     <svg viewBox={`0 0 ${W} ${H}`} className="replay-board" onMouseLeave={() => setHover(null)}>
       <g dangerouslySetInnerHTML={{ __html: ground }} />
       <g>{draw(surface)}</g>
+      {actionOverlay}
       <g>{draw(pieces)}</g>
       <g pointerEvents="none">{draw(effects)}</g>
       {hover !== null && <polygon points={diamond(hover)} fill="#fff" fillOpacity={0.22} stroke="#fff" strokeWidth={2.5} pointerEvents="none" />}
@@ -441,7 +492,31 @@ function ReplayBoard({ url, names, still, start, initialSpeed, compact, renderSi
 
   return (
     <div className={`replay${compact ? " replay-compact" : ""}${renderSide ? " replay-flanked" : ""}`} ref={root}>
-      {renderSide ? (
+      {showcase ? (
+        <div className="sc-board-stage">
+          <div className="sc-live-hud">
+            {([1, 2] as const).map((side) => {
+              const acting = action?.[0] === side;
+              const actText = lastActionLabel[side - 1];
+              return (
+                <div key={side} className="sc-live-side">
+                  <i style={{ background: PLAYER[side] }} aria-hidden="true" />
+                  <div>
+                    <strong>{names?.[side - 1] ?? data.names[side]}</strong>
+                    <span>{score[side - 1].toLocaleString()} pts · {cityCount[side]} cities · {unitCount[side]} units</span>
+                    {actText && (
+                      <em className={`sc-live-out${acting ? " is-active" : ""}`}>
+                        {actText}
+                      </em>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+          {boardSvg}
+        </div>
+      ) : renderSide ? (
         <div className="sc-row">
           {renderSide(0)}
           <div className="sc-center">

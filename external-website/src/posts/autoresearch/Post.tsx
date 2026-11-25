@@ -31,12 +31,12 @@ export default function AutoresearchPost() {
         signals.
       </p>
       <p className="pt-lede">
-        We gave AI models a GPU budget and tasked them with training
-        efficient neural networks to play games like Pokémon, Polytopia, and
-        Generals.io. The agents had to manage their budget to implement and
-        test ideas. We saw a wide range in taste and efficiency, reflected in
-        the strength of the policies they were able to train. Smarter, newer
-        models trained much more powerful networks.
+        We gave AI models a GPU budget and tasked them with training efficient
+        neural networks to play games like Pokémon, Polytopia, and Generals.io.
+        The agents had to manage their budget to implement and test ideas. We
+        saw a wide range in taste and efficiency, reflected in the strength of
+        the policies they were able to train. Smarter, newer models trained much
+        more powerful networks.
       </p>
       <Showcase />
 
@@ -72,27 +72,24 @@ export default function AutoresearchPost() {
       </p>
       <ul>
         <li>
-          <strong>Compute via Modal.</strong> A fixed budget and a command-line
-          tool to launch jobs on NVIDIA L40S workers and read their logs.
+          <strong>Compute via Modal.</strong> A budget to launch NVIDIA L40S
+          jobs and read their logs.
         </li>
         <li>
           <strong>Complete game rulebook.</strong> The rules, legal moves, and
           scoring for the task.
         </li>
         <li>
-          <strong>A simulator.</strong> Most tasks came with an optimized
-          simulator. In one Generals variant, agents got a slow, single-threaded
-          simulator they could improve themselves.
+          <strong>A simulator.</strong> We provided an optimized game simulator
+          in most tasks.
         </li>
         <li>
-          <strong>Editable training code and configs.</strong> Depending on the
-          task, agents started with a working training recipe or a scaffold
-          without learning code.
+          <strong>Editable training code and configs.</strong> We tried both
+          building from scratch and
         </li>
         <li>
-          <strong>A practice suite.</strong> Agents could evaluate their
-          checkpoints during the session and use the results to decide what to
-          try next or what to submit.
+          <strong>A practice suite.</strong> Agents could evaluate their models
+          against held out opponents.
         </li>
       </ul>
       <p>
@@ -166,10 +163,10 @@ export default function AutoresearchPost() {
         <p>
           Neon leaned into Polytopia&rsquo;s structure with a compact spatial
           map, partial observability under fog of war, countable economic state,
-          and evolving tactical counters. These are well-known techniques. Neon
-          seemed to have an intuition for which ones would work well together
-          in this game. Across repeated runs of the same task, no other model
-          found a recipe with a comparable gain in compute efficiency.
+          and evolving tactical counters. These are not novel techniques, but
+          only Neon employed this level of domain-specific structure. Across
+          repeated runs of the same task, no other model found a recipe with a
+          comparable gain in compute efficiency.
         </p>
         <NeonOutlierDiagrams />
       </section>
@@ -181,10 +178,10 @@ export default function AutoresearchPost() {
         Most models propose plausible ideas and run experiments, yet some are
         far better at choosing high-impact interventions and reading noisy
         signals accurately. Rather than gambling its budget on a few big
-        rewrites, Neon for instance assembled the winning recipe above through{" "}
+        rewrites, Neon for assembled the winning recipe above through{" "}
         <strong>five paired A/B tests</strong>
-        &mdash;short, inexpensive probes to confirm each change before spending
-        a final validation run on the combined stack.
+        &mdash; to confirm each change before spending a final validation run on
+        the combined stack.
       </p>
       <Figure n={4} wide caption={<>Neon&rsquo;s 5 A/B tests</>}>
         <NeonDiscipline />
@@ -193,8 +190,7 @@ export default function AutoresearchPost() {
         Comparing the seven models side by side under the same Polytopia
         research budget makes this gap in experimental style clear. Most agents
         ran a handful of long runs and blew their budget. Neon allocated many
-        fast, cheap probes&mdash;testing far more hypotheses before committing
-        to a full validation run.
+        fast, cheap probes&mdash;testing far more hypotheses.
       </p>
       <Figure
         n={5}
@@ -304,19 +300,19 @@ export default function AutoresearchPost() {
       <p>
         Vibe-coding made it easier to build software for your own needs. We
         encourage you to vibe-train: If you have a niche task and a way to
-        measure success, give a coding agent a modest compute budget and ask
-        it to train and evaluate a model for you.
+        measure success, give a coding agent a modest compute budget and ask it
+        to train and evaluate a model for you.
       </p>
       <p>
         For turn-based, fixed-action-space games with fast simulators like
         Polytopia and Generals, our results show you can already
-        &ldquo;vibe-train&rdquo; a strong, human-competitive RL policy for roughly{" "}
-        <strong>$50&ndash;$100</strong> in combined research and training
-        compute. At game studios like Curio, where rules can shift daily in
-        production and keep evolving after a live-service launch, cheaply
-        retraining bots as the game changes helps check balance and give players
-        reliable teammates&mdash;something newly practical even for small indie
-        teams.
+        &ldquo;vibe-train&rdquo; a strong, human-competitive RL policy for
+        roughly <strong>$50&ndash;$100</strong> in combined research and
+        training compute. At game studios like Curio, where rules can shift
+        daily in production and keep evolving after a live-service launch,
+        cheaply retraining bots as the game changes helps check balance and give
+        players reliable teammates&mdash;something newly practical even for
+        small indie teams.
       </p>
       <p>
         That price point also marks the boundary of where today&rsquo;s

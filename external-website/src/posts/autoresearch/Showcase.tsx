@@ -4,7 +4,6 @@ import {
   useEffect,
   useRef,
   useState,
-  type ReactNode,
 } from "react";
 import { useAgentView } from "../../view";
 import ReplayViewer from "./polytopia/ReplayViewer";
@@ -13,9 +12,9 @@ import { usePokemonReplay } from "./pokemonReplay";
 import { CMYK } from "./colors";
 
 // The post's opening showcase: recorded games between trained RL policies in three games.
-// Game tabs above, live replay stage in the center, compact policy "basketball cards" and matchup switcher below.
+// Game tabs above, full-width live replay stage in the center, condensed policy notes and matchup switcher below.
 // Tours on its own until the reader interacts.
-// Sources for card stats (all NVIDIA L40S):
+// Sources for policy notes (all NVIDIA L40S):
 // - Pokémon 3v3: Nov 14–15 recipes/configs & cost_effectiveness.json (fresh ~55 min final retrains at $2.903/h).
 // - Polytopia: Nov 15 recipe suite finals (2 h L40S at $2.903/h), Nov 14 Astra `refined` (shaped + refine leases),
 //   and the 200M-sample starter baseline (~0.7 h on L40S).
@@ -25,13 +24,10 @@ const BattleReplay = lazy(() => import("../../showdown/react/BattleReplay"));
 const ROTATE_MS = 4000;
 
 type Game = "pokemon" | "polytopia" | "generals";
-type CardStat = { label: string; value: string };
 type PolicyCard = {
   name: string;
-  tag: string;
-  stats: [CardStat, CardStat, CardStat];
-  arch: string;
-  train: string;
+  meta: string;
+  summary: string;
 };
 type Item = {
   game: Game;
@@ -50,168 +46,78 @@ const SIDE_COLORS: Record<Game, [string, string]> = {
 const CARDS = {
   pokeSolA1: {
     name: "GPT-6.1 Sol",
-    tag: "a1 · L40S",
-    stats: [
-      { label: "Params", value: "338K" },
-      { label: "GPU", value: "0.93 h" },
-      { label: "Cost", value: "$2.70" },
-    ],
-    arch: "96w MLP · damage, STAB & Tera prior",
-    train: "PPO (2 ep, γ=.997) + HP shaping",
+    meta: "338K params · $2.70",
+    summary: "96w MLP with damage, STAB & Tera priors, trained with HP-shaped PPO.",
   },
   pokeAstraA1: {
     name: "GPT-6 Astra",
-    tag: "a1 · L40S",
-    stats: [
-      { label: "Params", value: "477K" },
-      { label: "GPU", value: "0.93 h" },
-      { label: "Cost", value: "$2.70" },
-    ],
-    arch: "128w MLP · stat-stage combat head",
-    train: "PPO (3 ep, γ=.995) + HP shaping",
+    meta: "477K params · $2.70",
+    summary: "128w MLP with a stat-stage combat head, trained with HP-shaped PPO.",
   },
   pokeInklingB2: {
     name: "Inkling 2 Small",
-    tag: "b2 · L40S",
-    stats: [
-      { label: "Params", value: "526K" },
-      { label: "GPU", value: "0.93 h" },
-      { label: "Cost", value: "$2.70" },
-    ],
-    arch: "2× wider starter MLP (128w, 16d emb)",
-    train: "Self-play PPO, 2× entropy (0.02)",
+    meta: "526K params · $2.70",
+    summary: "2× wider starter MLP (128w, 16d emb), trained with high-entropy self-play PPO.",
   },
   pokeDeepSeekA2: {
     name: "DeepSeek V4 Pro",
-    tag: "a2 · L40S",
-    stats: [
-      { label: "Params", value: "814K" },
-      { label: "GPU", value: "0.93 h" },
-      { label: "Cost", value: "$2.70" },
-    ],
-    arch: "2-layer SiLU MLPs (160w, 20d emb)",
-    train: "PPO + 0.5× team-HP shaping",
+    meta: "814K params · $2.70",
+    summary: "2-layer SiLU MLPs (160w, 20d emb), trained with PPO and team-HP shaping.",
   },
   pokeSolA2: {
     name: "GPT-6.1 Sol",
-    tag: "a2 · L40S",
-    stats: [
-      { label: "Params", value: "421K" },
-      { label: "GPU", value: "0.92 h" },
-      { label: "Cost", value: "$2.67" },
-    ],
-    arch: "128w MLP · 18×18 type-chart prior",
-    train: "PPO + lagged & heuristic opp mix",
+    meta: "421K params · $2.67",
+    summary: "128w MLP with an 18×18 type-chart prior, trained with PPO vs lagged & heuristic opps.",
   },
   pokeGlmA3: {
     name: "GLM-5.3",
-    tag: "a3 · L40S",
-    stats: [
-      { label: "Params", value: "903K" },
-      { label: "GPU", value: "0.93 h" },
-      { label: "Cost", value: "$2.70" },
-    ],
-    arch: "320w side-aware cross-attention",
-    train: "Plain self-play PPO, unshaped",
+    meta: "903K params · $2.70",
+    summary: "320w side-aware cross-attention network, trained with plain unshaped self-play PPO.",
   },
   polyOpus: {
     name: "Claude Opus 5.5",
-    tag: "recipe · L40S",
-    stats: [
-      { label: "Params", value: "192K" },
-      { label: "GPU", value: "2.0 h" },
-      { label: "Cost", value: "$5.72" },
-    ],
-    arch: "2×32 ResNet + autoregressive heads",
-    train: "2-ep PPO, LR decay + score bonus",
+    meta: "192K params · $5.72",
+    summary: "2×32 ResNet with autoregressive heads, trained with 2-ep PPO, LR decay & score bonus.",
   },
   polyLuna: {
     name: "GPT-6 Luna",
-    tag: "starter · L40S",
-    stats: [
-      { label: "Params", value: "192K" },
-      { label: "GPU", value: "2.0 h" },
-      { label: "Cost", value: "$5.71" },
-    ],
-    arch: "2×32 ResNet + autoregressive heads",
-    train: "Unmodified starter PPO (LR 3e-4)",
+    meta: "192K params · $5.71",
+    summary: "2×32 ResNet with autoregressive heads, trained with unmodified starter PPO.",
   },
   polyAstra: {
     name: "GPT-6 Astra",
-    tag: "refined · L40S",
-    stats: [
-      { label: "Params", value: "390K" },
-      { label: "GPU", value: "2.7 h" },
-      { label: "Cost", value: "$10.36" },
-    ],
-    arch: "3×48 context-v3 ResNet (global→tile)",
-    train: "Score shaping + low-LR refine",
+    meta: "390K params · $10.36",
+    summary: "3×48 context-v3 ResNet (global→tile), trained with score shaping & low-LR refinement.",
   },
   polyStarter: {
     name: "Starter",
-    tag: "200M · L40S",
-    stats: [
-      { label: "Params", value: "192K" },
-      { label: "GPU", value: "~0.7 h" },
-      { label: "Cost", value: "~$2.00" },
-    ],
-    arch: "2×32 ResNet + autoregressive heads",
-    train: "Plain self-play PPO (200M samples)",
+    meta: "192K params · ~$2.00",
+    summary: "2×32 ResNet with autoregressive heads, trained with plain self-play PPO (200M samples).",
   },
   polySol: {
     name: "GPT-6.1 Sol",
-    tag: "recipe · L40S",
-    stats: [
-      { label: "Params", value: "192K" },
-      { label: "GPU", value: "2.0 h" },
-      { label: "Cost", value: "$5.71" },
-    ],
-    arch: "2×32 ResNet + autoregressive heads",
-    train: "Self-play PPO, γ=1.0 + dev reward",
+    meta: "192K params · $5.71",
+    summary: "2×32 ResNet with autoregressive heads, trained with self-play PPO (γ=1.0) & dev reward.",
   },
   genOpus: {
     name: "Claude Opus 5.5",
-    tag: "main7 · L40S",
-    stats: [
-      { label: "Speed", value: "~14.6k/s" },
-      { label: "GPU", value: "2.7 h" },
-      { label: "Cost", value: "$7.73" },
-    ],
-    arch: "Rebuilt batched JAX sim + jitted PPO",
-    train: "7 chained runs, anchored self-play",
+    meta: "~14.6k ticks/s · $7.73",
+    summary: "Rebuilt batched JAX sim with jitted PPO across 7 chained anchored self-play runs.",
   },
   genSol: {
     name: "GPT-6.1 Sol",
-    tag: "final1 · L40S",
-    stats: [
-      { label: "Speed", value: "~5.4k/s" },
-      { label: "GPU", value: "3.3 h" },
-      { label: "Cost", value: "$11.23" },
-    ],
-    arch: "Rebuilt batched JAX sim (37M ticks)",
-    train: "PPO + shaping, pool & symmetries",
+    meta: "~5.4k ticks/s · $11.23",
+    summary: "Rebuilt batched JAX sim (37M ticks), trained with shaped PPO, opponent pool & symmetries.",
   },
   genDeepSeek: {
     name: "DeepSeek V4 Pro",
-    tag: "train6 · L40S",
-    stats: [
-      { label: "Speed", value: "~565/s" },
-      { label: "GPU", value: "2.3 h" },
-      { label: "Cost", value: "$6.57" },
-    ],
-    arch: "8×96 CNN on supplied Python sim",
-    train: "PPO + castle rewards (~5M ticks)",
+    meta: "~565 ticks/s · $6.57",
+    summary: "8×96 CNN on the supplied Python sim, trained with PPO & castle rewards (~5M ticks).",
   },
   genKimi: {
     name: "Kimi K3.1 Pro",
-    tag: "ppo7 · L40S",
-    stats: [
-      { label: "Speed", value: "~630/s" },
-      { label: "GPU", value: "2.4 h" },
-      { label: "Cost", value: "$7.11" },
-    ],
-    arch: "5×64 ResNet on supplied Python sim",
-    train: "PPO + reward tuning (~5M ticks)",
+    meta: "~630 ticks/s · $7.11",
+    summary: "5×64 ResNet on the supplied Python sim, trained with PPO & reward tuning (~5M ticks).",
   },
 } satisfies Record<string, PolicyCard>;
 
@@ -286,54 +192,27 @@ const GAMES: { id: Game; label: string }[] = [
   { id: "generals", label: "Generals" },
 ];
 
-function SideCard({ card, accent }: { card: PolicyCard; accent: string }) {
+function PolicyNote({ card, accent }: { card: PolicyCard; accent: string }) {
   return (
-    <div className="sc-card">
-      <div className="sc-card-head">
-        <span className="sc-card-name">
+    <div className="sc-policy">
+      <div className="sc-policy-head">
+        <span className="sc-policy-name">
           <i style={{ background: accent }} aria-hidden="true" />
           <strong>{card.name}</strong>
         </span>
-        <span className="sc-card-tag">{card.tag}</span>
+        <span className="sc-policy-meta">{card.meta}</span>
       </div>
-      <div className="sc-card-stats">
-        {card.stats.map((s) => (
-          <div key={s.label}>
-            <span className="sc-stat-k">{s.label}</span>
-            <strong className="sc-stat-v">{s.value}</strong>
-          </div>
-        ))}
-      </div>
-      <dl className="sc-card-notes">
-        <div>
-          <dt>Arch</dt>
-          <dd>{card.arch}</dd>
-        </div>
-        <div>
-          <dt>Train</dt>
-          <dd>{card.train}</dd>
-        </div>
-      </dl>
+      <p className="sc-policy-desc">{card.summary}</p>
     </div>
   );
 }
 
-function Pokemon({
-  item,
-  renderSide,
-}: {
-  item: Item;
-  renderSide: (side: 0 | 1) => ReactNode;
-}) {
+function Pokemon({ item }: { item: Item }) {
   const file = usePokemonReplay(item.id);
   const wait = (
-    <div className="psr psr-flanked">
-      <div className="sc-row">
-        {renderSide(0)}
-        <div className="sc-center sc-wait">
-          {file === "error" ? "This battle could not load." : "Loading battle…"}
-        </div>
-        {renderSide(1)}
+    <div className="psr">
+      <div className="sc-board-stage sc-wait">
+        {file === "error" ? "This battle could not load." : "Loading battle…"}
       </div>
       <div className="psr-bar sc-controls-stub" aria-hidden="true" />
     </div>
@@ -346,8 +225,6 @@ function Pokemon({
           log={file.log}
           startTurn={item.start}
           initialSpeed="fast"
-          cropSidebars
-          renderSide={renderSide}
         />
       ) : (
         wait
@@ -357,12 +234,7 @@ function Pokemon({
 }
 
 function Stage({ item }: { item: Item }) {
-  const accents = SIDE_COLORS[item.game];
-  const renderSide = (side: 0 | 1) => (
-    <SideCard card={item.cards[side]} accent={accents[side]} />
-  );
-  if (item.game === "pokemon")
-    return <Pokemon item={item} renderSide={renderSide} />;
+  if (item.game === "pokemon") return <Pokemon item={item} />;
   if (item.game === "polytopia") {
     return (
       <ReplayViewer
@@ -372,7 +244,7 @@ function Stage({ item }: { item: Item }) {
         start={item.start}
         initialSpeed={4}
         compact
-        renderSide={renderSide}
+        showcase
       />
     );
   }
@@ -383,7 +255,7 @@ function Stage({ item }: { item: Item }) {
       names={item.players}
       start={item.start}
       initialSpeed={2}
-      renderSide={renderSide}
+      showcase
     />
   );
 }
@@ -420,7 +292,7 @@ export default function Showcase() {
 
   if (agent) {
     const describe = (c: PolicyCard) =>
-      `${c.name} (${c.stats.map((s) => `${s.label}: ${s.value}`).join(", ")}; ${c.arch}; ${c.train})`;
+      `${c.name} (${c.meta}; ${c.summary})`;
     return (
       <ul>
         {ITEMS.map((g) => (
@@ -437,6 +309,7 @@ export default function Showcase() {
   const sameGame = ITEMS.map((g, j) => ({ g, j })).filter(
     ({ g }) => g.game === item.game,
   );
+  const accents = SIDE_COLORS[item.game];
 
   return (
     <div
@@ -475,6 +348,11 @@ export default function Showcase() {
 
       <div className="sc-stage">
         <Stage item={item} />
+      </div>
+
+      <div className="sc-policies" aria-label="Trained network details">
+        <PolicyNote card={item.cards[0]} accent={accents[0]} />
+        <PolicyNote card={item.cards[1]} accent={accents[1]} />
       </div>
 
       <div className="sc-matchups" role="tablist" aria-label="Matchup">

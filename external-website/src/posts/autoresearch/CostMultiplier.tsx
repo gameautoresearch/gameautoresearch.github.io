@@ -217,14 +217,23 @@ const bars: Bar[] = [...new Set(curves.map((c) => c.r.model))]
   .sort((a, b) => b.x - a.x);
 export const trainBars = { n: bars.length, top: bars[0] };
 
-function TrainBars({ W }: { W: number }) {
-  const compact = W < 420;
+const BAR_ROW = 42;
+const BAR_TOP = 12;
+const AXIS_BOTTOM = 44;
+const PANEL_H = BAR_TOP + AXIS_BOTTOM + bars.length * BAR_ROW;
+
+function TrainBars({
+  W,
+  activeModel,
+  onHoverModel,
+}: {
+  W: number;
+  activeModel: string | null;
+  onHoverModel: (model: string | null) => void;
+}) {
   const hasBelow = bars.some((p) => p.x < 1);
-  const row = compact ? 38 : 30;
-  const m = compact
-    ? { l: 10, r: 44, t: 22, b: 36 }
-    : { l: 148, r: 96, t: 22, b: 36 };
-  const H = m.t + m.b + bars.length * row;
+  const m = { l: 8, r: 52, t: BAR_TOP, b: AXIS_BOTTOM };
+  const H = PANEL_H;
   const maxBar = Math.max(...bars.map((p) => p.x));
   const topTick = 2 ** Math.max(4, Math.ceil(Math.log2(maxBar)));
   const L0 = Math.log2(hasBelow ? 1 / 2 : 1),
@@ -240,19 +249,20 @@ function TrainBars({ W }: { W: number }) {
       viewBox={`0 0 ${W} ${H}`}
       role="img"
       aria-label="Training-only compute multiplier of each model's best recipe"
+      onMouseLeave={() => onHoverModel(null)}
     >
       {ticks.map((t) => (
         <g key={t}>
           <line
             x1={sx(t)}
             x2={sx(t)}
-            y1={m.t - 4}
+            y1={m.t}
             y2={H - m.b}
             className="viz-grid"
           />
           <text
             x={sx(t)}
-            y={H - m.b + 16}
+            y={H - m.b + 19}
             className="viz-axis"
             textAnchor="middle"
           >
@@ -263,81 +273,76 @@ function TrainBars({ W }: { W: number }) {
       <line
         x1={sx(1)}
         x2={sx(1)}
-        y1={m.t - 4}
+        y1={m.t}
         y2={H - m.b}
         stroke={CMYK.k}
         strokeWidth={1.6}
       />
-      <text x={m.l} y={m.t - 9} className="viz-axis">
-        {compact
-          ? "best recipe, 6–8 h mean"
-          : "best recipe, mean of 6–8 h: starter's training ÷ recipe's (log scale)"}
-      </text>
-      <text x={W - m.r} y={H - 4} className="viz-axis" textAnchor="end">
-        {compact ? "training multiplier (log)" : "training compute multiplier"}
+      <text
+        x={(sx(ticks[0]) + sx(topTick)) / 2}
+        y={H - 4}
+        className="viz-axis-title"
+        textAnchor="middle"
+      >
+        Multiplier
       </text>
       {bars.map((p, i) => {
         const st = modelStyle(p.r.model);
-        const y = m.t + i * row;
+        const y = m.t + i * BAR_ROW;
         const x0 = sx(1),
           x1 = sx(p.x);
-        const barY = compact ? y + 19 : y + 5;
-        const barH = compact ? 11 : row - 10;
+        const barY = y + 20;
+        const barH = 14;
         const midY = barY + barH / 2;
+        const dimmed = activeModel !== null && activeModel !== p.r.model;
         return (
-          <g key={p.r.key}>
+          <g
+            key={p.r.key}
+            className="ar-cost-bar-row"
+            opacity={dimmed ? 0.35 : 1}
+            onMouseEnter={() => onHoverModel(p.r.model)}
+          >
             <title>{`${displayModel(p.r.model)}, best recipe (${p.r.cell}): ${p.extrap ? "≈" : ""}${fx(p.x)} averaged over 6, 7 and 8 h of training; at 8 h as strong as the starter recipe after ${p.extrap ? "about " : ""}${hrs(p.sh8)}${p.extrap ? ` (extrapolated past the starter recipe's ${hrs(TOP.hours)} run)` : ""}`}</title>
-            <rect x={0} y={y} width={W} height={row} fill="transparent" />
-            {compact ? (
-              <text
-                x={x0 + 5}
-                y={y + 13}
-                className="viz-label"
-                style={{
-                  fontSize: 11.5,
-                  paintOrder: "stroke",
-                  stroke: "#fff",
-                  strokeWidth: 3,
-                }}
-              >
-                {displayModel(p.r.model)}
-                {p.extrap && <tspan className="viz-axis"> · extrap.</tspan>}
-              </text>
-            ) : (
-              <text
-                x={m.l - 10}
-                y={midY}
-                className="viz-label"
-                textAnchor="end"
-                dominantBaseline="middle"
-              >
-                {displayModel(p.r.model)}
-              </text>
-            )}
+            <rect x={0} y={y} width={W} height={BAR_ROW} fill="transparent" />
+            <text
+              x={x0 + 6}
+              y={y + 14}
+              className="viz-label"
+              style={{
+                fontSize: 13.5,
+                fontWeight: i === 0 || activeModel === p.r.model ? 600 : 500,
+                paintOrder: "stroke",
+                stroke: "#fff",
+                strokeWidth: 4,
+                strokeLinejoin: "round",
+              }}
+            >
+              {displayModel(p.r.model)}
+            </text>
             <rect
               x={Math.min(x0, x1)}
               y={barY}
-              width={Math.max(1, Math.abs(x1 - x0))}
+              width={Math.max(2, Math.abs(x1 - x0))}
               height={barH}
-              rx={2}
+              rx={2.5}
               fill={st.color}
             />
             <text
-              x={Math.max(x0, x1) + 6}
-              y={midY}
+              x={Math.max(x0, x1) + 7}
+              y={midY + 0.5}
               className="viz-label"
               dominantBaseline="middle"
-              style={{ fontSize: compact ? 11.5 : 12.5 }}
+              style={{
+                fontSize: 13,
+                fontWeight: 650,
+                paintOrder: "stroke",
+                stroke: "#fff",
+                strokeWidth: 4,
+                strokeLinejoin: "round",
+              }}
             >
-              <tspan style={{ fontWeight: 600 }}>
-                {p.extrap ? "≈" : ""}
-                {fx(p.x)}
-              </tspan>
-              {!compact && p.extrap && (
-                <tspan className="viz-axis" dx={6}>
-                  extrapolated
-                </tspan>
-              )}
+              {p.extrap ? "≈" : ""}
+              {fx(p.x)}
             </text>
           </g>
         );
@@ -359,11 +364,10 @@ export function CostMultiplier() {
   const agent = useAgentView();
   const leftRef = useRef<HTMLDivElement>(null);
   const rightRef = useRef<HTMLDivElement>(null);
-  const W = usePanelWidth(leftRef, 446);
-  const WR = usePanelWidth(rightRef, 224);
-  const sideBySide = WR < 420;
-  const compact = W < 520;
+  const W = usePanelWidth(leftRef, 415);
+  const WR = usePanelWidth(rightRef, 251);
   const [hit, setHit] = useState<Hit | null>(null);
+  const [hoverModel, setHoverModel] = useState<string | null>(null);
   if (agent) {
     return (
       <Table
@@ -387,10 +391,8 @@ export function CostMultiplier() {
       />
     );
   }
-  const H = sideBySide
-    ? 22 + 36 + bars.length * 38
-    : Math.round(Math.max(300, Math.min(400, W * 0.52)));
-  const m = { l: compact ? 38 : 46, r: compact ? 12 : 88, t: 22, b: 36 };
+  const H = PANEL_H;
+  const m = { l: 42, r: 16, t: 24, b: AXIS_BOTTOM };
   const all = curves.flatMap((c) => c.pts);
   const cx = (q: Pt) => q.cost,
     vy = (q: Pt) => q.x;
@@ -401,17 +403,20 @@ export function CostMultiplier() {
   const sy = (x: number) =>
     m.t +
     (1 - (Math.log2(Math.max(x, 2 ** L0)) - L0) / (L1 - L0)) * (H - m.t - m.b);
-  const yTicks = [1 / 16, 1 / 8, 1 / 4, 1 / 2, 1, 2, 4, 8, 16];
+  const yTicks = [1 / 16, 1 / 4, 1, 4, 16];
   const xTicks: number[] = [];
-  for (let x = 0; x <= COST_MAX; x += W < 380 ? 10 : 5) xTicks.push(x);
-  const models = [
-    ...bars.map((b) => b.r.model),
-    ...recipes.map((r) => r.model),
-  ].filter((mo, i, a) => a.indexOf(mo) === i);
+  for (let x = 0; x <= COST_MAX; x += 10) xTicks.push(x);
   const top = TOP8;
-  // Hovering a point brings forward every recipe from that model; the hovered recipe is drawn heaviest.
+  const activeModel = hit?.model ?? hoverModel;
+  // Hovering a point or bar brings forward every recipe from that model; the hovered recipe is drawn heaviest.
   const rank = (r: Recipe) =>
-    r.key === hit?.key ? 3 : r.model === hit?.model ? 2 : r === top.r ? 1 : 0;
+    r.key === hit?.key
+      ? 3
+      : r.model === activeModel
+        ? 2
+        : r === top.r
+          ? 1
+          : 0;
   const hits: Hit[] = all.map((q) => ({
     cx: sx(cx(q)),
     cy: sy(vy(q)),
@@ -447,33 +452,19 @@ export function CostMultiplier() {
           `${i ? "L" : "M"}${sx(cx(p)).toFixed(1)},${sy(vy(p)).toFixed(1)}`,
       )
       .join("");
-  const tipW = compact ? 220 : 250;
+  const tipW = 230;
   const tipLeft = hit
     ? Math.max(
         0,
         hit.cx + 12 + tipW > W ? Math.max(0, hit.cx - tipW - 12) : hit.cx + 12,
       )
     : 0;
+  const topStyle = modelStyle(top.r.model);
   return (
     <div className="ar-cost-wrap">
-      <div className="viz-legend ar-cost-legend">
-        {models.map((mo) => {
-          const st = modelStyle(mo);
-          return (
-            <span key={mo}>
-              <i style={{ background: st.color }} />
-              {displayModel(mo)}
-            </span>
-          );
-        })}
-        <span>
-          <i style={{ background: CMYK.k }} />
-          Starter recipe (1×)
-        </span>
-      </div>
       <div className="ar-cost-pair">
         <div className="ar-cost-fig">
-          <div className="ar-cost-head">Research cost included (x offset)</div>
+          <div className="ar-cost-head">Research + training</div>
           <div className="viz ar-cost" ref={leftRef}>
             <div className="ar-cost-plot">
               <svg
@@ -495,11 +486,16 @@ export function CostMultiplier() {
                       className="viz-grid"
                     />
                     <text
-                      x={m.l - 6}
+                      x={m.l - 8}
                       y={sy(t)}
                       className="viz-axis"
                       textAnchor="end"
                       dominantBaseline="middle"
+                      style={
+                        t === 1
+                          ? { fill: "var(--ink)", fontWeight: 600 }
+                          : undefined
+                      }
                     >
                       {t >= 1 ? `${t}×` : `1/${1 / t}`}
                     </text>
@@ -516,7 +512,7 @@ export function CostMultiplier() {
                     />
                     <text
                       x={sx(t)}
-                      y={H - m.b + 16}
+                      y={H - m.b + 19}
                       className="viz-axis"
                       textAnchor="middle"
                     >
@@ -525,19 +521,15 @@ export function CostMultiplier() {
                   </g>
                 ))}
                 <text
-                  x={W - m.r}
+                  x={(m.l + W - m.r) / 2}
                   y={H - 4}
-                  className="viz-axis"
-                  textAnchor="end"
+                  className="viz-axis-title"
+                  textAnchor="middle"
                 >
-                  {compact
-                    ? "total cost: research + training"
-                    : `total cost: research GPU spend + training ($${RATE.toFixed(2)}/h)`}
+                  Total cost
                 </text>
-                <text x={m.l} y={m.t - 9} className="viz-axis">
-                  {compact
-                    ? "compute multiplier (log scale)"
-                    : "compute multiplier: starter's cost ÷ recipe's total cost (log scale)"}
+                <text x={m.l} y={m.t - 10} className="viz-axis-title">
+                  Compute multiplier
                 </text>
                 {[...curves]
                   .sort((a, b) => rank(a.r) - rank(b.r))
@@ -545,29 +537,29 @@ export function CostMultiplier() {
                     const st = modelStyle(r.model),
                       focus = hit?.key === r.key,
                       hi = r === top.r;
-                    const lit = hit ? r.model === hit.model : hi;
+                    const lit = activeModel ? r.model === activeModel : hi;
                     return (
                       <g key={r.key}>
                         <path
                           d={path(pts)}
                           fill="none"
                           stroke={st.color}
-                          strokeWidth={focus ? 2.8 : lit ? 2.2 : 1.4}
+                          strokeWidth={focus ? 2.8 : lit ? 2.4 : 1.3}
                           strokeLinejoin="round"
-                          opacity={lit ? 1 : hit ? 0.15 : 0.25}
+                          opacity={lit ? 1 : activeModel ? 0.12 : 0.28}
                         />
-                        {pts.map((p) => (
-                          <circle
-                            key={p.hours}
-                            cx={sx(cx(p))}
-                            cy={sy(vy(p))}
-                            r={focus ? 4 : 2.6}
-                            fill={p.extrap ? "#fff" : st.color}
-                            stroke={p.extrap ? st.color : "#fff"}
-                            strokeWidth={p.extrap ? 1.6 : 1}
-                            opacity={lit ? 1 : hit ? 0.2 : 0.35}
-                          />
-                        ))}
+                        {lit &&
+                          pts.map((p) => (
+                            <circle
+                              key={p.hours}
+                              cx={sx(cx(p))}
+                              cy={sy(vy(p))}
+                              r={focus ? 4 : 3.1}
+                              fill={p.extrap ? "#fff" : st.color}
+                              stroke={p.extrap ? st.color : "#fff"}
+                              strokeWidth={p.extrap ? 1.8 : 1.2}
+                            />
+                          ))}
                       </g>
                     );
                   })}
@@ -579,51 +571,44 @@ export function CostMultiplier() {
                   stroke={CMYK.k}
                   strokeWidth={2}
                 />
-                {compact ? (
-                  <text
-                    x={W - m.r}
-                    y={sy(1) - 6}
-                    className="viz-axis"
-                    textAnchor="end"
-                    style={{
-                      fill: "var(--ink)",
-                      fontWeight: 600,
-                      paintOrder: "stroke",
-                      stroke: "#fff",
-                      strokeWidth: 3,
-                    }}
-                  >
-                    Starter, 1×
-                  </text>
-                ) : (
-                  <text
-                    x={W - m.r + 6}
-                    y={sy(1)}
-                    className="viz-label"
-                    dominantBaseline="middle"
-                    style={{ fontWeight: 600 }}
-                  >
-                    Starter, 1×
-                  </text>
-                )}
                 <text
-                  x={compact ? sx(cx(top)) : sx(cx(top)) + 9}
-                  y={compact ? sy(vy(top)) - 12 : sy(vy(top)) - 10}
+                  x={W - m.r - 2}
+                  y={sy(1) - 8}
                   className="viz-label"
-                  textAnchor={compact ? "end" : "start"}
-                  dominantBaseline="auto"
+                  textAnchor="end"
                   style={{
-                    fontSize: compact ? 11.5 : 12.5,
-                    fontWeight: 600,
+                    fontSize: 13,
+                    fontWeight: 650,
                     paintOrder: "stroke",
                     stroke: "#fff",
                     strokeWidth: 4,
                     strokeLinejoin: "round",
                   }}
                 >
-                  {compact
-                    ? `${displayModel(top.r.model)}: ${top.extrap ? "≈" : ""}${fx(vy(top))}`
-                    : `${displayModel(top.r.model)}, ${usd(top.r.spentUsd)} session: ${top.extrap ? "≈" : ""}${fx(vy(top))}`}
+                  Starter 1×
+                </text>
+                <text
+                  x={sx(cx(top)) + 10}
+                  y={sy(vy(top)) - 4}
+                  className="viz-label"
+                  textAnchor="start"
+                  style={{
+                    fontSize: 13.5,
+                    fontWeight: 650,
+                    fill: topStyle.color,
+                    paintOrder: "stroke",
+                    stroke: "#fff",
+                    strokeWidth: 4,
+                    strokeLinejoin: "round",
+                  }}
+                >
+                  <tspan x={sx(cx(top)) + 10} dy={0}>
+                    {displayModel(top.r.model)}
+                  </tspan>
+                  <tspan x={sx(cx(top)) + 10} dy={17}>
+                    {top.extrap ? "≈" : ""}
+                    {fx(vy(top))}
+                  </tspan>
                 </text>
               </svg>
               {hit && (
@@ -646,9 +631,13 @@ export function CostMultiplier() {
           </div>
         </div>
         <div className="ar-cost-fig">
-          <div className="ar-cost-head">Training compute only</div>
+          <div className="ar-cost-head">Training only</div>
           <div className="viz ar-cost" ref={rightRef}>
-            <TrainBars W={WR} />
+            <TrainBars
+              W={WR}
+              activeModel={activeModel}
+              onHoverModel={setHoverModel}
+            />
           </div>
         </div>
       </div>

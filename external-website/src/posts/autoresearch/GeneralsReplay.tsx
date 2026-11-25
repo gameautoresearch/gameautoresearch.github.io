@@ -15,15 +15,46 @@ const TICKS_PER_SECOND = 6;
 const END_HOLD_MS = 1600;
 const SPEEDS = [1, 2, 4];
 const SEAT_COLORS = [CMYK.c, CMYK.m];
+const DIR_ARROWS = ["↑", "↓", "←", "→"] as const;
+const DIR_DR = [-1, 1, 0, 0] as const;
+const DIR_DC = [0, 0, -1, 1] as const;
 
-function decodeOrder(id: number, width: number, actionWidth: number) {
+type DecodedOrder = {
+  player: 0 | 1;
+  from: number;
+  to: number;
+  fromRow: number;
+  fromCol: number;
+  toRow: number;
+  toCol: number;
+  arrow: string;
+  split: boolean;
+};
+
+function decodeOrder(id: number, width: number, height: number, actionWidth: number, player: 0 | 1): DecodedOrder | null {
   if (!id) return null;
-  const a = id - 1, cell = Math.floor(a / 8), row = Math.floor(cell / actionWidth), col = cell % actionWidth, dir = Math.floor(a / 2) % 4;
-  return { from: row * width + col, to: (row + [-1, 1, 0, 0][dir]) * width + col + [0, 0, -1, 1][dir] };
+  const a = id - 1, cell = Math.floor(a / 8), row = Math.floor(cell / actionWidth), col = cell % actionWidth;
+  const dir = Math.floor(a / 2) % 4, split = a % 2 === 1;
+  const toRow = row + DIR_DR[dir], toCol = col + DIR_DC[dir];
+  if (row < 0 || row >= height || col < 0 || col >= width || toRow < 0 || toRow >= height || toCol < 0 || toCol >= width) {
+    return null;
+  }
+  return {
+    player,
+    from: row * width + col,
+    to: toRow * width + toCol,
+    fromRow: row,
+    fromCol: col,
+    toRow,
+    toCol,
+    arrow: DIR_ARROWS[dir],
+    split,
+  };
 }
 
-export default function GeneralsReplay({ src, names, start = 0, initialSpeed = 1, renderSide }: {
+export default function GeneralsReplay({ src, names, start = 0, initialSpeed = 1, showcase = false, renderSide }: {
   src: string; names?: [string, string]; start?: number; initialSpeed?: number;
+  showcase?: boolean;
   renderSide?: (side: 0 | 1) => ReactNode;
 }) {
   const [rec, setRec] = useState<Recording | null>(null);
@@ -79,6 +110,14 @@ export default function GeneralsReplay({ src, names, start = 0, initialSpeed = 1
   }, [playing, rec, speed]);
 
   if (!rec || !boards.length) {
+    if (showcase) {
+      return (
+        <div className="gr">
+          <div className="sc-board-stage sc-wait">Loading game…</div>
+          <div className="gr-controls sc-controls-stub" aria-hidden="true" />
+        </div>
+      );
+    }
     if (renderSide) {
       return (
         <div className="gr gr-flanked">
@@ -97,7 +136,11 @@ export default function GeneralsReplay({ src, names, start = 0, initialSpeed = 1
   const t = Math.min(last, Math.floor(pos)), cells = boards[t], f = rec.frames[t];
   const label = names ?? rec.players;
   const C = 30, W = w * C, H = h * C;
-  const moves = (f.actions ?? []).map((id) => decodeOrder(id, w, rec.actionWidth ?? 24)).filter(Boolean) as { from: number; to: number }[];
+  const ordersByPlayer: [DecodedOrder | null, DecodedOrder | null] = [
+    decodeOrder(f.actions?.[0] ?? 0, w, h, rec.actionWidth ?? 24, 0),
+    decodeOrder(f.actions?.[1] ?? 0, w, h, rec.actionWidth ?? 24, 1),
+  ];
+  const moves = ordersByPlayer.filter(Boolean) as DecodedOrder[];
 
   const tiles = [];
   for (let i = 0; i < w * h; i++) {
@@ -125,16 +168,53 @@ export default function GeneralsReplay({ src, names, start = 0, initialSpeed = 1
   const boardSvg = (
     <svg viewBox={`0 0 ${W} ${H}`} className="gr-board" role="img" aria-label={`Generals: ${label[0]} vs ${label[1]}, tick ${t}`}>
       {tiles}
-      {moves.map((m, j) => (
-        <rect key={j} x={(m.to % w) * C + 1} y={Math.floor(m.to / w) * C + 1} width={C - 2} height={C - 2} rx={3}
-          fill="none" stroke="#111" strokeWidth={2} />
-      ))}
+      {moves.map((m, j) => {
+        const fx = m.fromCol * C + C / 2, fy = m.fromRow * C + C / 2;
+        const tx = m.toCol * C + C / 2, ty = m.toRow * C + C / 2;
+        const dx = tx - fx, dy = ty - fy, len = Math.hypot(dx, dy) || 1;
+        const ux = dx / len, uy = dy / len;
+        const sx = fx + ux * 8, sy = fy + uy * 8;
+        const ex = tx - ux * 6, ey = ty - uy * 6;
+        const px = -uy, py = ux;
+        const head = `${ex},${ey} ${ex - ux * 6.5 + px * 4},${ey - uy * 6.5 + py * 4} ${ex - ux * 6.5 - px * 4},${ey - uy * 6.5 - py * 4}`;
+        return (
+          <g key={j} pointerEvents="none">
+            <rect x={m.toCol * C + 1} y={m.toRow * C + 1} width={C - 2} height={C - 2} rx={3}
+              fill="none" stroke="#111" strokeWidth={2} />
+            <line x1={sx} y1={sy} x2={ex - ux * 4} y2={ey - uy * 4} stroke="#fff" strokeWidth={4.2} strokeLinecap="round" opacity={0.9} />
+            <line x1={sx} y1={sy} x2={ex - ux * 4} y2={ey - uy * 4} stroke="#111" strokeWidth={2} strokeLinecap="round"
+              strokeDasharray={m.split ? "2.5 2.5" : undefined} />
+            <polygon points={head} fill="#111" stroke="#fff" strokeWidth={1.1} strokeLinejoin="round" />
+          </g>
+        );
+      })}
     </svg>
   );
 
   return (
     <div className={`gr${renderSide ? " gr-flanked" : ""}`}>
-      {renderSide ? (
+      {showcase ? (
+        <div className="sc-board-stage">
+          <div className="sc-live-hud">
+            {([0, 1] as const).map((p) => {
+              const ord = ordersByPlayer[p];
+              return (
+                <div key={p} className="sc-live-side">
+                  <i style={{ background: SEAT_COLORS[p] }} aria-hidden="true" />
+                  <div>
+                    <strong>{label[p]}</strong>
+                    <span>{f.scores[p].army.toLocaleString()} army · {f.scores[p].land} land</span>
+                    <em className={`sc-live-out${ord ? " is-active" : ""}`}>
+                      {ord ? `${ord.split ? "Split" : "Move"} ${ord.arrow}` : "Wait"}
+                    </em>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+          {boardSvg}
+        </div>
+      ) : renderSide ? (
         <div className="sc-row">
           {renderSide(0)}
           <div className="sc-center">
