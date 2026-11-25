@@ -241,32 +241,59 @@ const GAMES: { id: Game; label: string }[] = [
 ];
 
 function SideColumn({
-  card,
-  accent,
+  cards,
+  accents,
+  activeSide,
+  onSelectSide,
   io,
 }: {
-  card: PolicyCard;
-  accent: string;
+  cards: [PolicyCard, PolicyCard];
+  accents: [string, string];
+  activeSide: 0 | 1;
+  onSelectSide: (side: 0 | 1) => void;
   io?: ReactNode;
 }) {
+  const card = cards[activeSide];
   return (
     <div className="sc-side">
       <div className="sc-side-head">
-        <div className="sc-side-top">
-          <span className="sc-side-name">
-            <i style={{ background: accent }} aria-hidden="true" />
-            <strong>{card.name}</strong>
-          </span>
-          <span className="sc-side-meta">{card.meta}</span>
+        <div className="sc-side-switch" role="tablist" aria-label="Inspected network">
+          {([0, 1] as const).map((s) => (
+            <button
+              key={s}
+              type="button"
+              role="tab"
+              aria-selected={activeSide === s}
+              onClick={() => onSelectSide(s)}
+              title={`Inspect ${cards[s].name}'s inputs and outputs`}
+            >
+              <i style={{ background: accents[s] }} aria-hidden="true" />
+              <span>{cards[s].name}</span>
+            </button>
+          ))}
         </div>
-        <p className="sc-side-desc">{card.summary}</p>
+        <p className="sc-side-desc">
+          <strong className="sc-side-meta">{card.meta}</strong>
+          {" · "}
+          {card.summary}
+        </p>
       </div>
       <div className="sc-side-io">{io}</div>
     </div>
   );
 }
 
-function Pokemon({ item, accents }: { item: Item; accents: [string, string] }) {
+function Pokemon({
+  item,
+  accents,
+  activeSide,
+  onSelectSide,
+}: {
+  item: Item;
+  accents: [string, string];
+  activeSide: 0 | 1;
+  onSelectSide: (side: 0 | 1) => void;
+}) {
   const file = usePokemonReplay(item.id);
   const [turn, setTurn] = useState(item.start);
   useEffect(() => {
@@ -276,19 +303,24 @@ function Pokemon({ item, accents }: { item: Item; accents: [string, string] }) {
   const ready = file && file !== "error" && file.id === item.id;
   const snapshots = useMemo(() => (ready ? parsePokemonTimeline(file.log) : []), [ready, file]);
 
-  const renderSide = (side: 0 | 1) => (
-    <SideColumn
-      card={item.cards[side]}
-      accent={accents[side]}
-      io={
-        ready ? (
-          <PokemonSideIO side={side} snapshots={snapshots} turn={turn} accents={accents} />
-        ) : (
-          <div className="sio sio-loading" aria-hidden="true" />
-        )
-      }
-    />
-  );
+  const renderSide = (side: 0 | 1) => {
+    if (side !== activeSide) return null;
+    return (
+      <SideColumn
+        cards={item.cards}
+        accents={accents}
+        activeSide={activeSide}
+        onSelectSide={onSelectSide}
+        io={
+          ready ? (
+            <PokemonSideIO side={activeSide} snapshots={snapshots} turn={turn} accents={accents} />
+          ) : (
+            <div className="sio sio-loading" aria-hidden="true" />
+          )
+        }
+      />
+    );
+  };
 
   const wait = (
     <div className="psr psr-flanked">
@@ -321,11 +353,39 @@ function Pokemon({ item, accents }: { item: Item; accents: [string, string] }) {
   );
 }
 
-function Stage({ item, accents }: { item: Item; accents: [string, string] }) {
-  const renderSide = (side: 0 | 1, io?: ReactNode) => (
-    <SideColumn card={item.cards[side]} accent={accents[side]} io={io} />
-  );
-  if (item.game === "pokemon") return <Pokemon item={item} accents={accents} />;
+function Stage({
+  item,
+  accents,
+  activeSide,
+  onSelectSide,
+}: {
+  item: Item;
+  accents: [string, string];
+  activeSide: 0 | 1;
+  onSelectSide: (side: 0 | 1) => void;
+}) {
+  const renderSide = (side: 0 | 1, io?: ReactNode) => {
+    if (side !== activeSide) return null;
+    return (
+      <SideColumn
+        cards={item.cards}
+        accents={accents}
+        activeSide={activeSide}
+        onSelectSide={onSelectSide}
+        io={io}
+      />
+    );
+  };
+  if (item.game === "pokemon") {
+    return (
+      <Pokemon
+        item={item}
+        accents={accents}
+        activeSide={activeSide}
+        onSelectSide={onSelectSide}
+      />
+    );
+  }
   if (item.game === "polytopia") {
     return (
       <ReplayViewer
@@ -366,6 +426,7 @@ function Stage({ item, accents }: { item: Item; accents: [string, string] }) {
 export default function Showcase() {
   const agent = useAgentView();
   const [i, setI] = useState(0);
+  const [activeSide, setActiveSide] = useState<0 | 1>(0);
   const [touring, setTouring] = useState(
     () =>
       typeof window === "undefined" ||
@@ -374,6 +435,10 @@ export default function Showcase() {
   const [visible, setVisible] = useState(true);
   const root = useRef<HTMLDivElement>(null);
   const item = ITEMS[i];
+
+  useEffect(() => {
+    setActiveSide(0);
+  }, [i]);
 
   useEffect(() => {
     const el = root.current;
@@ -450,7 +515,12 @@ export default function Showcase() {
       </div>
 
       <div className="sc-stage">
-        <Stage item={item} accents={accents} />
+        <Stage
+          item={item}
+          accents={accents}
+          activeSide={activeSide}
+          onSelectSide={setActiveSide}
+        />
       </div>
 
       <div className="sc-matchups" role="tablist" aria-label="Matchup">
