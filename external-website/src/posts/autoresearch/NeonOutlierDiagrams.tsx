@@ -746,7 +746,7 @@ const ITEMS = [
   {
     key: "critic",
     title: "Omniscient critic distilled into the policy",
-    text: "A training critic value head sees both sides through the fog of war; we distills its judgment into the policy.",
+    text: "A training critic value head sees both sides through the fog of war. We distill its judgment into the policy.",
     Diagram: CriticDistillDiagram,
   },
   {

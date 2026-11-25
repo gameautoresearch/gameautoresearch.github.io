@@ -123,7 +123,7 @@ html.agent-view .ar h2.ar-config { margin-top: 2em; padding-top: 0; border-top: 
 }
 .ar-sf-single {
   max-width: 480px;
-  margin: 4px auto 20px;
+  margin: 20px auto;
 }
 .ar-sf-recipe {
   border-color: #f3cbe0;
@@ -306,6 +306,10 @@ html.agent-view .ar h2.ar-config { margin-top: 2em; padding-top: 0; border-top: 
 /* Polytopia, 13 models: best-so-far race and Elo leaderboard. */
 .fr { position: relative; }
 .fr svg { display: block; width: 100%; height: auto; overflow: visible; }
+@media (prefers-reduced-motion: no-preference) {
+  .fr-run-dot { opacity: 0; transition: opacity 320ms ease-out; }
+  .fr-runs-seen .fr-run-dot { opacity: 1; }
+}
 .fr-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 6px 12px; margin-bottom: 8px; }
 .fr-title { font-size: 15px; font-weight: 600; color: var(--ink); line-height: 1.3; }
 .fr-pin-chip {

@@ -28,10 +28,13 @@ export default function AutoresearchPost() {
         Can AI agents train strong domain-specific models? Agents have shown
         superhuman skills writing deterministic code. But effective machine
         learning poses different challenges: limited compute and noisy training
-        signals. We gave AI models a GPU budget and tasked them with training
+        signals.
+      </p>
+      <p className="pt-lede">
+        We gave AI models a GPU budget and tasked them with training
         efficient neural networks to play games like Pokémon, Polytopia, and
         Generals.io. The agents had to manage their budget to implement and
-        tested ideas. We saw a wide range in taste and efficiency, reflected in
+        test ideas. We saw a wide range in taste and efficiency, reflected in
         the strength of the policies they were able to train. Smarter, newer
         models trained much more powerful networks.
       </p>
@@ -43,7 +46,7 @@ export default function AutoresearchPost() {
       <p>
         We evaluated ten models across five training tasks: Two variants of
         Polytopia, Pokémon Showdown, Generals, as well as a task based on
-        forcasting the sucess of a training recipe without running it.
+        forecasting the success of a training recipe without running it.
       </p>
       <Figure
         n={1}
@@ -73,8 +76,8 @@ export default function AutoresearchPost() {
           tool to launch jobs on NVIDIA L40S workers and read their logs.
         </li>
         <li>
-          <strong>A game rulebook.</strong> The rules, legal moves, and scoring
-          for the task.
+          <strong>Complete game rulebook.</strong> The rules, legal moves, and
+          scoring for the task.
         </li>
         <li>
           <strong>A simulator.</strong> Most tasks came with an optimized
@@ -93,7 +96,7 @@ export default function AutoresearchPost() {
         </li>
       </ul>
       <p>
-        Agents design and submit a <strong>training recipe</strong>, . They use
+        Agents design and submit a <strong>training recipe</strong>. They use
         their research budget on iterating on this code, then we retrain the
         recipe from scratch on a separate, fixed training budget and grade the
         network it produces.
@@ -104,7 +107,7 @@ export default function AutoresearchPost() {
         We landed on this format because we saw that balancing small compute
         budgets between research and training incentivized very simple
         strategies. Standardizing the training budget incentivized more
-        exploration, and is a better matche for how scaled up training works:
+        exploration, and is a better match for how scaled-up training works:
         many small experiments which inform the recipe for an expensive "yolo"
         run.
       </p>
@@ -163,7 +166,10 @@ export default function AutoresearchPost() {
         <p>
           Neon leaned into Polytopia&rsquo;s structure with a compact spatial
           map, partial observability under fog of war, countable economic state,
-          and evolving tactical counters.
+          and evolving tactical counters. These are well-known techniques. Neon
+          seemed to have an intuition for which ones would work well together
+          in this game. Across repeated runs of the same task, no other model
+          found a recipe with a comparable gain in compute efficiency.
         </p>
         <NeonOutlierDiagrams />
       </section>
@@ -173,9 +179,9 @@ export default function AutoresearchPost() {
       </h2>
       <p>
         Most models propose plausible ideas and run experiments, yet some are
-        far better at chosing high impact interventions, and reading noisy
+        far better at choosing high-impact interventions and reading noisy
         signals accurately. Rather than gambling its budget on a few big
-        rewrites, Neon assembled the winning recipe above through{" "}
+        rewrites, Neon for instance assembled the winning recipe above through{" "}
         <strong>five paired A/B tests</strong>
         &mdash;short, inexpensive probes to confirm each change before spending
         a final validation run on the combined stack.
@@ -184,11 +190,11 @@ export default function AutoresearchPost() {
         <NeonDiscipline />
       </Figure>
       <p>
-        Comparing all seven models on the same Polytopia research budget makes
-        this gap in experimental style clear. Most agents ran handful of long
-        runs and blew their budget, Neon allocated many fast, cheap
-        probes&mdash;testing far more hypotheses before committing to a full
-        validation run.
+        Comparing the seven models side by side under the same Polytopia
+        research budget makes this gap in experimental style clear. Most agents
+        ran a handful of long runs and blew their budget. Neon allocated many
+        fast, cheap probes&mdash;testing far more hypotheses before committing
+        to a full validation run.
       </p>
       <Figure
         n={5}
@@ -212,10 +218,14 @@ export default function AutoresearchPost() {
         the strongest agents buy themselves more feedback per dollar.
       </p>
 
-      <h3 id="tools">Would agents fix a slow simulator?</h3>
+      <h3 id="tools">Would agents improve the simulator itself?</h3>
       <p>
         In our own experience{" "}
-        <a href="https://thekevinz.com/blog/polytopia-bot">
+        <a
+          href="https://thekevinz.com/blog/polytopia-bot"
+          target="_blank"
+          rel="noreferrer"
+        >
           training Polytopia bots
         </a>
         , simulator speed was one of the biggest bottlenecks to iteration and
@@ -292,11 +302,15 @@ export default function AutoresearchPost() {
         Closing Thoughts
       </h2>
       <p>
-        Specialized models like image classifiers or motor controls are coming
-        into reach as an accessible building block for agents. For turn-based,
-        fixed-action-space games with fast simulators like Polytopia and
-        Generals, our results show you can already &ldquo;vibe-train&rdquo; a
-        strong, human-competitive RL policy for roughly{" "}
+        Vibe-coding made it easier to build software for your own needs. We
+        encourage you to vibe-train: If you have a niche task and a way to
+        measure success, give a coding agent a modest compute budget and ask
+        it to train and evaluate a model for you.
+      </p>
+      <p>
+        For turn-based, fixed-action-space games with fast simulators like
+        Polytopia and Generals, our results show you can already
+        &ldquo;vibe-train&rdquo; a strong, human-competitive RL policy for roughly{" "}
         <strong>$50&ndash;$100</strong> in combined research and training
         compute. At game studios like Curio, where rules can shift daily in
         production and keep evolving after a live-service launch, cheaply

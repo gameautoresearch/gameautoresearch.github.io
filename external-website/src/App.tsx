@@ -20,7 +20,7 @@ export default function App() {
               {PAGE.authors.map(({ name, url }, index) => (
                 <Fragment key={url}>
                   {index > 0 && " and "}
-                  <a href={url} rel="author">{name}</a>
+                  <a href={url} target="_blank" rel="author noopener noreferrer">{name}</a>
                 </Fragment>
               ))}
               {" · "}<time dateTime={PAGE.date}>{displayDate(PAGE.date)}</time>

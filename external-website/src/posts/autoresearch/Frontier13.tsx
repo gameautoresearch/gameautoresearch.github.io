@@ -169,6 +169,23 @@ export function ResearchRace() {
   const narrow = W < 540;
   const [hover, setHover] = useState<HoverState | null>(null);
   const [pinnedKey, setPinnedKey] = useState<string | null>(null);
+  const [seen, setSeen] = useState(false);
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el || agent || seen) return;
+    if (typeof IntersectionObserver === "undefined") {
+      setSeen(true);
+      return;
+    }
+    const observer = new IntersectionObserver(([entry]) => {
+      if (entry.intersectionRatio < 0.2) return;
+      setSeen(true);
+      observer.disconnect();
+    }, { threshold: 0.2 });
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [agent, seen]);
 
   if (agent) {
     return (
@@ -363,7 +380,7 @@ export function ResearchRace() {
   const otherCount = MODELS.length - labeledModels.length;
 
   return (
-    <div className="viz fr" ref={ref}>
+    <div className={`viz fr${seen ? " fr-runs-seen" : ""}`} ref={ref}>
       <div className="fr-head">
         <div className="fr-title">Best 15-minute network found over 5 hours of research</div>
         {pinnedKey && activeModel && (
@@ -457,11 +474,36 @@ export function ResearchRace() {
             );
           })}
 
-          {/* Frontier step curves */}
           <clipPath id={plotId}>
             <rect x={m.l - 4} y={m.t - 4} width={plotW + 8} height={plotH + 8} />
           </clipPath>
           <g clipPath={`url(#${plotId})`}>
+            <g pointerEvents="none" aria-hidden="true">
+              {MODELS.map((model) => {
+                const colored = isColored(model);
+                const color = colored ? curveColor(model.label) : "#989891";
+                const opacity = activeKey === model.key ? 0 : activeKey ? 0.08 : colored ? 0.28 : 0.2;
+                return (
+                  <g key={model.key} opacity={opacity}>
+                    {MODEL_POINTS.get(model.key)?.map((p) => (
+                      <circle
+                        key={p.run}
+                        className="fr-run-dot"
+                        cx={sx(p.x)}
+                        cy={sy(p.y)}
+                        r={p.isFrontier ? 2.6 : 2.3}
+                        fill={p.isFrontier ? color : "none"}
+                        stroke={p.isFrontier ? "none" : color}
+                        strokeWidth={1.1}
+                        style={{ transitionDelay: `${(Math.min(xMax, Math.max(0, p.x)) / xMax) * 1000}ms` }}
+                      />
+                    ))}
+                  </g>
+                );
+              })}
+            </g>
+
+            {/* Frontier step curves and highlighted experiment runs */}
             {drawOrder.map((model) => {
               const isTop = TOP_KEYS.has(model.key);
               const colored = isColored(model);

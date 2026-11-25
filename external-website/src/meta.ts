@@ -2,8 +2,8 @@
 // run the app.
 export const PAGE = {
   title:
-    "VibeResearch Bench: Can AI agents train strong game bots on a budget?",
-  date: "2026-11-19",
+    "Game Autoresearch Bench: Can AI agents train strong game bots on a budget?",
+  date: "2026-11-25",
   authors: [
     { name: "Kevin Zhang", url: "https://x.com/kzdagoof" },
     { name: "Max Bittker", url: "https://x.com/maxbittker" },
