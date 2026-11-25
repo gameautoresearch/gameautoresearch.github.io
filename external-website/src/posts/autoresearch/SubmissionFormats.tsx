@@ -20,7 +20,7 @@ function TrainingRecipeDiagram() {
 
   return (
     <svg
-      viewBox="0 0 300 108"
+      viewBox="0 0 300 80"
       role="img"
       aria-label="The agent spends 100 percent of its compute budget on research tests and submits training code and settings; the benchmark then runs a fresh retrain from scratch on a separate fixed compute budget."
     >
@@ -196,14 +196,6 @@ function TrainingRecipeDiagram() {
         style={{ fill: INK, fontWeight: 600 }}
       >
         Fixed budget
-      </text>
-
-      {/* Footer captions */}
-      <text x={69} y={98} className="sf-cap mid">
-        No final run to save for
-      </text>
-      <text x={241} y={98} className="sf-cap mid">
-        Retrained from scratch
       </text>
     </svg>
   );
