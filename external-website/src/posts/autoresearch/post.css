@@ -479,14 +479,6 @@ html.agent-view .ar-chip { padding: 0; background: none; color: inherit; font-si
 .rl-tiny { font-size: 7.5px; fill: #6b6b6b; }
 .rl-army { font-size: 8.5px; font-weight: 600; text-anchor: middle; font-variant-numeric: tabular-nums; }
 
-.rl-controls { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; margin: 0 0 12px; }
-.rl-controls button {
-  padding: 4px 10px; border: 1px solid #e3e3df; border-radius: 999px;
-  background: #fff; color: #545450; font: inherit; font-size: 12px; cursor: pointer;
-}
-.rl-controls button:hover { background: #f5f5f3; }
-.rl-controls button[aria-pressed="true"] { color: #1e3227; background: #eaf4ee; border-color: #b8d8c5; }
-
 /* Overall model score chart. */
 .ar-top .ts-head { fill: var(--secondary); font-weight: 600; }
 .ar-top .ts-cell-head { font-size: 10px; font-weight: 500; }

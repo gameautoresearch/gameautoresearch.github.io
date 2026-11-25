@@ -941,7 +941,7 @@ export default function ResearchLoop() {
   const checkpoint = typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("rl")?.split(",").map(Number) : undefined;
   const frozen = checkpoint && Number.isInteger(checkpoint[0]) && checkpoint[0] >= 0 && checkpoint[0] < SCENES.length && Number.isFinite(checkpoint[1]);
   const reduce = typeof window !== "undefined" && !!window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
-  const [playing, setPlaying] = useState(!frozen && !reduce);
+  const playing = !frozen && !reduce;
   const [{ scene, t }, setFrame] = useState({
     scene: frozen ? checkpoint[0] : 0,
     t: frozen ? clamp(checkpoint[1], 0, SCENE_MS) : reduce ? T.out : 0,
@@ -991,26 +991,25 @@ export default function ResearchLoop() {
   const boardOp = Math.min(prev.game === s.game ? 1 : into, next.game === s.game ? 1 : 1 - ease(out));
   const hasRef = (x: Scene) => (SCALE[x.game].ref === null ? 0 : 1);
   const refOp = hasRef(s) * Math.min(hasRef(prev) ? 1 : into, hasRef(next) ? 1 : 1 - ease(out));
-  const go = (i: number) => setFrame({ scene: i, t: playing ? 0 : T.out });
+  const advance = () => setFrame(({ scene }) => ({ scene: (scene + 1) % SCENES.length, t: playing ? 0 : T.out }));
   const vb = narrow ? "0 0 388 518" : "0 0 632 262";
   const place = narrow
     ? { agent: "translate(85 0)", runs: "translate(6 258)", game: "translate(214 258)" }
     : { agent: "translate(8 0)", runs: "translate(240 0)", game: "translate(456 0)" };
   return (
     <div className="rl" ref={ref}>
-      <svg viewBox={vb} role="img" aria-label={`${labelOf(s)} researching ${GAME_NAME[s.game]} on an NVIDIA L40S GPU rented from Modal: “${s.quote}” ${s.result}.`}
-        onClick={() => go((scene + 1) % SCENES.length)}>
+      <svg viewBox={vb} role="button" tabIndex={0} aria-label={`Next scene. ${labelOf(s)} researching ${GAME_NAME[s.game]} on an NVIDIA L40S GPU rented from Modal: “${s.quote}” ${s.result}.`}
+        onClick={advance}
+        onKeyDown={(event) => {
+          if (event.key === "Enter" || event.key === " ") {
+            event.preventDefault();
+            advance();
+          }
+        }}>
         <g transform={place.agent}><Agent s={s} t={t} color={color} out={out} /></g>
         <g transform={place.runs}><Runs s={s} t={t} out={out} refOp={refOp} /></g>
         <g transform={place.game}><Match s={s} t={t} out={out} boardOp={boardOp} art={art} /></g>
       </svg>
-      <div className="rl-controls" aria-label="Hero animation controls" role="group">
-        <button type="button" onClick={() => setPlaying(!playing)}>{playing ? "Pause" : "Play"}</button>
-        {(Object.keys(GAME_NAME) as Game[]).map((game) => (
-          <button key={game} type="button" aria-pressed={s.game === game}
-            onClick={() => go(SCENES.findIndex((entry) => entry.game === game))}>{GAME_NAME[game]}</button>
-        ))}
-      </div>
     </div>
   );
 }
