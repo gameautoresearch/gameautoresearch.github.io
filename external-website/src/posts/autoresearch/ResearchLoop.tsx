@@ -57,6 +57,12 @@ type Timing = RunTiming & { say1: number };
 const C = "#00a0d6", M = "#e0218a", K = "#111", GOOD = "#2f9e5c", BAD = "#d64545";
 const clamp = (v: number, a = 0, b = 1) => Math.max(a, Math.min(b, v));
 const ease = (t: number) => 1 - (1 - t) ** 3;
+const smooth = (t: number) => {
+  const x = clamp(t);
+  return x * x * (3 - 2 * x);
+};
+const rampInt = (t: number, a: number, b: number) =>
+  t <= a ? 0 : t >= b ? 0.5 * (b - a) + (t - b) : (0.5 * (t - a) * (t - a)) / (b - a);
 // Elo → chart height (0 at the bottom of the plot, 1 at the top). The scale is piecewise linear so the part where
 // the strong models live (around the starter) gets room, and the long climb up from random play is compressed.
 const YS: [number, number][] = [[-1500, 0], [-600, 0.22], [-200, 0.42], [0, 0.56], [320, 1]];
@@ -151,31 +157,34 @@ function Bill({ x, y, op = 1, sc = 1, tilt = 0, curl = 0, seal }: {
   );
 }
 
-function CashPile({ left, spending, x, cy, t }: { left: number; spending: boolean; x: number; cy: number; t: number }) {
+function CashPile({ left, spending, activity, spin, x, cy }: {
+  left: number; spending: boolean; activity: number; spin: number; x: number; cy: number;
+}) {
   const exact = left * BILLS, stackDy = 2.4, y = cy - BILL_H / 2 - 4;
   const px = x + 1;
   const full = spending ? Math.floor(exact + 1e-6) : Math.round(exact);
   const progress = spending ? clamp(1 - (exact - full)) : 0;
   const bills: JSX.Element[] = [];
   for (let i = 0; i < full; i++) bills.push(<Bill key={i} x={px} y={y - i * stackDy} seal={i === full - 1} />);
-  const phase = progress ** 1.4;
-  const sc = 1 - phase * 0.70;
+  const phase = 0.25 * progress + 0.75 * smooth(progress);
+  const sc = 1 - phase * 0.68;
   const startY = y - full * stackDy;
-  const endX = x + 128 - BILL_W * sc / 2, endY = 190 - BILL_H * sc / 2;
-  const intake = progress > .68 ? Math.sin(Math.PI * (progress - .68) / .32) : 0;
+  const endX = x + 127 - (BILL_W * sc) / 2, endY = 198 - (BILL_H * sc) / 2;
+  const intake = spending && progress > 0.64 ? clamp((progress - 0.64) / 0.36) : 0;
+  const arc = Math.sin(progress * Math.PI);
   return (
     <g>
       <rect x={px} y={y} width={BILL_W} height={BILL_H} rx={2.6} fill="#f7faf8" stroke="#d8e6dd" strokeDasharray="3 2.5" />
       {bills}
-      <GpuCard x={x + 91} y={168} active={spending} t={t} intake={intake} />
+      <GpuCard x={x + 91} y={168} activity={activity} spin={spin} intake={intake} />
       {progress > 0 && progress < 1 && (
         <Bill
           x={px + phase * (endX - px)}
-          y={startY + phase * (endY - startY) - Math.sin(progress * Math.PI) * 21}
+          y={startY + phase * (endY - startY) - arc * 13}
           sc={sc}
-          tilt={Math.sin(progress * Math.PI) * (progress * 62 - 14)}
-          curl={Math.sin(progress * Math.PI) * 7}
-          op={1 - clamp((progress - .78) / .22)}
+          tilt={arc * (progress * 32 - 8)}
+          curl={arc * 4.5}
+          op={1 - smooth((progress - 0.66) / 0.34)}
           seal
         />
       )}
@@ -342,6 +351,9 @@ function Agent({ s, t, color, out }: { s: Scene; t: number; color: string; out: 
   // The budget refills while the scene fades out, so the next session starts with the full amount.
   const unspent = clamp(1 - spent), remain = unspent + (1 - unspent) * ease(out);
   const spending = out === 0 && t > tm.runs0 && t < tm.hero1;
+  // Smooth spin-up / coast-down curves so the GPU fans and tint ease cleanly into and out of training.
+  const activity = smooth((t - (tm.runs0 - 80)) / 320) * (1 - smooth((t - (tm.hero1 - 80)) / 400)) * (1 - ease(out));
+  const spin = (0.08 * t + (0.5 - 0.08) * (rampInt(t, tm.runs0 - 80, tm.runs0 + 260) - rampInt(t, tm.hero1 - 80, tm.hero1 + 340))) % 360;
   return (
     <g>
       <g opacity={op}>
@@ -355,7 +367,7 @@ function Agent({ s, t, color, out }: { s: Scene; t: number; color: string; out: 
         <Avatar s={s} t={t} color={color} x={40} y={botY + 26} R={25} seed={SCENES.indexOf(s)} />
         <text x={78} y={botY + 31} className="rl-name">{label}</text>
       </g>
-      <CashPile left={remain} spending={spending} x={0} cy={213} t={t} />
+      <CashPile left={remain} spending={spending} activity={activity} spin={spin} x={0} cy={213} />
     </g>
   );
 }
