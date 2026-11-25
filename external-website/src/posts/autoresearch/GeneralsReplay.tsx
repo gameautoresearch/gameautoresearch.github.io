@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { CMYK } from "./colors";
+import { GeneralsSideIO } from "./NetworkIO";
 
 // Every joint action in the public demos was replayed independently to the exact final state. Frame 0 lists
 // every cell as [index, kind, owner, army]; later frames list changes. Kinds: 0 land, 1 mountain, 2 city,
@@ -52,10 +53,9 @@ function decodeOrder(id: number, width: number, height: number, actionWidth: num
   };
 }
 
-export default function GeneralsReplay({ src, names, start = 0, initialSpeed = 1, showcase = false, renderSide }: {
+export default function GeneralsReplay({ src, names, start = 0, initialSpeed = 1, renderSide }: {
   src: string; names?: [string, string]; start?: number; initialSpeed?: number;
-  showcase?: boolean;
-  renderSide?: (side: 0 | 1) => ReactNode;
+  renderSide?: (side: 0 | 1, io?: ReactNode) => ReactNode;
 }) {
   const [rec, setRec] = useState<Recording | null>(null);
   const [pos, setPos] = useState(0);
@@ -110,14 +110,6 @@ export default function GeneralsReplay({ src, names, start = 0, initialSpeed = 1
   }, [playing, rec, speed]);
 
   if (!rec || !boards.length) {
-    if (showcase) {
-      return (
-        <div className="gr">
-          <div className="sc-board-stage sc-wait">Loading game…</div>
-          <div className="gr-controls sc-controls-stub" aria-hidden="true" />
-        </div>
-      );
-    }
     if (renderSide) {
       return (
         <div className="gr gr-flanked">
@@ -191,35 +183,29 @@ export default function GeneralsReplay({ src, names, start = 0, initialSpeed = 1
     </svg>
   );
 
+  const sideIO = (p: 0 | 1) => (
+    <GeneralsSideIO
+      side={p}
+      width={w}
+      height={h}
+      cells={cells}
+      tick={t}
+      maxTicks={last}
+      actions={f.actions}
+      actionWidth={rec.actionWidth ?? 24}
+      scores={f.scores}
+      accents={[SEAT_COLORS[0], SEAT_COLORS[1]]}
+    />
+  );
+
   return (
     <div className={`gr${renderSide ? " gr-flanked" : ""}`}>
-      {showcase ? (
-        <div className="sc-board-stage">
-          <div className="sc-live-hud">
-            {([0, 1] as const).map((p) => {
-              const ord = ordersByPlayer[p];
-              return (
-                <div key={p} className="sc-live-side">
-                  <i style={{ background: SEAT_COLORS[p] }} aria-hidden="true" />
-                  <div>
-                    <strong>{label[p]}</strong>
-                    <span>{f.scores[p].army.toLocaleString()} army · {f.scores[p].land} land</span>
-                    <em className={`sc-live-out${ord ? " is-active" : ""}`}>
-                      {ord ? `${ord.split ? "Split" : "Move"} ${ord.arrow}` : "Wait"}
-                    </em>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-          {boardSvg}
-        </div>
-      ) : renderSide ? (
+      {renderSide ? (
         <div className="sc-row">
-          {renderSide(0)}
+          {renderSide(0, sideIO(0))}
           <div className="sc-center">
             <div className="sc-live-hud">
-              {[0, 1].map((p) => (
+              {([0, 1] as const).map((p) => (
                 <div key={p} className="sc-live-side">
                   <i style={{ background: SEAT_COLORS[p] }} aria-hidden="true" />
                   <div>
@@ -231,7 +217,7 @@ export default function GeneralsReplay({ src, names, start = 0, initialSpeed = 1
             </div>
             {boardSvg}
           </div>
-          {renderSide(1)}
+          {renderSide(1, sideIO(1))}
         </div>
       ) : (
         <>

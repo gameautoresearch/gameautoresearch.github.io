@@ -2,13 +2,16 @@ import {
   lazy,
   Suspense,
   useEffect,
+  useMemo,
   useRef,
   useState,
+  type ReactNode,
 } from "react";
 import { useAgentView } from "../../view";
 import ReplayViewer from "./polytopia/ReplayViewer";
 import GeneralsReplay from "./GeneralsReplay";
 import { usePokemonReplay } from "./pokemonReplay";
+import { parsePokemonTimeline, PokemonSideIO } from "./NetworkIO";
 import { CMYK } from "./colors";
 
 // The post's opening showcase: recorded games between trained RL policies in three games.
@@ -46,78 +49,78 @@ const SIDE_COLORS: Record<Game, [string, string]> = {
 const CARDS = {
   pokeSolA1: {
     name: "GPT-6.1 Sol",
-    meta: "338K params · $2.70",
-    summary: "96w MLP with damage, STAB & Tera priors, trained with HP-shaped PPO.",
+    meta: "338K · $2.70",
+    summary: "96w MLP w/ damage, STAB & Tera priors; HP-shaped PPO.",
   },
   pokeAstraA1: {
     name: "GPT-6 Astra",
-    meta: "477K params · $2.70",
-    summary: "128w MLP with a stat-stage combat head, trained with HP-shaped PPO.",
+    meta: "477K · $2.70",
+    summary: "128w MLP w/ stat-stage combat head; HP-shaped PPO.",
   },
   pokeInklingB2: {
     name: "Inkling 2 Small",
-    meta: "526K params · $2.70",
-    summary: "2× wider starter MLP (128w, 16d emb), trained with high-entropy self-play PPO.",
+    meta: "526K · $2.70",
+    summary: "2× wider starter MLP (128w); high-entropy self-play PPO.",
   },
   pokeDeepSeekA2: {
     name: "DeepSeek V4 Pro",
-    meta: "814K params · $2.70",
-    summary: "2-layer SiLU MLPs (160w, 20d emb), trained with PPO and team-HP shaping.",
+    meta: "814K · $2.70",
+    summary: "2-layer SiLU MLPs (160w); PPO + team-HP shaping.",
   },
   pokeSolA2: {
     name: "GPT-6.1 Sol",
-    meta: "421K params · $2.67",
-    summary: "128w MLP with an 18×18 type-chart prior, trained with PPO vs lagged & heuristic opps.",
+    meta: "421K · $2.67",
+    summary: "128w MLP w/ 18×18 type-chart prior; PPO vs opp mix.",
   },
   pokeGlmA3: {
     name: "GLM-5.3",
-    meta: "903K params · $2.70",
-    summary: "320w side-aware cross-attention network, trained with plain unshaped self-play PPO.",
+    meta: "903K · $2.70",
+    summary: "320w side-aware cross-attention; plain unshaped PPO.",
   },
   polyOpus: {
     name: "Claude Opus 5.5",
-    meta: "192K params · $5.72",
-    summary: "2×32 ResNet with autoregressive heads, trained with 2-ep PPO, LR decay & score bonus.",
+    meta: "192K · $5.72",
+    summary: "2×32 ResNet + AR heads; 2-ep PPO, LR decay & score bonus.",
   },
   polyLuna: {
     name: "GPT-6 Luna",
-    meta: "192K params · $5.71",
-    summary: "2×32 ResNet with autoregressive heads, trained with unmodified starter PPO.",
+    meta: "192K · $5.71",
+    summary: "2×32 ResNet + AR heads; unmodified starter PPO.",
   },
   polyAstra: {
     name: "GPT-6 Astra",
-    meta: "390K params · $10.36",
-    summary: "3×48 context-v3 ResNet (global→tile), trained with score shaping & low-LR refinement.",
+    meta: "390K · $10.36",
+    summary: "3×48 context-v3 ResNet; score shaping + low-LR refine.",
   },
   polyStarter: {
     name: "Starter",
-    meta: "192K params · ~$2.00",
-    summary: "2×32 ResNet with autoregressive heads, trained with plain self-play PPO (200M samples).",
+    meta: "192K · ~$2.00",
+    summary: "2×32 ResNet + AR heads; plain self-play PPO (200M).",
   },
   polySol: {
     name: "GPT-6.1 Sol",
-    meta: "192K params · $5.71",
-    summary: "2×32 ResNet with autoregressive heads, trained with self-play PPO (γ=1.0) & dev reward.",
+    meta: "192K · $5.71",
+    summary: "2×32 ResNet + AR heads; self-play PPO (γ=1) + dev reward.",
   },
   genOpus: {
     name: "Claude Opus 5.5",
-    meta: "~14.6k ticks/s · $7.73",
-    summary: "Rebuilt batched JAX sim with jitted PPO across 7 chained anchored self-play runs.",
+    meta: "14.6k/s · $7.73",
+    summary: "Rebuilt batched JAX sim; jitted PPO, 7 anchored runs.",
   },
   genSol: {
     name: "GPT-6.1 Sol",
-    meta: "~5.4k ticks/s · $11.23",
-    summary: "Rebuilt batched JAX sim (37M ticks), trained with shaped PPO, opponent pool & symmetries.",
+    meta: "5.4k/s · $11.23",
+    summary: "Rebuilt JAX sim (37M ticks); shaped PPO, pool & symmetries.",
   },
   genDeepSeek: {
     name: "DeepSeek V4 Pro",
-    meta: "~565 ticks/s · $6.57",
-    summary: "8×96 CNN on the supplied Python sim, trained with PPO & castle rewards (~5M ticks).",
+    meta: "565/s · $6.57",
+    summary: "8×96 CNN on slow Python sim; PPO + castle rewards.",
   },
   genKimi: {
     name: "Kimi K3.1 Pro",
-    meta: "~630 ticks/s · $7.11",
-    summary: "5×64 ResNet on the supplied Python sim, trained with PPO & reward tuning (~5M ticks).",
+    meta: "630/s · $7.11",
+    summary: "5×64 ResNet on slow Python sim; PPO + reward tuning.",
   },
 } satisfies Record<string, PolicyCard>;
 
@@ -192,39 +195,79 @@ const GAMES: { id: Game; label: string }[] = [
   { id: "generals", label: "Generals" },
 ];
 
-function PolicyNote({ card, accent }: { card: PolicyCard; accent: string }) {
+function SideColumn({
+  card,
+  accent,
+  io,
+}: {
+  card: PolicyCard;
+  accent: string;
+  io?: ReactNode;
+}) {
   return (
-    <div className="sc-policy">
-      <div className="sc-policy-head">
-        <span className="sc-policy-name">
-          <i style={{ background: accent }} aria-hidden="true" />
-          <strong>{card.name}</strong>
-        </span>
-        <span className="sc-policy-meta">{card.meta}</span>
+    <div className="sc-side">
+      <div className="sc-side-head">
+        <div className="sc-side-top">
+          <span className="sc-side-name">
+            <i style={{ background: accent }} aria-hidden="true" />
+            <strong>{card.name}</strong>
+          </span>
+          <span className="sc-side-meta">{card.meta}</span>
+        </div>
+        <p className="sc-side-desc">{card.summary}</p>
       </div>
-      <p className="sc-policy-desc">{card.summary}</p>
+      <div className="sc-side-io">{io}</div>
     </div>
   );
 }
 
-function Pokemon({ item }: { item: Item }) {
+function Pokemon({ item, accents }: { item: Item; accents: [string, string] }) {
   const file = usePokemonReplay(item.id);
+  const [turn, setTurn] = useState(item.start);
+  useEffect(() => {
+    setTurn(item.start);
+  }, [item.id, item.start]);
+
+  const ready = file && file !== "error" && file.id === item.id;
+  const snapshots = useMemo(() => (ready ? parsePokemonTimeline(file.log) : []), [ready, file]);
+
+  const renderSide = (side: 0 | 1) => (
+    <SideColumn
+      card={item.cards[side]}
+      accent={accents[side]}
+      io={
+        ready ? (
+          <PokemonSideIO side={side} snapshots={snapshots} turn={turn} accents={accents} />
+        ) : (
+          <div className="sio sio-loading" aria-hidden="true" />
+        )
+      }
+    />
+  );
+
   const wait = (
-    <div className="psr">
-      <div className="sc-board-stage sc-wait">
-        {file === "error" ? "This battle could not load." : "Loading battle…"}
+    <div className="psr psr-flanked">
+      <div className="sc-row">
+        {renderSide(0)}
+        <div className="sc-center sc-center-poke sc-wait">
+          {file === "error" ? "This battle could not load." : "Loading battle…"}
+        </div>
+        {renderSide(1)}
       </div>
       <div className="psr-bar sc-controls-stub" aria-hidden="true" />
     </div>
   );
   return (
     <Suspense fallback={wait}>
-      {file && file !== "error" && file.id === item.id ? (
+      {ready ? (
         <BattleReplay
           key={item.id}
           log={file.log}
           startTurn={item.start}
           initialSpeed="fast"
+          cropSidebars
+          renderSide={renderSide}
+          onTurnChange={setTurn}
         />
       ) : (
         wait
@@ -233,8 +276,11 @@ function Pokemon({ item }: { item: Item }) {
   );
 }
 
-function Stage({ item }: { item: Item }) {
-  if (item.game === "pokemon") return <Pokemon item={item} />;
+function Stage({ item, accents }: { item: Item; accents: [string, string] }) {
+  const renderSide = (side: 0 | 1, io?: ReactNode) => (
+    <SideColumn card={item.cards[side]} accent={accents[side]} io={io} />
+  );
+  if (item.game === "pokemon") return <Pokemon item={item} accents={accents} />;
   if (item.game === "polytopia") {
     return (
       <ReplayViewer
@@ -244,7 +290,7 @@ function Stage({ item }: { item: Item }) {
         start={item.start}
         initialSpeed={4}
         compact
-        showcase
+        renderSide={renderSide}
       />
     );
   }
@@ -255,7 +301,7 @@ function Stage({ item }: { item: Item }) {
       names={item.players}
       start={item.start}
       initialSpeed={2}
-      showcase
+      renderSide={renderSide}
     />
   );
 }
@@ -347,12 +393,7 @@ export default function Showcase() {
       </div>
 
       <div className="sc-stage">
-        <Stage item={item} />
-      </div>
-
-      <div className="sc-policies" aria-label="Trained network details">
-        <PolicyNote card={item.cards[0]} accent={accents[0]} />
-        <PolicyNote card={item.cards[1]} accent={accents[1]} />
+        <Stage item={item} accents={accents} />
       </div>
 
       <div className="sc-matchups" role="tablist" aria-label="Matchup">

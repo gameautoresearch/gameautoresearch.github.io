@@ -23,6 +23,8 @@ export interface BattleReplayProps {
   cropSidebars?: boolean;
   /** Optional left/right side cards rendered flanking the arena (0 = p1, 1 = p2). */
   renderSide?: (side: 0 | 1) => ReactNode;
+  /** Optional callback fired whenever the displayed turn changes. */
+  onTurnChange?: (turn: number) => void;
   className?: string;
 }
 
@@ -37,7 +39,7 @@ const Icon = {
   soundOn: <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z" fill="currentColor" /><path d="M15.5 9a4 4 0 0 1 0 6M18 6.5a7.5 7.5 0 0 1 0 11" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" /></svg>,
 };
 
-export default function BattleReplay({ log, autoplay = true, startTurn, initialSpeed, cropSidebars = false, renderSide, className }: BattleReplayProps) {
+export default function BattleReplay({ log, autoplay = true, startTurn, initialSpeed, cropSidebars = false, renderSide, onTurnChange, className }: BattleReplayProps) {
   const summary = useMemo(() => summarizeReplay(log), [log]);
   const end = summary.turns + 1; // the scrubber's last stop: the end of the battle, after the final turn
   const stage = useRef<HTMLDivElement>(null);
@@ -87,6 +89,9 @@ export default function BattleReplay({ log, autoplay = true, startTurn, initialS
     else { userPaused.current = false; b.play(); }
   };
   const position = state.finished ? end : Math.min(state.turn, end);
+  useEffect(() => {
+    onTurnChange?.(position);
+  }, [position, onTurnChange]);
   const turnText = position >= end ? "End" : `${position}/${summary.turns}`;
 
   const onKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {

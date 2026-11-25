@@ -98,14 +98,14 @@ export default function RecipeTimelines() {
   const T = 4.5;
   const ticks = [0, 1, 2, 3, 4];
 
-  const runsW = 36;
-  const eloW = 50;
-  const rightGap = 12;
+  const runsW = 44;
+  const eloW = 56;
+  const rightGap = 14;
   const m = narrow
-    ? { l: 8, r: 8, t: 8, b: 34 }
-    : { l: 134, r: rightGap + runsW + eloW, t: 28, b: 36 };
-  const rowH = narrow ? 64 : 46;
-  const starterRowH = narrow ? 40 : 34;
+    ? { l: 8, r: 8, t: 8, b: 44 }
+    : { l: 152, r: rightGap + runsW + eloW, t: 32, b: 44 };
+  const rowH = narrow ? 68 : 50;
+  const starterRowH = narrow ? 44 : 38;
   const H = m.t + m.b + SESSIONS.length * rowH + starterRowH;
   const rowTop = (i: number) => m.t + i * rowH + (i >= STARTER_IDX ? starterRowH : 0);
 
@@ -148,8 +148,8 @@ export default function RecipeTimelines() {
           {ticks.map((t) => (
             <g key={t}>
               <line x1={sx(t)} x2={sx(t)} y1={m.t - 3} y2={H - m.b} className="viz-grid" />
-              <text x={sx(t)} y={H - m.b + 15} className="viz-axis" textAnchor="middle">
-                {t} h
+              <text x={sx(t)} y={H - m.b + 20} className="ar-rt-tick" textAnchor="middle">
+                {t}h
               </text>
             </g>
           ))}
@@ -157,28 +157,28 @@ export default function RecipeTimelines() {
           {/* Column headings */}
           {!narrow && (
             <>
-              <text x={m.l} y={m.t - 11} className="viz-axis ar-rt-colhead">
-                Two L40S GPU slots over real session time
+              <text x={m.l} y={m.t - 12} className="ar-rt-colhead">
+                Timeline (2 GPUs)
               </text>
-              <text x={runsX} y={m.t - 11} className="viz-axis ar-rt-colhead" textAnchor="end">
+              <text x={runsX} y={m.t - 12} className="ar-rt-colhead" textAnchor="end">
                 Runs
               </text>
-              <text x={eloX} y={m.t - 11} className="viz-axis ar-rt-colhead" textAnchor="end">
-                8 h Elo
+              <text x={eloX} y={m.t - 12} className="ar-rt-colhead" textAnchor="end">
+                8h Elo
               </text>
               <line x1={0} x2={W} y1={m.t - 3} y2={m.t - 3} stroke="#d8d8d3" strokeWidth={1} />
             </>
           )}
-          <text x={(sx(0) + sx(T)) / 2} y={H - 5} className="viz-axis" textAnchor="middle">
-            real session time (7 h limit · $8.70 GPU budget)
+          <text x={(sx(0) + sx(T)) / 2} y={H - 4} className="ar-rt-axis-title" textAnchor="middle">
+            Session time
           </text>
 
           {SESSIONS.map((s, i) => {
             const top = rowTop(i);
-            const barTop = narrow ? top + 22 : top + 7;
-            const slotH = 10;
-            const slotGap = 2.5;
-            const trackH = slotH * 2 + slotGap + 4; // 26.5px
+            const barTop = narrow ? top + 24 : top + 8;
+            const slotH = 11;
+            const slotGap = 3;
+            const trackH = slotH * 2 + slotGap + 4; // 29px
             const midY = barTop + trackH / 2;
             const evalY = barTop + trackH + 3.5;
             const isNeon = s.key === "neon-b3";
@@ -191,10 +191,10 @@ export default function RecipeTimelines() {
 
                 {narrow ? (
                   <>
-                    <text x={m.l} y={top + 14} className="viz-label ar-rt-model">
+                    <text x={m.l} y={top + 16} className="ar-rt-model" style={{ fontWeight: isNeon ? 700 : 600 }}>
                       {s.model}
                     </text>
-                    <text x={W - m.r} y={top + 14} className="viz-axis" textAnchor="end">
+                    <text x={W - m.r} y={top + 16} className="ar-rt-inline" textAnchor="end">
                       <tspan className="ar-rt-inline-num">{s.runs.length} runs</tspan>
                       {" · "}
                       <tspan
@@ -209,8 +209,9 @@ export default function RecipeTimelines() {
                   <text
                     x={0}
                     y={midY}
-                    className="viz-label ar-rt-model"
+                    className="ar-rt-model"
                     dominantBaseline="middle"
+                    style={{ fontWeight: isNeon ? 700 : 600 }}
                   >
                     {s.model}
                   </text>
@@ -222,16 +223,16 @@ export default function RecipeTimelines() {
                   y={barTop}
                   width={Math.max(2, sx(s.wallH) - sx(0))}
                   height={trackH}
-                  rx={2}
-                  fill="#f4f4f0"
+                  rx={2.5}
+                  fill="#f3f3ee"
                 />
                 <line
                   x1={sx(s.wallH)}
                   x2={sx(s.wallH)}
                   y1={barTop}
                   y2={barTop + trackH}
-                  stroke="#b4b4ac"
-                  strokeWidth={1.25}
+                  stroke="#a8a8a0"
+                  strokeWidth={1.3}
                 />
 
                 {/* Two parallel GPU slots */}
@@ -299,7 +300,7 @@ export default function RecipeTimelines() {
                       x={ex}
                       y={evalY}
                       width={ew}
-                      height={3.5}
+                      height={4}
                       rx={1}
                       fill={active ? "#555" : EVAL_COLOR}
                       className="ar-rt-bar"
@@ -335,7 +336,7 @@ export default function RecipeTimelines() {
                       x={cx}
                       y={evalY - 0.5}
                       width={cw}
-                      height={4.5}
+                      height={5}
                       rx={1}
                       fill={CPU_COLOR}
                       stroke={active ? "#111" : "none"}
@@ -359,7 +360,7 @@ export default function RecipeTimelines() {
                     <text
                       x={runsX}
                       y={midY}
-                      className="viz-value ar-rt-runs"
+                      className="ar-rt-runs"
                       textAnchor="end"
                       dominantBaseline="middle"
                     >
@@ -368,7 +369,7 @@ export default function RecipeTimelines() {
                     <text
                       x={eloX}
                       y={midY}
-                      className={`viz-value ar-rt-elo${isNeon ? " is-top" : ""}`}
+                      className={`ar-rt-elo${isNeon ? " is-top" : ""}`}
                       textAnchor="end"
                       dominantBaseline="middle"
                     >
@@ -383,27 +384,27 @@ export default function RecipeTimelines() {
           {/* No-op reference row: the starter recipe trained 8 h with no experimentation */}
           {(() => {
             const top = m.t + STARTER_IDX * rowH;
-            const midY = narrow ? top + 14 : top + starterRowH / 2;
-            const note = "No experiments: the starter recipe as given, trained 8 h";
+            const midY = narrow ? top + 16 : top + starterRowH / 2;
+            const note = "Unmodified baseline (no research)";
             return (
               <g className="ar-rt-noop">
                 {[top, top + starterRowH].map((y) => (
-                  <line key={y} x1={0} x2={W} y1={y} y2={y} stroke="#d8d8d3" strokeWidth={1} strokeDasharray="3 3" />
+                  <line key={y} x1={0} x2={W} y1={y} y2={y} stroke="#cfcfc8" strokeWidth={1.1} strokeDasharray="3 3" />
                 ))}
                 {narrow ? (
                   <>
-                    <text x={m.l} y={midY} className="viz-label ar-rt-model">Starter recipe</text>
-                    <text x={W - m.r} y={midY} className="viz-axis" textAnchor="end">
+                    <text x={m.l} y={midY} className="ar-rt-model">Starter recipe</text>
+                    <text x={W - m.r} y={midY} className="ar-rt-inline" textAnchor="end">
                       <tspan className="ar-rt-inline-num">{STARTER} Elo</tspan>
                     </text>
-                    <text x={m.l} y={top + 30} className="viz-axis">{note}</text>
+                    <text x={m.l} y={top + 34} className="ar-rt-noop-note">{note}</text>
                   </>
                 ) : (
                   <>
-                    <text x={0} y={midY} className="viz-label ar-rt-model" dominantBaseline="middle">Starter recipe</text>
-                    <text x={sx(0) + 6} y={midY} className="viz-axis" dominantBaseline="middle">{note}</text>
-                    <text x={runsX} y={midY} className="viz-value ar-rt-runs" textAnchor="end" dominantBaseline="middle">0</text>
-                    <text x={eloX} y={midY} className="viz-value ar-rt-elo" textAnchor="end" dominantBaseline="middle">{STARTER}</text>
+                    <text x={0} y={midY} className="ar-rt-model" dominantBaseline="middle">Starter recipe</text>
+                    <text x={sx(0) + 8} y={midY} className="ar-rt-noop-note" dominantBaseline="middle">{note}</text>
+                    <text x={runsX} y={midY} className="ar-rt-runs" textAnchor="end" dominantBaseline="middle">0</text>
+                    <text x={eloX} y={midY} className="ar-rt-elo" textAnchor="end" dominantBaseline="middle">{STARTER}</text>
                   </>
                 )}
               </g>

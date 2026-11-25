@@ -244,13 +244,12 @@ export default function AutoresearchPost() {
       </h3>
       <p>
         Evaluating agents on full RL sessions is expensive, so we wanted a
-        cheaper signal. Forecasting tests a core piece of research
-        judgment&mdash;predicting which experiment will pay off before buying
-        compute&mdash;without needing any GPUs at all. We took historical
-        research runs and showed each model only the evidence available before a
-        run launched, like its training recipe and prior results. Even at a
-        fraction of the cost, forecasting skill tracked which models performed
-        best in full training runs.
+        cheaper signal. Forecasting is a valuable skill predicting which
+        experiment will pay off before buying compute&mdash;. We took historical
+        research runs and rolled back time to show models only evidence
+        available before a run launched: training recipe and prior results. We
+        found that these forecasting tasks tracked which models performed best
+        in full training runs, without using GPU time.
       </p>
       <p>
         Only {pokeSkill.above.join(" and ")} reliably beat a simple regression
