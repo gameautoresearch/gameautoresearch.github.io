@@ -944,21 +944,33 @@ function Match({ s, t, out, boardOp, art }: { s: Scene; t: number; out: number; 
   );
 }
 
-export default function ResearchLoop() {
+export default function ResearchLoop({
+  controlled,
+  onArtReady,
+}: {
+  controlled?: { scene: number; t: number };
+  onArtReady?: () => void;
+} = {}) {
   const agent = useAgentView();
   const art = useHeroArt(!agent);
   const ref = useRef<HTMLDivElement>(null);
-  const W = useWidth(ref), narrow = W < 520;
+  const W = useWidth(ref), narrow = !controlled && W < 520;
   // ?rl=SCENE,MS freezes the loop at that scene and time (for reviewing frames).
   const checkpoint = typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("rl")?.split(",").map(Number) : undefined;
-  const frozen = checkpoint && Number.isInteger(checkpoint[0]) && checkpoint[0] >= 0 && checkpoint[0] < SCENES.length && Number.isFinite(checkpoint[1]);
+  const frozen = !!controlled || (checkpoint && Number.isInteger(checkpoint[0]) && checkpoint[0] >= 0 && checkpoint[0] < SCENES.length && Number.isFinite(checkpoint[1]));
   const reduce = typeof window !== "undefined" && !!window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
   const playing = !frozen && !reduce;
-  const [{ scene, t }, setFrame] = useState({
-    scene: frozen ? checkpoint[0] : 0,
-    t: frozen ? clamp(checkpoint[1], 0, SCENE_MS) : reduce ? T.out : 0,
+  const [frameState, setFrame] = useState({
+    scene: controlled ? controlled.scene : frozen && checkpoint ? checkpoint[0] : 0,
+    t: controlled ? clamp(controlled.t, 0, SCENE_MS) : frozen && checkpoint ? clamp(checkpoint[1], 0, SCENE_MS) : reduce ? T.out : 0,
   });
+  const scene = controlled ? controlled.scene : frameState.scene;
+  const t = controlled ? clamp(controlled.t, 0, SCENE_MS) : frameState.t;
   const [visible, setVisible] = useState(true);
+
+  useEffect(() => {
+    if (art.polytopia) onArtReady?.();
+  }, [art.polytopia, onArtReady]);
 
   useEffect(() => {
     const el = ref.current;

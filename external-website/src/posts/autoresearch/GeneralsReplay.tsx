@@ -53,14 +53,33 @@ function decodeOrder(id: number, width: number, height: number, actionWidth: num
   };
 }
 
-export default function GeneralsReplay({ src, names, start = 0, initialSpeed = 1, renderSide }: {
+export type GeneralsCustomContext = {
+  board: ReactNode;
+  width: number;
+  height: number;
+  cells: Int32Array;
+  tick: number;
+  maxTicks: number;
+  actions: [number, number] | null;
+  actionWidth: number;
+  scores: { army: number; land: number }[];
+  winner: string | null;
+  moves: DecodedOrder[];
+};
+
+export default function GeneralsReplay({ src, names, start = 0, initialSpeed = 1, controlledPos, onReady, renderSide, renderCustom }: {
   src: string; names?: [string, string]; start?: number; initialSpeed?: number;
+  controlledPos?: number;
+  onReady?: (frameCount: number) => void;
   renderSide?: (side: 0 | 1, io?: ReactNode) => ReactNode;
+  renderCustom?: (ctx: GeneralsCustomContext) => ReactNode;
 }) {
   const [rec, setRec] = useState<Recording | null>(null);
-  const [pos, setPos] = useState(0);
+  const [pos, setPos] = useState(controlledPos ?? 0);
   const [playing, setPlaying] = useState(
-    () => typeof window === "undefined" || !window.matchMedia?.("(prefers-reduced-motion: reduce)").matches,
+    () =>
+      controlledPos === undefined &&
+      (typeof window === "undefined" || !window.matchMedia?.("(prefers-reduced-motion: reduce)").matches),
   );
   const [speed, setSpeed] = useState(initialSpeed);
   const hold = useRef(0);
@@ -70,7 +89,8 @@ export default function GeneralsReplay({ src, names, start = 0, initialSpeed = 1
     fetch(src).then((r) => r.json()).then((d: Recording) => {
       if (!live) return;
       setRec(d);
-      setPos(Math.floor(start * (d.frames.length - 1)));
+      if (controlledPos === undefined) setPos(Math.floor(start * (d.frames.length - 1)));
+      onReady?.(d.frames.length);
     });
     return () => { live = false; };
   }, [src]);
@@ -125,7 +145,8 @@ export default function GeneralsReplay({ src, names, start = 0, initialSpeed = 1
     return <div className="gr gr-loading">Loading game…</div>;
   }
   const { width: w, height: h } = rec, last = rec.frames.length - 1;
-  const t = Math.min(last, Math.floor(pos)), cells = boards[t], f = rec.frames[t];
+  const activePos = controlledPos ?? pos;
+  const t = Math.max(0, Math.min(last, Math.floor(activePos))), cells = boards[t], f = rec.frames[t];
   const label = names ?? rec.players;
   const C = 30, W = w * C, H = h * C;
   const ordersByPlayer: [DecodedOrder | null, DecodedOrder | null] = [
@@ -197,6 +218,26 @@ export default function GeneralsReplay({ src, names, start = 0, initialSpeed = 1
       accents={[SEAT_COLORS[0], SEAT_COLORS[1]]}
     />
   );
+
+  if (renderCustom) {
+    return (
+      <div className="replay-custom">
+        {renderCustom({
+          board: boardSvg,
+          width: w,
+          height: h,
+          cells,
+          tick: t,
+          maxTicks: last,
+          actions: f.actions,
+          actionWidth: rec.actionWidth ?? 24,
+          scores: f.scores,
+          winner: t >= last ? winner : null,
+          moves,
+        })}
+      </div>
+    );
+  }
 
   return (
     <div className={`gr${renderSide ? " gr-flanked" : ""}`}>

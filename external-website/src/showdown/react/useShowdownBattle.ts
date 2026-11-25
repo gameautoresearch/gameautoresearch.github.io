@@ -103,7 +103,7 @@ export function useShowdownBattle(log: string, { enabled = true }: { enabled?: b
     battleRef.current?.setMute(m);
   }, []);
 
-  return { frameRef, logRef, state, speed, muted, play, pause, seekTurn, step, switchSides, setSpeed, setMuted };
+  return { frameRef, logRef, state, speed, muted, play, pause, seekTurn, step, switchSides, setSpeed, setMuted, refresh };
 }
 
 function applySpeed(b: Battle, s: Speed) {

@@ -1,0 +1,576 @@
+/* Pure edge-to-edge 16:9 landscape canvas (960x540 CSS @ 2x DPR = 1920x1080). */
+html,
+body,
+#root {
+  width: 960px;
+  height: 540px;
+  min-height: 0 !important;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  background: #fff;
+}
+
+.tv-frame {
+  position: relative;
+  width: 960px;
+  height: 540px;
+  background: #fff;
+  overflow: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+
+.tv-frame > * + * {
+  margin-top: 0 !important;
+}
+
+/* Part 1: Full-canvas ResearchLoop, origin 0 0 for exact affine camera zoom math */
+.tv-act1-layer {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transform-origin: 0 0;
+  will-change: transform, opacity;
+  pointer-events: none;
+}
+
+.tv-rl-wrap {
+  width: 912px;
+}
+
+.tv-rl-wrap .rl svg {
+  cursor: default;
+}
+
+/* Part 2: Radically simplified 2-column layout (Trained Policy left, huge Game Board right) */
+.replay-custom,
+.sp-root {
+  position: absolute;
+  inset: 0;
+  width: 960px;
+  height: 540px;
+  pointer-events: none;
+}
+
+.sp-board-zoom-layer {
+  position: absolute;
+  inset: 0;
+  transform-origin: 0 0;
+  will-change: transform, opacity;
+}
+
+.sp-board-card {
+  position: absolute;
+  left: 320px;
+  top: 16px;
+  width: 624px;
+  height: 508px;
+  border-radius: 12px;
+  background: #f8f8f6;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  overflow: hidden;
+}
+
+.sp-hud {
+  flex: none;
+  width: 100%;
+  height: 44px;
+  padding: 0 18px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-variant-numeric: tabular-nums;
+}
+
+.sp-score {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.sp-score i {
+  width: 9px;
+  height: 9px;
+  border-radius: 2px;
+  flex: none;
+}
+
+.sp-score-name {
+  font-size: 13.5px;
+  font-weight: 500;
+  color: #5e5e59;
+}
+
+.sp-score strong {
+  font-size: 16px;
+  font-weight: 700;
+  color: #111;
+  letter-spacing: -0.02em;
+}
+
+.sp-turn {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: #7c7c76;
+  letter-spacing: 0.01em;
+}
+
+.sp-board-wrap {
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 12px 26px;
+}
+
+.sp-board-wrap .replay-board,
+.sp-board-wrap .gr-board {
+  margin: 0 !important;
+  width: 100%;
+  height: 100%;
+  max-height: none;
+  object-fit: contain;
+}
+
+.sp-gen-board-wrap {
+  padding: 2px 38px 34px;
+}
+
+.sp-poke-board-wrap {
+  padding: 0 12px 12px;
+}
+
+.sp-poke-psr {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.sp-poke-stage {
+  border-radius: 8px;
+  box-shadow: 0 2px 14px rgba(0, 0, 0, 0.08);
+  cursor: default;
+}
+
+.sp-act-pill {
+  position: absolute;
+  left: 50%;
+  bottom: 11px;
+  transform: translateX(-50%);
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 4px 12px;
+  border-radius: 999px;
+  border: 1px solid #e4e4de;
+  background: rgba(255, 255, 255, 0.94);
+  font-size: 12.5px;
+  font-weight: 600;
+  color: #111;
+  white-space: nowrap;
+}
+
+.sp-act-pill i {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+}
+
+/* Left column: simplified Trained Policy neural I/O */
+.sp-panel-layer {
+  position: absolute;
+  left: 16px;
+  top: 16px;
+  width: 288px;
+  height: 508px;
+  will-change: transform, opacity;
+}
+
+.sp-panel {
+  width: 100%;
+  height: 100%;
+  padding: 14px 15px 15px;
+  border: 1px solid #e5e5df;
+  border-radius: 12px;
+  background: #fafaf8;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  font-variant-numeric: tabular-nums;
+}
+
+.sp-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-bottom: 10px;
+  border-bottom: 1px solid #eaeae4;
+}
+
+.sp-name {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.sp-name i {
+  width: 9px;
+  height: 9px;
+  border-radius: 2px;
+}
+
+.sp-name strong {
+  font-size: 15.5px;
+  font-weight: 650;
+  letter-spacing: -0.015em;
+  color: #111;
+}
+
+.sp-tag {
+  font-size: 11px;
+  font-weight: 600;
+  color: #6b6b66;
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: #eeeee9;
+}
+
+.sp-sec {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.sp-sec-out {
+  flex: 1;
+  min-height: 0;
+  padding-top: 12px;
+  border-top: 1px dashed #e2e2dc;
+}
+
+.sp-panel.is-waiting .sp-sec-out {
+  opacity: 0.62;
+}
+
+.sp-sec-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #4a4a46;
+}
+
+.sp-wait-pill {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: none;
+  color: #eb6834;
+}
+
+/* Spatial observation planes (4x2, clean and readable) */
+.sp-planes {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 7px;
+}
+
+.sp-plane {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+}
+
+.sp-plane svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  border: 1px solid #e3e3dd;
+  border-radius: 3px;
+}
+
+.sp-plane span {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 9.5px;
+  color: #6b6b66;
+  line-height: 1.1;
+}
+
+/* Polytopia: Core 8 action family pills */
+.sp-actions {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 5px;
+}
+
+.sp-act {
+  text-align: center;
+  padding: 4px 2px;
+  border-radius: 4px;
+  border: 1px solid #e5e5df;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 10.5px;
+  line-height: 1.25;
+}
+
+.sp-act.is-legal {
+  border-color: #c2c2ba;
+  background: #fff;
+  color: #111;
+  font-weight: 500;
+}
+
+.sp-act.is-masked {
+  background: #f2f2ee;
+  color: #bdbdb6;
+}
+
+.sp-act.is-chosen {
+  border-color: #2f95e0;
+  background: #2f95e0;
+  color: #fff;
+  font-weight: 700;
+}
+
+/* Polytopia: Source & Target / Param outputs */
+.sp-grids {
+  margin-top: auto;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  align-items: start;
+}
+
+.sp-grid-box {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.sp-grid-lbl {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #6b6b66;
+}
+
+.sp-grid-box svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  border: 1px solid #e3e3dd;
+  border-radius: 4px;
+}
+
+.sp-param-card {
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  border: 1px solid #e3e3dd;
+  border-radius: 4px;
+  background: #f3f3ee;
+  display: grid;
+  place-items: center;
+  padding: 8px;
+}
+
+.sp-param-pill {
+  display: inline-block;
+  padding: 6px 10px;
+  border-radius: 6px;
+  border: 1px solid #d5d5ce;
+  background: #fff;
+  color: #6b6b66;
+  font-size: 12px;
+  font-weight: 600;
+  text-align: center;
+  line-height: 1.25;
+}
+
+.sp-param-pill.is-chosen {
+  border-color: #2f95e0;
+  background: #2f95e0;
+  color: #fff;
+}
+
+/* Generals: large clean move vector map */
+.sp-gen-choice {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.sp-gen-map-wrap {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.sp-gen-map {
+  display: block;
+  width: 100%;
+  max-height: 224px;
+  height: auto;
+  border: 1px solid #e3e3dd;
+  border-radius: 6px;
+}
+
+/* Pokémon: clean team state & move buttons */
+.sp-poke-teams {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.sp-poke-sep {
+  height: 1px;
+  background: #e8e8e2;
+  margin: 4px 0;
+}
+
+.sp-mon {
+  display: grid;
+  grid-template-columns: 78px 1fr 34px;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 6px;
+  border-radius: 5px;
+  font-size: 12px;
+}
+
+.sp-mon.is-act {
+  background: #efefe9;
+}
+
+.sp-mon.is-unk {
+  opacity: 0.52;
+}
+
+.sp-mon-name {
+  font-weight: 600;
+  color: #111;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sp-mon.is-unk .sp-mon-name {
+  font-weight: 400;
+  font-style: italic;
+  color: #6b6b66;
+}
+
+.sp-mon-bar {
+  display: block;
+  height: 6px;
+  border-radius: 999px;
+  background: #e4e4de;
+  overflow: hidden;
+}
+
+.sp-mon-bar i {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+}
+
+.sp-mon-tag {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 10px;
+  font-weight: 600;
+  text-align: right;
+  color: #6b6b66;
+}
+
+.sp-tera-chip {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: none;
+  padding: 1.5px 7px;
+  border-radius: 999px;
+  background: #fde6f1;
+  color: #b8156e;
+}
+
+.sp-poke-moves {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 7px;
+  margin-top: 2px;
+}
+
+.sp-move-btn {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px;
+  padding: 9px 10px;
+  border-radius: 6px;
+  border: 1px solid #d5d5ce;
+  background: #fff;
+  color: #111;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+.sp-move-btn.is-chosen {
+  border-color: #0081ad;
+  background: #0081ad;
+  color: #fff;
+}
+
+.sp-move-tera {
+  font-style: normal;
+  font-size: 9.5px;
+  font-weight: 800;
+  padding: 1px 4px;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.25);
+}
+
+.sp-poke-switches {
+  margin-top: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.sp-switch-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 7px;
+}
+
+.sp-sw-pill {
+  text-align: center;
+  padding: 6px 8px;
+  border-radius: 5px;
+  border: 1px solid #e2e2dc;
+  background: #f4f4f0;
+  color: #7c7c76;
+  font-size: 11px;
+  font-weight: 500;
+}
+
+.sp-sw-pill.is-chosen {
+  border-color: #0081ad;
+  background: #0081ad;
+  color: #fff;
+  font-weight: 600;
+}

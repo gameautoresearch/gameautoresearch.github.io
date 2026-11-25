@@ -9,14 +9,29 @@ import {
 // thekevinz.com's Polytopia post. The data (tools/convert_polytopia_replays.py) is the god-view state before the
 // first action plus, for every action, what it changed.
 
-type Tile = [terrain: number, owner: number, structure: number, resource: number, road: number, capital: number];
-type Unit = [owner: number, kind: number, hp: number, veteran: number];
-type City = [owner: number, level: number];
-type Action = [
+export type PolyTile = [terrain: number, owner: number, structure: number, resource: number, road: number, capital: number];
+export type PolyUnit = [owner: number, kind: number, hp: number, veteran: number];
+export type PolyCity = [owner: number, level: number];
+export type PolyAction = [
   player: number, turn: number, kind: number, source: number, target: number, label: number,
-  units: ([number] | [number, ...Unit])[], tiles: [number, ...Tile][], cities: [number, ...City][],
+  units: ([number] | [number, ...PolyUnit])[], tiles: [number, ...PolyTile][], cities: [number, ...PolyCity][],
   score: [number, number], value: number | null,
 ];
+type Tile = PolyTile;
+type Unit = PolyUnit;
+type City = PolyCity;
+type Action = PolyAction;
+export type ReplayCustomContext = {
+  board: ReactNode;
+  size: number;
+  tiles: PolyTile[];
+  units: Map<number, PolyUnit>;
+  cities: Map<number, PolyCity>;
+  action: PolyAction | null;
+  turn: number;
+  score: [number, number];
+  labels: string[];
+};
 export type Moment = { turn: number; player: number; text: string };
 type Replay = {
   size: number;
@@ -113,7 +128,11 @@ type ViewerProps = {
   start?: number;
   initialSpeed?: number;
   compact?: boolean;
+  controlledPos?: number;
+  hidePlayButton?: boolean;
+  onReady?: (actionCount: number) => void;
   renderSide?: (side: 0 | 1, io?: ReactNode) => ReactNode;
+  renderCustom?: (ctx: ReplayCustomContext) => ReactNode;
 };
 export default function ReplayViewer({ src, ...rest }: ViewerProps) {
   return (
@@ -123,13 +142,14 @@ export default function ReplayViewer({ src, ...rest }: ViewerProps) {
   );
 }
 
-function ReplayBoard({ url, names, still, start, initialSpeed, compact, renderSide }: Omit<ViewerProps, "src"> & { url: string }) {
+function ReplayBoard({ url, names, still, start, initialSpeed, compact, controlledPos, hidePlayButton, onReady, renderSide, renderCustom }: Omit<ViewerProps, "src"> & { url: string }) {
   const [data, setData] = useState<Replay | null>(null);
-  const [pos, setPos] = useState(still ?? 0); // action index; the fraction is how far that action's animation has run
+  const [pos, setPos] = useState(controlledPos ?? still ?? 0); // action index; the fraction is how far that action's animation has run
   // Plays on its own and loops, unless the reader prefers reduced motion. Play/Pause, the slider, the speed
   // and the moment buttons still take over.
   const [playing, setPlaying] = useState(
     () =>
+      controlledPos === undefined &&
       still === undefined &&
       (typeof window === "undefined" || !window.matchMedia?.("(prefers-reduced-motion: reduce)").matches),
   );
@@ -143,8 +163,10 @@ function ReplayBoard({ url, names, still, start, initialSpeed, compact, renderSi
     let live = true;
     fetch(url).then((r) => r.json()).then((d) => {
       if (!live) return;
-      setData(d as Replay);
-      if (start !== undefined && still === undefined) setPos(Math.floor(start * (d as Replay).actions.length));
+      const replay = d as Replay;
+      setData(replay);
+      if (start !== undefined && still === undefined && controlledPos === undefined) setPos(Math.floor(start * replay.actions.length));
+      onReady?.(replay.actions.length);
     });
     return () => { live = false; };
   }, [url]);
@@ -251,8 +273,9 @@ function ReplayBoard({ url, names, still, start, initialSpeed, compact, renderSi
 
   const { n, W, H, at, order, diamond, ground, states, turnStart, strip } = geom;
   const last = data.actions.length;
-  const k = Math.max(0, Math.min(last, Math.floor(pos) || 0));
-  const p = k >= last ? 0 : pos - k;
+  const activePos = controlledPos ?? pos;
+  const k = Math.max(0, Math.min(last, Math.floor(activePos) || 0));
+  const p = k >= last ? 0 : activePos - k;
   const action = k < last ? data.actions[k] : null;
   const before = states[k], after = states[Math.min(last, k + 1)];
   const shownIndex = p < 0.5 ? k : Math.min(last, k + 1);
@@ -426,7 +449,7 @@ function ReplayBoard({ url, names, still, start, initialSpeed, compact, renderSi
   })();
 
   let actionOverlay: ReactNode = null;
-  if (action && renderSide) {
+  if (action && (renderSide || renderCustom)) {
     const actColor = PLAYER[action[0]];
     if ((kind === 1 || kind === 2) && src >= 0 && dst >= 0 && src !== dst) {
       const s0 = at(src), d0 = at(dst);
@@ -488,6 +511,24 @@ function ReplayBoard({ url, names, still, start, initialSpeed, compact, renderSi
     />
   );
 
+  if (renderCustom) {
+    return (
+      <div className="replay-custom" ref={root}>
+        {renderCustom({
+          board: boardSvg,
+          size: n,
+          tiles: before.tiles,
+          units: before.units,
+          cities: before.cities,
+          action,
+          turn: now[1],
+          score,
+          labels: data.labels,
+        })}
+      </div>
+    );
+  }
+
   return (
     <div className={`replay${compact ? " replay-compact" : ""}${renderSide ? " replay-flanked" : ""}`} ref={root}>
       {renderSide ? (
@@ -531,10 +572,12 @@ function ReplayBoard({ url, names, still, start, initialSpeed, compact, renderSi
       </p>}
 
       <div className="replay-controls">
-        <button type="button" onClick={() => { if (pos >= last) setPos(0); setPlaying(!playing); }}>
-          {playing ? "Pause" : "Play"}
-        </button>
-        <input type="range" min={0} max={last} step="any" value={pos} aria-label="Action"
+        {!hidePlayButton && (
+          <button type="button" onClick={() => { if (activePos >= last) setPos(0); setPlaying(!playing); }}>
+            {playing ? "Pause" : "Play"}
+          </button>
+        )}
+        <input type="range" min={0} max={last} step="any" value={activePos} aria-label="Action"
           onPointerDown={() => setPlaying(false)}
           onChange={(e) => { setPlaying(false); setPos(+e.target.value); }} />
         <span className="replay-turn" title={action ? `Turn ${now[1]} · ${data.labels[action[5]]}` : undefined}>
@@ -549,7 +592,7 @@ function ReplayBoard({ url, names, still, start, initialSpeed, compact, renderSi
         <path d={strip.blue} stroke={PLAYER[1]} strokeWidth={2} fill="none" />
         <path d={strip.orange} stroke={PLAYER[2]} strokeWidth={2} fill="none" />
         {hasValue && <path d={strip.win} stroke="#111" strokeWidth={1.25} strokeDasharray="3 3" fill="none" />}
-        <line x1={strip.sx(pos)} x2={strip.sx(pos)} y1={4} y2={strip.SH - 4} stroke="#111" strokeWidth={1} />
+        <line x1={strip.sx(activePos)} x2={strip.sx(activePos)} y1={4} y2={strip.SH - 4} stroke="#111" strokeWidth={1} />
       </svg>
       <div className="viz-legend replay-legend">
         <span><i style={{ background: PLAYER[1] }} />Blue score</span>
