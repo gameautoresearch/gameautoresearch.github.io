@@ -126,18 +126,18 @@ const CARDS = {
 
 const ITEMS: Item[] = [
   {
-    game: "pokemon",
-    id: "sol61-a1-vs-astra6-a1",
-    players: ["GPT-6.1 Sol", "GPT-6 Astra"],
-    cards: [CARDS.pokeSolA1, CARDS.pokeAstraA1],
-    start: 2,
-  },
-  {
     game: "polytopia",
     id: "polytopia-v3a-opus-vs-luna",
     players: ["Claude Opus 5.5", "GPT-6 Luna"],
     cards: [CARDS.polyOpus, CARDS.polyLuna],
     start: 0.55,
+  },
+  {
+    game: "pokemon",
+    id: "sol61-a1-vs-astra6-a1",
+    players: ["GPT-6.1 Sol", "GPT-6 Astra"],
+    cards: [CARDS.pokeSolA1, CARDS.pokeAstraA1],
+    start: 2,
   },
   {
     game: "generals",
@@ -147,18 +147,18 @@ const ITEMS: Item[] = [
     start: 0.76358,
   },
   {
-    game: "pokemon",
-    id: "inkling2s-b2-vs-deepseek-v4pro-a2",
-    players: ["Inkling 2 Small", "DeepSeek V4 Pro"],
-    cards: [CARDS.pokeInklingB2, CARDS.pokeDeepSeekA2],
-    start: 6,
-  },
-  {
     game: "polytopia",
     id: "polytopia-v3a-astra-vs-starter",
     players: ["GPT-6 Astra", "Starter"],
     cards: [CARDS.polyAstra, CARDS.polyStarter],
     start: 0.5,
+  },
+  {
+    game: "pokemon",
+    id: "inkling2s-b2-vs-deepseek-v4pro-a2",
+    players: ["Inkling 2 Small", "DeepSeek V4 Pro"],
+    cards: [CARDS.pokeInklingB2, CARDS.pokeDeepSeekA2],
+    start: 6,
   },
   {
     game: "generals",
@@ -168,18 +168,18 @@ const ITEMS: Item[] = [
     start: 0.81033,
   },
   {
-    game: "pokemon",
-    id: "sol61-a2-vs-glm53-a3",
-    players: ["GPT-6.1 Sol", "GLM-5.3"],
-    cards: [CARDS.pokeSolA2, CARDS.pokeGlmA3],
-    start: 1,
-  },
-  {
     game: "polytopia",
     id: "polytopia-v3a-opus-vs-sol",
     players: ["Claude Opus 5.5", "GPT-6.1 Sol"],
     cards: [CARDS.polyOpus, CARDS.polySol],
     start: 0.5,
+  },
+  {
+    game: "pokemon",
+    id: "sol61-a2-vs-glm53-a3",
+    players: ["GPT-6.1 Sol", "GLM-5.3"],
+    cards: [CARDS.pokeSolA2, CARDS.pokeGlmA3],
+    start: 1,
   },
   {
     game: "generals",
@@ -190,8 +190,8 @@ const ITEMS: Item[] = [
   },
 ];
 const GAMES: { id: Game; label: string }[] = [
-  { id: "pokemon", label: "Pokémon" },
   { id: "polytopia", label: "Polytopia" },
+  { id: "pokemon", label: "Pokémon" },
   { id: "generals", label: "Generals" },
 ];
 
