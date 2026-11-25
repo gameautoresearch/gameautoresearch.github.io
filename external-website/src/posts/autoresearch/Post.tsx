@@ -307,20 +307,20 @@ export default function AutoresearchPost() {
         For turn-based, fixed-action-space games with fast simulators like
         Polytopia and Generals, our results show you can already
         &ldquo;vibe-train&rdquo; a strong, human-competitive RL policy for
-        roughly <strong>$50&ndash;$100</strong> in combined research and
-        training compute. At game studios like Curio, where rules can shift
-        daily in production and keep evolving after a live-service launch,
-        cheaply retraining bots as the game changes helps check balance and give
-        players reliable teammates&mdash;something newly practical even for
-        small indie teams.
+        roughly 5-50 gpu-hours ($10-$100) in combined research and training
+        compute. At game studios like Curio, where rules can shift daily in
+        production and keep evolving after a live-service launch, cheaply
+        retraining bots as the game changes helps check balance and give players
+        reliable teammates&mdash;something newly practical even for small indie
+        teams.
       </p>
       <p>
         That price point also marks the boundary of where today&rsquo;s
         vibe-training works out of the box. Real-time games like StarCraft:
         Brood War, Dota, or CS:GO sit on the far side of that spectrum:
-        continuous or sprawling action spaces, real-time control, and heavier,
-        slower simulators mean each sample costs far more to generate and
-        policies need orders of magnitude more of them, pushing total costs{" "}
+        continuous high dimensional action spaces, real-time control, and
+        heavier, slower simulators mean each sample costs far more to generate
+        and policies need orders of magnitude more of them, pushing total costs{" "}
         <strong>100&ndash;1,000× higher</strong>. Mapping out that
         cost-versus-game-complexity curve&mdash;and measuring how far
         agent-driven algorithmic and simulator improvements can bend it
@@ -331,7 +331,8 @@ export default function AutoresearchPost() {
         allocate scarce compute and learn from noisy experiments. As models
         advance from failing to beat random play to discovering multi-fold
         compute multipliers in a single session, their ability to train small,
-        useful models shows support for recursive self-improvement capability.
+        useful models shows capabilities that support recursive self-improvement
+        ability.
       </p>
       <aside className="ar-sponsor">
         <a href="https://modal.com" target="_blank" rel="noreferrer">

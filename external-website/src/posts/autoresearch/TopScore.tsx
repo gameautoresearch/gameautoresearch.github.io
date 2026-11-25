@@ -352,7 +352,6 @@ export default function TopScore() {
         head={[
           "#",
           "Model",
-          "Overall score (50 = avg of the ten reference models, +10 = +1 SD)",
           "±1 standard error across tasks",
           ...CELL_ORDER.map(
             (j) => `${SHORT_TASK[SCORE_TASKS[j]]} (standardized; raw)`,
@@ -393,7 +392,7 @@ export default function TopScore() {
     l: narrow ? 8 : 26 + nameW,
     r: narrow ? scoreW : scoreW + (cellsW ? cellsW + cellsGap : 0),
     t: 40,
-    b: 40,
+    b: 20,
   };
   const H = m.t + m.b + rows.length * rowH;
   const plotR = W - m.r;
@@ -479,16 +478,6 @@ export default function TopScore() {
             </text>
           </g>
         ))}
-        <text
-          x={(sx(LO) + sx(HI)) / 2}
-          y={H - 6}
-          className="viz-axis"
-          textAnchor="middle"
-        >
-          {narrow
-            ? "score (50 = average, +10 = +1 SD)"
-            : "overall score (50 = average of the ten reference models, +10 = +1 SD)"}
-        </text>
         {rows.map((r, i) => {
           const top = m.t + i * rowH;
           const y = top + (narrow ? rowH * 0.7 : rowH / 2);
