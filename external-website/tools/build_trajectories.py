@@ -26,6 +26,38 @@ HOME = Path.home()
 BENCH = HOME / "repos/game-autoresearch-bench"
 DATA = HOME / "repos/game-autoresearch-data"
 POKE = HOME / "repos/gab-poke-sub"
+HEX13 = BENCH / "runs/nanny/hex13-recipe-20261123/collected/campaign"
+HEX13_CARBON = BENCH / "runs/nanny/hex13-recipe-carbon-20261124b/collected/campaign"
+HEX9 = BENCH / "runs/nanny/suite-20261113/collected/campaign"
+
+
+def hex13(id_: str, model: str, elo: int, wins: int, summary: str, session: str, root: Path = HEX13) -> dict:
+    # Elo and wins from the 10-way round robin runs/tournaments/hex13-recipe-20261125b (1,152 games each).
+    return {
+        "id": id_,
+        "taskGroup": "hex13",
+        "taskLabel": "Hex 13×13 · Recipe (3 h)",
+        "model": model,
+        "outcome": f"{elo:+d} Elo · {wins / 1152:.0%} round-robin wins",
+        "summary": summary,
+        "sessionDir": root / session,
+        "budget": "1.5 GPU-h · 3 h limit",
+    }
+
+
+def hex9(id_: str, model: str, elo: int, summary: str, session: str) -> dict:
+    # Tournament Elo vs MoHex = 0 (reports/suite-2026-11-13.md, data.ts crossGame).
+    return {
+        "id": id_,
+        "taskGroup": "hex9",
+        "taskLabel": "Hex 9×9 (5 h)",
+        "model": model,
+        "outcome": f"{elo:+d} Elo (MoHex = 0)",
+        "summary": summary,
+        "sessionDir": HEX9 / session,
+        "budget": "$10 · 5 h limit",
+    }
+
 
 # Curated trajectories across the main benchmark tasks featured in the post.
 SPECS = [
@@ -193,6 +225,35 @@ SPECS = [
         "sessionDir": BENCH / "runs/nanny/suite-20261113/collected/campaign/generals-flash-1",
         "budget": "5 GPU-h",
     },
+    # --- Hex 13×13 · Recipe (Nov 23–24; carbon from the Nov 24 rerun) ---
+    hex13("hex13-neon", "Gemini 4 Neon", 589, 1046,
+          "Tournament winner: 8×128/64 ResNet with global pooling trained by KataGo-style PUCT AlphaZero.", "hex-neon-agy-1"),
+    hex13("hex13-fable", "Claude Fable 5.2", 389, 877,
+          "8×64 ResNet with test-time augmentation and Gumbel top-k 1-ply lookahead self-play.", "hex-fable-1"),
+    hex13("hex13-astra62", "GPT-6.2 Astra", 378, 866,
+          "Small 4×32 ResNet on bitboard features with a learned minimax lookahead.", "hex-astra62-1"),
+    hex13("hex13-carbon", "Gemini 4 Carbon", 330, 819,
+          "8×64 SE-ResNet with bridge planes and Gumbel 2-ply AlphaZero (rerun session, two segments).",
+          "hex-carbon-agy-1", HEX13_CARBON),
+    hex13("hex13-flash", "DeepSeek V4.1 Flash", 239, 728,
+          "128-channel 5-block residual CNN with PPO clipped updates and a value baseline.", "hex-flash-1"),
+    hex13("hex13-opus", "Claude Opus 5.5", 48, 548,
+          "Conv ResNet with PPO self-play, then distance features and heuristic-teacher distillation.", "hex-opus-1"),
+    hex13("hex13-sol62", "GPT-6.2 Sol", -139, 394,
+          "Bridge-discounted shortest-route imitation with value reranking and exact immediate win/block checks.", "hex-sol62-1"),
+    hex13("hex13-sol", "GPT-6.1 Sol", -337, 253,
+          "Electrical-circuit teacher with virtual bridges distilled into a 40×4 residual network.", "hex-sol-1"),
+    hex13("hex13-astra", "GPT-6 Astra", -379, 227,
+          "Resistor-network teacher with bridge repair distilled into a 48×4 residual CNN.", "hex-astra-1"),
+    hex13("hex13-kimi", "Kimi K3.1 Pro", -1118, 2,
+          "Residual CNN moving from multi-epoch REINFORCE to PPO after early entropy collapse.", "hex-kimi-1"),
+    # --- Hex 9×9 (Nov 13 cross-game suite) ---
+    hex9("hex9-sol", "GPT-6.1 Sol", 64, "Top Hex 9×9 policy in the cross-game suite, one of two to finish above MoHex.", "hex-sol-1"),
+    hex9("hex9-opus", "Claude Opus 5.5", 33, "Second-place Hex 9×9 policy, the other one to finish above MoHex.", "hex-opus-1"),
+    hex9("hex9-astra", "GPT-6 Astra", -241, "5-hour Hex 9×9 research session under a $10 compute budget.", "hex-astra-1"),
+    hex9("hex9-flash", "DeepSeek V4.1 Flash", -507, "5-hour Hex 9×9 session with full chain-of-thought on each step.", "hex-flash-1"),
+    hex9("hex9-luna", "GPT-6 Luna", -522, "5-hour Hex 9×9 research session under a $10 compute budget.", "hex-luna-1"),
+    hex9("hex9-terra", "GPT-6.1 Terra", -723, "5-hour Hex 9×9 research session under a $10 compute budget.", "hex-terra-1"),
 ]
 
 ANSI_RE = re.compile(r"\x1b\[[0-?]*[ -/]*[@-~]|\x1b\][^\x07]*\x07|\x1b[@-Z\\-_]")
@@ -211,14 +272,38 @@ def parse_iso(ts: str | None) -> float | None:
         return None
 
 
-def find_trajectory(session_dir: Path) -> Path:
+def find_trajectories(session_dir: Path) -> list[Path]:
+    """Top-level trajectory if present; otherwise every step segment (research, continue1, ...) in time order."""
     harbor = session_dir / "harbor"
     cands = [p for p in harbor.rglob("agent/trajectory.json") if "/steps/" not in str(p)]
-    if not cands:
-        cands = list(harbor.rglob("agent/trajectory.json"))
+    if cands:
+        return cands[:1]
+    cands = list(harbor.rglob("agent/trajectory.json"))
     if not cands:
         raise FileNotFoundError(f"No trajectory.json under {harbor}")
-    return cands[0]
+
+    def first_ts(p: Path) -> float:
+        steps = json.loads(p.read_text()).get("steps") or [{}]
+        return parse_iso(steps[0].get("timestamp")) or 0.0
+
+    return sorted(cands, key=first_ts)
+
+
+def load_trajectory(session_dir: Path) -> dict:
+    """Merge segments into one ATIF-like dict: steps renumbered in order, final token totals summed."""
+    paths = find_trajectories(session_dir)
+    raws = [json.loads(p.read_text()) for p in paths]
+    if len(raws) == 1:
+        return raws[0]
+    steps: list[dict] = []
+    totals: dict = {}
+    for raw in raws:
+        for st in raw.get("steps", []):
+            steps.append({**st, "step_id": len(steps) + 1})
+        for k, v in (raw.get("final_metrics") or {}).items():
+            if isinstance(v, (int, float)):
+                totals[k] = totals.get(k, 0) + v
+    return {"steps": steps, "final_metrics": totals}
 
 
 def clean_terminal(raw: str) -> str:
@@ -387,8 +472,7 @@ def check_no_secrets(payload_str: str, traj_id: str) -> None:
 
 def build_one(spec: dict) -> tuple[dict, dict]:
     sdir: Path = spec["sessionDir"]
-    traj_path = find_trajectory(sdir)
-    raw = json.loads(traj_path.read_text())
+    raw = load_trajectory(sdir)
 
     raw_steps = raw.get("steps", [])
     start_ts = parse_iso(raw_steps[0].get("timestamp")) if raw_steps else None

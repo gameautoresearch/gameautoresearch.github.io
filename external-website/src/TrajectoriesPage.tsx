@@ -8,7 +8,7 @@ type StepTag = "think" | "train" | "eval" | "edit" | "submit" | "notes" | "wait"
 
 type TrajectoryMeta = {
   id: string;
-  taskGroup: "poly-empty" | "poly-budget" | "pokemon" | "generals";
+  taskGroup: "poly-empty" | "poly-budget" | "pokemon" | "generals" | "hex13" | "hex9";
   taskLabel: string;
   model: string;
   outcome: string;
@@ -56,6 +56,8 @@ const TASK_ORDER: { id: TrajectoryMeta["taskGroup"]; label: string }[] = [
   { id: "poly-budget", label: "Polytopia · $8.70 Recipe" },
   { id: "pokemon", label: "Pokémon 3v3" },
   { id: "generals", label: "Generals" },
+  { id: "hex13", label: "Hex 13×13 · Recipe (3 h)" },
+  { id: "hex9", label: "Hex 9×9 (5 h)" },
 ];
 
 const BADGE_LABEL: Partial<Record<StepTag, string>> = {
